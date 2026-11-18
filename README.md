@@ -74,6 +74,7 @@ The port follows the decomp in steps. A bump moves the submodule and `port/DECOM
 together and re-applies the port's patches to the decomp (`port/decomp_patches/`). The
 battery fails when the two disagree, so after a `git pull` run
 `git submodule update --init` before you build.
+The full procedure is in [port/docs/DECOMP_BUMP.md](port/docs/DECOMP_BUMP.md).
 
 ## License
 
