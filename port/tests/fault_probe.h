@@ -793,7 +793,7 @@ static void port_rich_dump(EXCEPTION_POINTERS *ep, unsigned code,
             }
         }
     }
-    PORT_RD_STR("\r\nresolve: tools/resolve_crash.py <thisfile>"
+    PORT_RD_STR("\r\nresolve: port/tools/resolve_crash.py <thisfile>"
                 "  (offsets -> build/port/walk_window.map)\r\n");
     /* WHICH THREAD, WHICH MODULES (lane CRASHDRV093). Every address the dump
        printed so far was relative to the exe; a fault in a DLL named nothing.
