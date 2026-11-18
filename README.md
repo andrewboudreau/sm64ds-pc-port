@@ -6,6 +6,10 @@ code, compiled for the PC, with a small platform layer in place of the DS hardwa
 
 This repo is the plain port: the base game, played the way the cartridge plays it.
 
+**Just want to play?** The official download is at
+**[tangos.dev/downloads](https://tangos.dev/downloads)**. That is the only official place to get
+the port; builds from anywhere else are not ours. You still need your own copy of the game.
+
 ## What is in here
 
 - `port/`: the port itself (the platform layer, the build, the tools and tests).
@@ -75,6 +79,11 @@ together and re-applies the port's patches to the decomp (`port/decomp_patches/`
 battery fails when the two disagree, so after a `git pull` run
 `git submodule update --init` before you build.
 The full procedure is in [port/docs/DECOMP_BUMP.md](port/docs/DECOMP_BUMP.md).
+
+## Credits
+
+[CREDITS.md](CREDITS.md) lists everyone who worked on the port and on the decomp it is built
+from, the testers, and the third-party code.
 
 ## License
 
