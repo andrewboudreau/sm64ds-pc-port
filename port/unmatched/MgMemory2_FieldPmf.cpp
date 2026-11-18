@@ -1,0 +1,625 @@
+// PORT_HOST_ABI. The mwcc POINTER-TO-MEMBER WALL in its WORSE form: three
+// dispatchers that read the member pointer out of an OBJECT FIELD rather than
+// out of a table.  Run mg6, lane MEM (dScMgMemory2_c, actor id 0x16b,
+// scene 363).
+//
+// Read unmatched/MgBase_StateDispatch.cpp's header first for the ROM's dispatch
+// sequence and the framework's entry points; read
+// unmatched/MgMemory2_StateDispatch.cpp for this class's TABLE half.  This file
+// is only the field half.
+//
+// ---- 1. WHY A FIELD IS WORSE THAN A TABLE ---------------------------------
+//
+// port/mg_fanout_costs.txt section 4 states it and this lane's three cases are
+// three more instances: a table dispatched at the wrong stride is a wrong
+// stride inside a correctly laid-out object, while a member pointer stored IN
+// the object is four bytes on MSVC where the ROM has eight, so every field
+// after it moves and the body reads the wrong field BEFORE any dispatch
+// happens.  One of the three below has exactly that defect and it is spelled
+// out in section 3.
+//
+// A LINK NEVER NAMES ANY OF THE THREE.  There is no global to be unresolved --
+// the pointer is a field -- so an LNK1120 is silent on all of them however the
+// tables are declared.  Only the `::*` sweep finds them, which is why
+// port/mg_fanout_costs.txt makes the sweep a rule rather than a courtesy.  This
+// lane swept its whole 869-file closure (lane MEM, run mg6)
+// and found fourteen `::*` TUs: the six ov006 ones the handover named, seven
+// ov004 ones MG1/MG2/BASESET already host-copied, and ONE THAT NO LANE HAD
+// SEEN -- src/Coin_Update.cpp, section 4 below.
+//
+// ---- 2. _ZN6Dealer6UpdateEv, THE MODEL SUB-OBJECT'S TICK -------------------
+//
+// dScMgMemory2_c::Behavior calls it on `this + 0x4f38` every frame (the last
+// statement of _ZN14dScMgMemory2_c8BehaviorEv, disassembled in the state-dispatch file).
+// It is SHARED ov006 glue, not this class's: eight src TUs name it, among them
+// bodies belonging to four other minigames.  This is the first lane to reach
+// it, so this file is where it lands.
+//
+// The ROM at 0x020c19d0, out of extracted/overlays/overlay_0006.bin at base
+// 0x020bfec0:
+//
+//     stmdb sp!,{r4,lr}
+//     mov   r4,r0
+//     ldr   r2,[r4]           the CODE word
+//     cmp   r2,#0
+//     beq   +6                the ROM'S OWN null-pmf guard
+//     ldr   r1,[r4,#4]        the adjustment
+//     add   r0,r4,r1,asr #1
+//     ands  r1,r1,#1
+//     ldrne r1,[r0] / ldrne r1,[r1,r2]
+//     ldreq r1,[r4]
+//     blx   r1
+//
+// which is src/Dealer_Update.cpp's `if (*(int*)c != 0) (o->*(o->pmf))();`
+// instruction for instruction.  The pair is at offset 0 of the sub-object, so
+// nothing after it moves and this one is a wrong-decode only.
+//
+// ---- 3. _ZN12MascotWalker6UpdateEv, AND IT IS THE LAYOUT CASE ---------------------
+//
+// Reached from 020c19d0's last statement, on `c + 0xdc`.  Its src struct is
+//
+//     char pad0[0xb4];  PMF pmf;  char pad1[0xc8 - 0xb4 - 8];  Vector3 v0c8;
+//
+// -- the pad after the member pointer is written 0xc8 - 0xb4 - 8, which is only
+// correct at EIGHT BYTES.  Compiled as spelled, MSVC's four-byte member pointer
+// puts v0c8 at 0xc4 and every field after it four bytes early, so the body
+// would read the wrong words before the dispatch is even reached.  Spelling the
+// pair as MgPmf (two ints, eight bytes on both machines) restores every offset
+// the src file itself asserts, and nothing else in the struct moves.
+//
+// ITS IDLE TEST READS THE STORED PAIR BY VALUE, which is the reason this seat
+// routes at the DISPATCH SITE and does not rewrite the mounted pair.  The body
+// ends with
+//
+//     int* p = (int*)((int)c + 0xb4);  int* g = pmf_MascotWalker_StateWalk_2;
+//     if (p[0] == g[0]) { if (p[1] == g[1]) return; ... }
+//
+// and pmf_MascotWalker_StateWalk_2 is a real mwcc pair, {0x020c0364, 0}.  A seat of the
+// ov085/ov100 kind -- write HOST addresses over the .data source pairs before
+// the constructor copies them -- would leave that comparison permanently false
+// while the dispatch itself looked fine.  port/mg_fanout_costs.txt section 4
+// derives the same rule from src/FlowerFace_IsIdle.c on the flower's
+// sub-object.  The stored pair keeps the ROM's own words here.
+//
+// ---- 4. _Z11Coin_UpdateP6Sprite IS A FIND, NOT AN INHERITANCE ------------------
+//
+// The handover for this class named six ov006 TUs to host-copy and said the
+// framework's own (_ZN10dMgState_c8SetStateEi) was already trapped.  The sweep found a
+// SEVENTH ov004 dispatcher that no lane has ever handled, and it is on this
+// class's live path:
+//
+//     _ZN14dScMgMemory2_c8BehaviorEv  (vtable slot 6, every frame)
+//       -> _Z14MgCoins_Updatev
+//            -> for i in 0..0x13: _Z11Coin_UpdateP6Sprite(&sMgCoins[i*0x24])
+//
+// src/Coin_Update.cpp is six lines, `struct C { PMF pmf; };
+// (c->*(c->pmf))();`, and it is NOT in unmatched/MgBase_StateSetter.cpp's
+// eighty-address universe: that file bounds ov004's TABLE member pointers, and
+// this one is a field of a .bss record array.  Neither _Z14MgCoins_Updatev nor
+// _Z11Coin_UpdateP6Sprite appears in the baseline walk_window.map, so nothing in
+// the port reached it before this lane and no neighbour changes because of it.
+//
+// THE ROM HAS NO NULL GUARD HERE, and that is worth stating because this file
+// adds one.  0x020b52fc is fourteen instructions with no `cmp r2,#0` anywhere:
+// it decodes and `blx r1` unconditionally, so on the DS a record whose pair is
+// still {0,0} would branch to zero.  The port routes through port_mg_call0,
+// whose first statement is the framework's `if (code == 0) return;`.  That is a
+// divergence in the safe direction and it is visible rather than hidden: the
+// dispatch call count in hal/scene_mg_memory2.cpp's census counts every one of
+// the twenty per frame, so a run in which the records are never populated reads
+// as a large call count and a small routed count.
+//
+// THE TWENTY RECORDS' PMF UNIVERSE IS BOUNDED FROM THE SOURCE, the way lane
+// BASESET bounded ov004's.  sMgCoins is twenty records of 0x24
+// bytes, constructed by __sinit_unit020b4aa4.cpp through __cxa_vec_ctor with
+// _ZN6SpriteC1Ev as the element constructor -- and that constructor is
+// EMPTY, so the pairs start as the .bss zeros the null guard above is about.
+// The writers are _Z12Coin_SendOffP6Sprite (`*(struct W2*)c = pmf_Coin_MoveThenRise`)
+// and _Z11Coin_LaunchP6SpriteP5Vec2i (pmf_Coin_MoveThenBank and _020bc820), and the pair
+// symbols they draw from are a contiguous run in the ov004 image:
+//
+//     pmf_Coin_MoveThenRise  {0x020b4ff0, 0}      pmf_Coin_MoveThenBank  {0x020b51f0, 0}
+//     pmf_Coin_RiseSpent  {0x020b4d50, 0}      pmf_Coin_FlyToCounter  {0x020b4aa4, 0}
+//     pmf_Coin_Move  {0x020b5288, 0}      pmf_Coin_MoveThenRiseSpent  {0x020b4dfc, 0}
+//     pmf_Coin_Move_2  {0x020b5288, 0}      pmf_Coin_MoveThenRefund  {0x020b4c30, 0}
+//     pmf_Coin_Rise  {0x020b4f44, 0}      pmf_Coin_Move_3  {0x020b5288, 0}
+//
+// Ten pairs, EIGHT distinct code words, every adjustment zero, read out of
+// extracted/overlays/overlay_0004.bin at base 0x020ad660.  All eight are routed
+// below and all eight have a matched src TU.
+//
+// ---- 5. THE MODEL SUB-OBJECT'S PMF UNIVERSE, BOUNDED THE SAME WAY ---------
+//
+// The pairs 020c19d0 and 020c07e8 dispatch come from one contiguous run of
+// ov006 .data, 0x0213ac48..0x0213acb8, every one {code, 0}:
+//
+//     0213ac48 {020c11c0,0}   0213ac60 {020c14bc,0}   0213ac78 {020c0364,0}
+//     0213ac50 {020c1760,0}   0213ac68 {020c0364,0}   0213ac80 {020c0b74,0}
+//     0213ac58 {020c1760,0}   0213ac70 {020c0264,0}   0213ac88 {020c0364,0}
+//     0213ac90 {020c1760,0}   0213ac98 {020c0ce8,0}   0213aca0 {020c0df0,0}
+//     0213aca8 {020c0f9c,0}   0213acb0 {020c11c0,0}   0213acb8 {020c0f9c,0}
+//
+// Fifteen pairs, NINE distinct code words, all with a matched src TU.  The
+// writers are the ordinary ones -- _ZN12MascotWalker10StartPauseEv and _020c0264 write
+// +0xb4, _ZN6Dealer9StartSwapEv and _020c1164 write offset 0 -- and 0213ac78 is
+// the by-value sentinel section 3 names.  0x0213acc0 is where the run stops
+// being pairs: it reads {4, 0x0213ad58}, which is a length and a pointer, and
+// is the reason this list is taken from the CONSUMERS rather than from an
+// address range.
+//
+// ---- 6. WHAT A RUN IS STILL THE ONLY DETECTOR FOR --------------------------
+//
+// Seventeen addresses are routed below because the source names them.  Nothing
+// here claims that is all of them: a field pmf can be written by any code that
+// can reach the object, and port/mg_fanout_costs.txt section 4's third shape
+// (a TU that open-codes the Itanium sequence in plain ints) is invisible to
+// both the link and the sweep.  Anything this file does not own falls through
+// to the framework, which prints the address on an UNHANDLED line, and
+// hal/scene_mg_memory2.cpp's census reports the count.  A run with zero
+// UNHANDLED is the evidence; this header is not.
+
+#include <cstdio>
+#include <cstdlib>   /* std::abort, for the model seat below (lane MGWRITER) */
+
+/* The eight-byte mwcc member pointer, in the only spelling that is true on both
+   machines.  The same struct MgMemory2_StateDispatch.cpp uses; each TU declares
+   its own because neither is a header. */
+struct MgPmf { unsigned code; int adj; };
+
+/* src/MascotWalker_Update.cpp's own Vector3, kept so the two Vec3_HorzAngle
+   arguments are the shapes that file passes. */
+struct MemVector3 { int x, y, z; };
+
+extern "C" {
+
+/* this class's table-half chain, which ends at the framework's port_mg_call0 */
+void port_mg_memory2_call0(void *self, unsigned code, int adj);
+
+/* ---- the eight ov004 record bodies, section 4 -------------------------- */
+void _Z17Coin_FlyToCounterP6Sprite(char *c);
+void _Z19Coin_MoveThenRefundP6Sprite(char *r4);
+void _Z14Coin_RiseSpentP6Sprite(char *c);
+void _Z22Coin_MoveThenRiseSpentP6Sprite(char *c);
+void _Z9Coin_RiseP6Sprite(char *c);
+void _Z17Coin_MoveThenRiseP6Sprite(char *c);
+void _Z17Coin_MoveThenBankP6Sprite(char *c);
+void _Z9Coin_MoveP6Sprite(char *c);
+
+/* ---- the nine ov006 model bodies, section 5 ---------------------------- */
+void _ZN12MascotWalker10StatePauseEv(char *c);
+void _ZN12MascotWalker9StateWalkEv(char *c);
+void _ZN6Dealer8StateWinEv(char *p);
+void _ZN6Dealer9StateLoseEv(char *c);
+void _ZN6Dealer9StateSwapEv(char *c);
+void _ZN6Dealer11StateRevealEv(void *cc);
+void _ZN6Dealer9StateDealEv(char *c);
+void _ZN6Dealer12StateShuffleEv(char *c);
+void _ZN6Dealer9StateIdleEv(void);      /* 4 bytes in the ROM, `bx lr` */
+
+/* the ordinary callees the two ov006 host copies keep, spelled as their own
+   src TUs spell them */
+void _ZN19dExtBlendAnmModel_c7AdvanceEv(void *x);
+int  _Z15ApproachLinear2Rsss(short &v, short a, short b);
+short Vec3_HorzAngle(const void *a, const void *b);
+void _Z11UpdateAngleRssis(short *p, short d, int n, short lim);
+extern short sDealerLampTimes[];
+/* pmf_MascotWalker_StateWalk_2 WAS DECLARED HERE as `extern int [2]`, for the by-value
+   idle test in the host copy of _ZN12MascotWalker6UpdateEv. Run link100 lane PMFB8
+   gate 3 seats that row and the host copy is gone, so the record is declared
+   ONCE, below, as the MgPmf the seat writes -- two spellings of one symbol in
+   one TU do not compile and the seat's is the one that is still read. */
+/* src/MascotWalker_Update.cpp declares sMascotWalkerOffset OUTSIDE its
+   extern "C" block, so it mangles as a C++ global and the ov006 mount's plain C
+   definition does not satisfy it. With the host copy retired the reference that
+   needed the C-linkage declaration is gone too, and what remains is the matched
+   TU's own decorated spelling, bound by the /alternatename row below. */
+
+/* host-copied below and called from above its own definition */
+void MascotWalker_Update(void *x);
+
+}  /* extern "C" */
+
+// ---- THE MODEL SUB-OBJECT'S +0x00 SEAT, run link100 lane MGWRITER ----------
+//
+// WHAT THIS REPLACES. _ZN6Dealer6UpdateEv's host copy stood below and handed
+// the field's DS code word to mem2_field_try. It is src/Dealer_Update.cpp
+// again, on port/slice_mgwriter.txt, because the ELEVEN .data pairs that can
+// ever reach the +0x00 field now hold host addresses installed at boot.
+//
+// ---- WHY SECTION 3'S RULE DOES NOT FORBID THIS ----------------------------
+//
+// Section 3 says a seat that writes host addresses over the mounted pairs
+// "would leave that comparison permanently false while the dispatch itself
+// looked fine", and that is true of a seat that writes ONE SIDE. Four of the
+// eleven pairs below are not installs at all; they are the by-value sentinels
+// the class asks "is this slot idle" against:
+//
+//   pmf_Dealer_StateIdle_2  src/Dealer_IsIdle.c   returns "idle" when the
+//                        stored pair equals it (states 2, 5 and 7 of
+//                        dScMgCard_c gate on this, and hal/scene_mg_card.cpp
+//                        prints the same test as its census line)
+//   pmf_Dealer_StateIdle_3  src/Dealer_IsIdleAtRest.c   the same test one caller over
+//   pmf_Dealer_StateDeal_2  src/Dealer_IsBusy.c   the first arm of its answer
+//   pmf_Dealer_StateReveal  src/Dealer_IsBusy.c   the second arm
+//
+// Every one of the four holds the SAME code word as an install in the same
+// group (0x020c1760 twice, 0x020c11c0, 0x020c0f9c), so seating BOTH SIDES with
+// the same host body leaves every comparison answering exactly what the
+// cartridge answers, and `p[0] == 0` stays zero on an unwritten slot. That is
+// the rule this lane derived at pmf_Banner_UpdatePressed_2 in
+// port/unmatched/MgBase_StateSetter.cpp and it is the same shape here.
+//
+// ---- THE UNIVERSE IS CLOSED BY RANGE, NOT BY A CONSUMER LIST -------------
+//
+// Section 6 says a run is still the only detector, because a field pmf can be
+// written by any code that can reach the object. That is answered for this
+// field. A relocation sweep over ov006 for every `load` row whose destination
+// lands anywhere in the model sub-object's own code block 0x020c0000 ..
+// 0x020c2000, keeping the rows whose FOLLOWING word reads zero, returns
+// EXACTLY FIFTEEN pairs -- the fifteen section 5 lists, and nothing else. The
+// four rows in that range that are not pairs are literal-pool words inside
+// code, each followed by an ARM instruction (0x020c0af4, _020c1ef4, _020c228c
+// and _020c3b7c, all holding 0x020c0134). So no storage anywhere in this
+// overlay can hand this field a model-block address that is not one of the
+// nine, and a code word from outside the block cannot be one of this class's
+// own states. lane MGWRITER's report (run link100) is the listing.
+//
+// ---- THE SPLIT IS BY FIELD, AND THE TWO HALVES ARE DISJOINT --------------
+//
+// The fifteen serve TWO fields, and only the +0x00 one is seated here:
+//
+//   +0x00  _ZN6Dealer6UpdateEv's field, ELEVEN pairs, SEVEN code words
+//          (0x020c0b74, _0ce8, _0df0, _0f9c, _11c0, _14bc, _1760)
+//          installs  ac48 ac50 ac60 ac80 ac98 aca0 acb8
+//          sentinels ac58 ac90 aca8 acb0
+//   +0xb4  _ZN12MascotWalker6UpdateEv's field, FOUR pairs, TWO code words
+//          (0x020c0264, _0364): ac68 (src/MascotWalker_StartNextPath.cpp), ac70
+//          (src/MascotWalker_StartPause.c), ac88 (src/_ZN12MascotWalker10StatePauseEv.cpp) and
+//          the sentinel ac78 that body reads itself
+//
+// The two code-word sets are DISJOINT, so seating one half cannot hand the
+// other half's dispatcher a host word: mem2_field_try keeps its 0x020c0264 and
+// 0x020c0364 arms for _ZN12MascotWalker6UpdateEv, and its eight ov004 arms for
+// _Z11Coin_UpdateP6Sprite, and loses only the seven this seat made unreachable.
+//
+// ---- WHY _ZN12MascotWalker6UpdateEv IS NOT TAKEN WITH IT ------------------------
+//
+// Two reasons, both measured. First, its src TU NEEDS /Zp4 and the tree does
+// not carry it: the ROM reads the pair at `add r3, r6, #0xb4` (0x020c07f4) and
+// MSVC without the option emits `mov ecx,[esi+188] / mov eax,[esi+184]`, which
+// is +0xb8 -- section 3's own alignment case, four bytes late, a silent wrong
+// read rather than a link error. With /Zp4 it emits +0xb4 and agrees with the
+// ROM. Second, and this is the one that stops it rather than costs it an
+// option: NEITHER the ROM nor the src has a null guard at 0x020c07e8 (fourteen
+// instructions, no `cmp` before the `blx`), so retiring the host copy would
+// take away the `if (code == 0) return` this port adds through
+// port_mg_memory2_field_call, and an unwritten +0xb4 field would branch to
+// zero. _ZN6Dealer6UpdateEv has no such exposure: `ldr r2,[r4]; cmp r2,#0;
+// beq` is the ROM's OWN guard at 0x020c19d8 and its src spells it, so the
+// retired TU refuses a zero exactly where the cartridge refuses it.
+//
+// ---- THE DISPATCH SHAPE, OFF THE TU'S OWN /FAsc LISTING ------------------
+//
+//   ROM       ldr r2,[r4] / cmp r2,#0 / ldr r1,[r4,#4] / add r0,r4,r1,asr #1 /
+//             ands r1,r1,#1 / ldreq r1,[r4] / blx r1 -- zero argument, this in r0
+//   EMITTED   mov eax,[esi] / test eax,eax / mov ecx,[esi+4] / add ecx,esi /
+//             CALL eax, with no push before it and no add esp after it
+//
+// so the receiver is in ecx with ZERO stack arguments and the callee cleans
+// nothing: the seven cells hold __fastcall FACES, not plain bodies. /Zp4 is a
+// measured no-op on this TU (compiled both ways, the only differing listing
+// line is the TITLE naming the .obj).
+//
+// ONE /alternatename. The matched TU declares `extern short
+// sDealerLampTimes[]` outside its extern "C" block, so MSVC spells the
+// reference ?sDealerLampTimes@@3PAFA -- read off the TU's own listing --
+// while the ov006 mount defines the plain C name. Nothing in the tree DEFINES
+// that LHS, so it cannot be silently defeated.
+
+#pragma comment(linker, "/alternatename:?sDealerLampTimes@@3PAFA=_sDealerLampTimes")
+
+/* AND ONE MORE, run link100 lane PMFB8 gate 3, for the same reason one symbol
+   over. src/MascotWalker_Update.cpp declares `extern Vector3
+   sMascotWalkerOffset;` outside its extern "C" block, so MSVC spells the
+   reference ?sMascotWalkerOffset@@3UVector3@@A while the ov006 mount defines
+   the plain C name. Read off that TU's own /FAsc EXTRN list before the link
+   (lane PMFB8, run link100) and the RHS checked present in
+   walk_window.map. Nothing in the tree defines the LHS. */
+#pragma comment(linker, "/alternatename:?sMascotWalkerOffset@@3UVector3@@A=_sMascotWalkerOffset")
+
+extern "C" {
+extern MgPmf pmf_Dealer_StateDeal;
+extern MgPmf pmf_Dealer_StateIdle;
+extern MgPmf pmf_Dealer_StateIdle_2;
+extern MgPmf pmf_Dealer_StateShuffle;
+/* run link100 lane PMFB8 gate 3: the +0xb4 field's four, seated below */
+extern MgPmf pmf_MascotWalker_StateWalk;
+extern MgPmf pmf_MascotWalker_StatePause;
+extern MgPmf pmf_MascotWalker_StateWalk_2;
+extern MgPmf pmf_MascotWalker_StateWalk_3;
+extern MgPmf pmf_Dealer_StateWin;
+extern MgPmf pmf_Dealer_StateIdle_3;
+extern MgPmf pmf_Dealer_StateLose;
+extern MgPmf pmf_Dealer_StateSwap;
+extern MgPmf pmf_Dealer_StateReveal;
+extern MgPmf pmf_Dealer_StateDeal_2;
+extern MgPmf pmf_Dealer_StateReveal_2;
+}
+
+static unsigned g_m4f38_hits;
+static unsigned g_m4f38_seated;
+
+static void __fastcall m4f38_020c0b74(void *self, void *) { ++g_m4f38_hits; _ZN6Dealer8StateWinEv((char *)self); }
+static void __fastcall m4f38_020c0ce8(void *self, void *) { ++g_m4f38_hits; _ZN6Dealer9StateLoseEv((char *)self); }
+static void __fastcall m4f38_020c0df0(void *self, void *) { ++g_m4f38_hits; _ZN6Dealer9StateSwapEv((char *)self); }
+static void __fastcall m4f38_020c0f9c(void *self, void *) { ++g_m4f38_hits; _ZN6Dealer11StateRevealEv(self); }
+static void __fastcall m4f38_020c11c0(void *self, void *) { ++g_m4f38_hits; _ZN6Dealer9StateDealEv((char *)self); }
+static void __fastcall m4f38_020c14bc(void *self, void *) { ++g_m4f38_hits; _ZN6Dealer12StateShuffleEv((char *)self); }
+static void __fastcall m4f38_020c1760(void *self, void *) { ++g_m4f38_hits; _ZN6Dealer9StateIdleEv(); }
+
+/* ---- RUN link100 LANE PMFB8 GATE 3: THE +0xb4 HALF'S TWO FACES -----------
+ * src/MascotWalker_Update.cpp is in the link now (port/slice_pmfb8.txt, with
+ * /Zp4 on that one source) and dispatches this field itself. Its emitted side
+ * is `mov eax,[esi] / test eax,eax / mov ecx,[esi+4] / add ecx,esi / call eax`
+ * -- receiver in ecx, ARITY ZERO -- the same shape the eleven above answer, so
+ * the faces are the same shape.
+ * ONE FACE PER CODE WORD, and here that is load-bearing rather than tidy:
+ * 0213ac78 is a BY-VALUE SENTINEL the row reads itself (`if (p[0] == g[0])`),
+ * so both sides of that comparison have to move together, and they do exactly
+ * when a code word maps to one face. Two faces, four records. */
+static void __fastcall mb4_020c0264(void *self, void *) { ++g_m4f38_hits; _ZN12MascotWalker10StatePauseEv((char *)self); }
+static void __fastcall mb4_020c0364(void *self, void *) { ++g_m4f38_hits; _ZN12MascotWalker9StateWalkEv((char *)self); }
+
+typedef void (*SeatFn)(void *);
+
+/* run linkfull lane PMFMG1: the ov004 record field's ten pairs, seated from
+   the end of the installer below; defined after the field counters. */
+static void mem2_record_seat(void);
+
+/* Compare against the cartridge's own code word and a zero adjustment first,
+   abort loudly on either mismatch, then write the host body. */
+extern "C" void port_mg_memory2_model_seat(void)
+{
+    static int done;
+    if (done)
+        return;
+    done = 1;
+
+    static const struct {
+        MgPmf *cell;
+        const char *name;
+        unsigned rom;
+        SeatFn host;
+    } seats[] = {
+    { &pmf_Dealer_StateDeal, "0213ac48", 0x020c11c0u, (SeatFn)m4f38_020c11c0 },
+    { &pmf_Dealer_StateIdle, "0213ac50", 0x020c1760u, (SeatFn)m4f38_020c1760 },
+    { &pmf_Dealer_StateIdle_2, "0213ac58", 0x020c1760u, (SeatFn)m4f38_020c1760 },
+    { &pmf_Dealer_StateShuffle, "0213ac60", 0x020c14bcu, (SeatFn)m4f38_020c14bc },
+    { &pmf_Dealer_StateWin, "0213ac80", 0x020c0b74u, (SeatFn)m4f38_020c0b74 },
+    { &pmf_Dealer_StateIdle_3, "0213ac90", 0x020c1760u, (SeatFn)m4f38_020c1760 },
+    { &pmf_Dealer_StateLose, "0213ac98", 0x020c0ce8u, (SeatFn)m4f38_020c0ce8 },
+    { &pmf_Dealer_StateSwap, "0213aca0", 0x020c0df0u, (SeatFn)m4f38_020c0df0 },
+    { &pmf_Dealer_StateReveal, "0213aca8", 0x020c0f9cu, (SeatFn)m4f38_020c0f9c },
+    { &pmf_Dealer_StateDeal_2, "0213acb0", 0x020c11c0u, (SeatFn)m4f38_020c11c0 },
+    { &pmf_Dealer_StateReveal_2, "0213acb8", 0x020c0f9cu, (SeatFn)m4f38_020c0f9c },
+    /* run link100 lane PMFB8 gate 3: the +0xb4 field's four records, two code
+       words, one face each. 0213ac78 is the by-value sentinel. */
+    { &pmf_MascotWalker_StateWalk, "0213ac68", 0x020c0364u, (SeatFn)mb4_020c0364 },
+    { &pmf_MascotWalker_StatePause, "0213ac70", 0x020c0264u, (SeatFn)mb4_020c0264 },
+    { &pmf_MascotWalker_StateWalk_2, "0213ac78", 0x020c0364u, (SeatFn)mb4_020c0364 },
+    { &pmf_MascotWalker_StateWalk_3, "0213ac88", 0x020c0364u, (SeatFn)mb4_020c0364 },
+    };
+
+    for (unsigned i = 0; i < sizeof seats / sizeof seats[0]; ++i) {
+        if ((unsigned)(seats[i].cell->code) < 0x02000000u || (unsigned)(seats[i].cell->code) >= 0x02400000u) continue;  /* PORTSYNC3: a mount word that is not a DS code address: the class TU owns the live table */
+        if (seats[i].cell->code != seats[i].rom || seats[i].cell->adj != 0) {
+            std::fprintf(stderr, "FATAL: dScMgCard_c model sub-object pair "
+                         "data_ov006_%s: the mount holds %08x/%d, the ROM's own "
+                         "bytes say %08x/0 -- WRONG BYTES\n", seats[i].name,
+                         seats[i].cell->code, seats[i].cell->adj, seats[i].rom);
+            std::abort();
+        }
+        seats[i].cell->code = (unsigned)(size_t)seats[i].host;
+        ++g_m4f38_seated;
+    }
+
+    mem2_record_seat();
+}
+
+extern "C" void port_mg_memory2_model_counts(unsigned *seated, unsigned *hits)
+{
+    if (seated) *seated = g_m4f38_seated;
+    if (hits)   *hits   = g_m4f38_hits;
+}
+
+// ---- the field switch -------------------------------------------------------
+
+static unsigned g_mem2_field_calls;
+static unsigned g_mem2_field_hits;
+
+static int mem2_field_try(void *self, unsigned code)
+{
+    char *c = (char *)self;
+    switch (code) {
+    /* ov004, sMgCoins's ten pairs, eight distinct */
+    case 0x020b4aa4u: _Z17Coin_FlyToCounterP6Sprite(c); return 1;
+    case 0x020b4c30u: _Z19Coin_MoveThenRefundP6Sprite(c); return 1;
+    case 0x020b4d50u: _Z14Coin_RiseSpentP6Sprite(c); return 1;
+    case 0x020b4dfcu: _Z22Coin_MoveThenRiseSpentP6Sprite(c); return 1;
+    case 0x020b4f44u: _Z9Coin_RiseP6Sprite(c); return 1;
+    case 0x020b4ff0u: _Z17Coin_MoveThenRiseP6Sprite(c); return 1;
+    case 0x020b51f0u: _Z17Coin_MoveThenBankP6Sprite(c); return 1;
+    case 0x020b5288u: _Z9Coin_MoveP6Sprite(c); return 1;
+    /* THE OV006 ARMS ARE GONE, run link100 lane PMFB8 gate 3. Lane MGWRITER
+       took the +0x00 field's seven; this gate takes the +0xb4 field's two.
+       src/MascotWalker_Update.cpp dispatches that field itself now and its four
+       records hold host faces, so no path can present 0x020c0264 or 0x020c0364
+       here again. What is left is ov004's ten records, whose eight code words
+       are disjoint from both ov006 sets. */
+    default:                                  return 0;
+    }
+}
+
+/* The entry point the three host copies below use.  It tries this file's
+   addresses and hands everything else to the class's table chain, which ends at
+   the framework -- so the null-code guard, the nonzero-adjustment refusal and
+   the UNHANDLED report still live in exactly one place. */
+extern "C" void port_mg_memory2_field_call(void *self, unsigned code, int adj)
+{
+    ++g_mem2_field_calls;
+    if (code != 0 && adj == 0 && mem2_field_try(self, code)) {
+        ++g_mem2_field_hits;
+        return;
+    }
+    port_mg_memory2_call0(self, code, adj);
+}
+
+extern "C" void port_mg_memory2_field_counts(unsigned *calls, unsigned *hits)
+{
+    if (calls) *calls = g_mem2_field_calls;
+    if (hits)  *hits  = g_mem2_field_hits;
+}
+
+// ---- the three host copies -------------------------------------------------
+//
+// Each is its src TU verbatim except for the member-pointer declaration (MgPmf
+// rather than a PMF field) and the dispatch site.  Where anything else moved it
+// is stated on the line.
+
+/* src/Coin_Update.cpp -- RETIRED, run linkfull lane PMFMG1. The ten
+   ov004 .data pairs the record field can ever hold are seated with host faces
+   (mem2_record_seat below), so the matched TU's own `(c->*(c->pmf))()`
+   reaches a host body. Its listing (lane PMFMG1, run linkfull,
+   _Z11Coin_UpdateP6Sprite.asm) is `mov ecx, [eax+4] / add ecx, eax / mov eax,
+   [eax] / pop ebp / jmp eax`: a TAIL JUMP with the receiver in ecx and nothing
+   pushed, so zero-argument __fastcall faces, which pop nothing and return to
+   whoever the jump left on the stack.
+
+   SECTION 4'S MISSING NULL GUARD, MEASURED. The ROM decodes and branches with
+   no `cmp`, and so does the matched TU; the retired copy routed through
+   port_mg_call0, whose first line returns on a zero code word. A cdb count on
+   the INT45 build over 900 frames of scene 363 with a scripted stylus read
+   17060 record dispatches and NONE with a zero code word
+   (lane PMFMG1, run linkfull): the twenty records are
+   written before the first walk, so the guard never had a case to catch.
+
+   ---- THE TEN PAIRS AND THE EIGHT FACES ------------------------------------
+   Section 4's ten, re-read out of overlay_0004.bin with their relocations
+   (lane PMFMG1, run linkfull): all {load-relocated code word,
+   0}. The address-targeted sweep of the whole of ov004 for the eight code
+   words finds exactly these ten pairs, and no literal pool in code holds any
+   of them (rom_memory2_code_refs.txt).
+
+   BOTH SIDES OF THE BY-VALUE TEST MOVE TOGETHER. src/Coin_Launch.c
+   compares the stored pair with pmf_Coin_MoveThenBank word for word, and eight
+   more writers copy pairs of this run whole (020b4b84, 020b4cc4, 020b4dfc,
+   020b4e78, 020b4ff0, 020b506c, 020b51f0, 020b5334; three of them also test
+   stored words against zero, which a host word keeps nonzero). One face per
+   CODE WORD, written into every pair that holds it, so every comparison
+   answers what the cartridge answers: 0x020b5288 sits in three pairs and has
+   one face. The census moves into the faces: g_mem2_field_calls and _hits are
+   what hal/scene_mg_memory2.cpp prints as the FIELD dispatch pair. */
+/* PORTDROP2: main renamed these (symbols.txt, by address); the macro below pastes the
+   old address-spelled name, so each is aliased to its new name here. */
+#define func_ov004_020b4aa4 _Z17Coin_FlyToCounterP6Sprite
+#define func_ov004_020b4c30 _Z19Coin_MoveThenRefundP6Sprite
+#define func_ov004_020b4d50 _Z14Coin_RiseSpentP6Sprite
+#define func_ov004_020b4dfc _Z22Coin_MoveThenRiseSpentP6Sprite
+#define func_ov004_020b4f44 _Z9Coin_RiseP6Sprite
+#define func_ov004_020b4ff0 _Z17Coin_MoveThenRiseP6Sprite
+#define func_ov004_020b51f0 _Z17Coin_MoveThenBankP6Sprite
+#define func_ov004_020b5288 _Z9Coin_MoveP6Sprite
+
+#define M2R_FACE(code)                                                        \
+    static void __fastcall m2r_##code(void *self, void *)                     \
+    {                                                                         \
+        ++g_mem2_field_calls;                                                 \
+        ++g_mem2_field_hits;                                                  \
+        func_ov004_##code((char *)self);                                      \
+    }
+M2R_FACE(020b4aa4)
+M2R_FACE(020b4c30)
+M2R_FACE(020b4d50)
+M2R_FACE(020b4dfc)
+M2R_FACE(020b4f44)
+M2R_FACE(020b4ff0)
+M2R_FACE(020b51f0)
+M2R_FACE(020b5288)
+
+extern "C" {
+extern MgPmf pmf_Coin_MoveThenRise;   /* written  src/Coin_SendOff.c */
+extern MgPmf pmf_Coin_RiseSpent;   /* written  src/_Z22Coin_MoveThenRiseSpentP6Sprite.c */
+extern MgPmf pmf_Coin_Move;   /* written  src/Coin_Reset.c */
+extern MgPmf pmf_Coin_Move_2;   /* written  src/_Z17Coin_MoveThenBankP6Sprite.c */
+extern MgPmf pmf_Coin_Rise;   /* written  src/_Z17Coin_MoveThenRiseP6Sprite.c */
+extern MgPmf pmf_Coin_MoveThenBank;   /* SENTINEL src/Coin_Launch.c */
+extern MgPmf pmf_Coin_FlyToCounter;   /* written  src/Coin_PlacePayout.c */
+extern MgPmf pmf_Coin_MoveThenRiseSpent;   /* written  src/Coin_Spend.c */
+extern MgPmf pmf_Coin_MoveThenRefund;   /* written  src/Coin_Return.c */
+extern MgPmf pmf_Coin_Move_3;   /* written  src/Coin_Launch.c */
+}
+
+static void mem2_record_seat(void)
+{
+    static const struct { MgPmf *cell; const char *name; unsigned rom; void *host; }
+    rec[] = {
+        { &pmf_Coin_MoveThenRise, "020bc7d8", 0x020b4ff0u, (void *)m2r_020b4ff0 },
+        { &pmf_Coin_RiseSpent, "020bc7e0", 0x020b4d50u, (void *)m2r_020b4d50 },
+        { &pmf_Coin_Move, "020bc7e8", 0x020b5288u, (void *)m2r_020b5288 },
+        { &pmf_Coin_Move_2, "020bc7f0", 0x020b5288u, (void *)m2r_020b5288 },
+        { &pmf_Coin_Rise, "020bc7f8", 0x020b4f44u, (void *)m2r_020b4f44 },
+        { &pmf_Coin_MoveThenBank, "020bc800", 0x020b51f0u, (void *)m2r_020b51f0 },
+        { &pmf_Coin_FlyToCounter, "020bc808", 0x020b4aa4u, (void *)m2r_020b4aa4 },
+        { &pmf_Coin_MoveThenRiseSpent, "020bc810", 0x020b4dfcu, (void *)m2r_020b4dfc },
+        { &pmf_Coin_MoveThenRefund, "020bc818", 0x020b4c30u, (void *)m2r_020b4c30 },
+        { &pmf_Coin_Move_3, "020bc820", 0x020b5288u, (void *)m2r_020b5288 },
+    };
+    for (unsigned i = 0; i < sizeof rec / sizeof rec[0]; ++i) {
+        if ((unsigned)(rec[i].cell->code) < 0x02000000u || (unsigned)(rec[i].cell->code) >= 0x02400000u) continue;  /* PORTSYNC3: a mount word that is not a DS code address: the class TU owns the live table */
+        if (rec[i].cell->code != rec[i].rom || rec[i].cell->adj != 0) {
+            std::fprintf(stderr, "FATAL: dScMgMemory2_c record pair "
+                         "data_ov004_%s: the mount holds %08x/%d, the ROM's own "
+                         "bytes say %08x/0 -- WRONG BYTES\n", rec[i].name,
+                         rec[i].cell->code, rec[i].cell->adj, rec[i].rom);
+            std::abort();
+        }
+        rec[i].cell->code = (unsigned)(size_t)rec[i].host;
+    }
+}
+
+/* _ZN6Dealer6UpdateEv IS GONE, run link100 lane MGWRITER: its host copy is
+   src/Dealer_Update.cpp again, on port/slice_mgwriter.txt. The seat block
+   above is the derivation. Its callee below is unchanged and still hosted, and
+   the matched TU calls it by the same C name on c+0xdc, exactly as the src
+   spells it. */
+
+/* src/MascotWalker_Update.cpp, section 3.  The struct below is that file's own,
+   with `PMF pmf` replaced by `MgPmf pmf` -- which is what makes the pads it
+   spells (`0xc8 - 0xb4 - 8`) true again, and therefore what puts v0c8, a0ea,
+   a0f0 and a0f4 back at the offsets the file asserts.  Nothing else in the
+   layout or the body moves, including the by-value idle test at the end. */
+struct MemModelC {
+    char  pad0[0xb4];
+    MgPmf pmf;                        /* 0xb4, two words -- DELTA: was PMF */
+    char  pad1[0xc8 - 0xb4 - 8];
+    MemVector3 v0c8;                  /* 0xc8 */
+    char  pad2[0xea - 0xc8 - 12];
+    short a0ea;                       /* 0xea */
+    char  pad3[0xf0 - 0xea - 2];
+    short a0f0;                       /* 0xf0 */
+    char  pad4[0xf4 - 0xf0 - 2];
+    int   a0f4;                       /* 0xf4 */
+};
+
+/* HOST COPY RETIRED, run link100 lane PMFB8 gate 3, and the counted-run
+   instrument that made it admissible went with it.
+   src/MascotWalker_Update.cpp is in the link (port/slice_pmfb8.txt, /Zp4 on
+   that one source) and reads its own +0xb4 pair. The four records hold the two
+   faces seated above, including the by-value sentinel 0213ac78, so the idle
+   test at the end of that body keeps comparing one host address against
+   itself.
+   THE NULL-PAIR QUESTION IS SETTLED BY MEASUREMENT, not by the guard that goes
+   away with this file's body: gate 3 step A counted every dispatch and every
+   dispatch whose stored pair read {0, ...} across the whole battery, and the
+   result is in lane PMFB8's report (run link100). The field is installed
+   before the first dispatch on every row that reaches this body. */

@@ -1,0 +1,18 @@
+diff --git a/src/engine/os/OS_Alarm.cpp b/src/engine/os/OS_Alarm.cpp
+--- a/src/engine/os/OS_Alarm.cpp
++++ b/src/engine/os/OS_Alarm.cpp
+@@ -162,12 +162,14 @@
+ 
+ /* The timer 1 IRQ entry. It pushes lr alone and calls out with no stack pad,
+  * which mwccarm never emits for C: the SDK writes this one as asm. */
++#ifndef _MSC_VER   /* host: hal/cxx_aliases.cpp's OSi_AlarmHandler tail-calls OSi_ArrangeTimer; no host compiler takes ARM asm */
+ asm void OSi_AlarmHandler(void *arg) {
+     stmdb sp!, {lr}
+     bl OSi_ArrangeTimer
+     ldmia sp!, {lr}
+     bx lr
+ }
++#endif
+ 
+ void OSi_ArrangeTimer(void) {
+     OSAlarm *alarm;

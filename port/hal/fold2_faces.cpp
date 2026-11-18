@@ -1,0 +1,126 @@
+// LANE FOLD2, batch 2 (run link100): ten cdecl faces for the actor-class host
+// copies whose only reason was the MSVC destructor fold.
+//
+// THE FOLD, AND WHY IT IS DEAD. mwccarm gives `virtual ~Class()` TWO vtable
+// entries -- the Itanium D1 complete / D0 deleting pair -- and MSVC folds them
+// into ONE, which pulls every virtual declared after the destructor up by one
+// slot, all the way down ModelBase -> Model -> ModelAnim -> {ModelAnim2,
+// BlendModelAnim}. Lane SLOT5F respelled that pair as two plain virtuals under
+// _MSC_VER in include/ModelBase.h and its five siblings, so the host tables are
+// ROM-numbered again. Read straight out of config/arm9/relocs.txt at each
+// table's own address, with every destination resolved in
+// config/arm9/symbols.txt:
+//
+//   _ZTV17dExtSimpleModel_c           0x0208e90c  [3] 0x02016c98 dExtSimpleModel_c::UpdateVerts
+//                                    [4] 0x02016bb8 dExtSimpleModel_c::Virtual10
+//                                    [5] 0x02016b78 dExtSimpleModel_c::Render
+//   _ZTV14dExtAnmModel_c       0x0208e980  [3] 0x0201686c dExtAnmModel_c::UpdateVerts
+//                                    [4] 0x0201682c dExtAnmModel_c::Virtual10
+//                                    [5] 0x020167f8 dExtAnmModel_c::Render
+//   _ZTV15dExtAnm2Model_c     0x0208e9b4  [3][4][5] the same three words
+//   _ZTV19dExtBlendAnmModel_c 0x0208e94c  [3] 0x02016578 dExtBlendAnmModel_c::UpdateVerts
+//                                    [4] 0x02016518 dExtBlendAnmModel_c::Virtual10
+//                                    [5] 0x020164e4 dExtBlendAnmModel_c::Render
+//
+// Every matched source retired by this batch models a model-family member with
+// a LOCAL shadow class counted in ROM numbering and dispatches index 5 (Render)
+// or index 3 (UpdateVerts). The folded host table put Virtual18 on index 5 and
+// Virtual10 on index 3 -- a different function taking a different argument, and
+// on index 3 one that also returns `ret 4` and unbalances the caller's stack.
+// It does not now, so each source reaches the body it means.
+//
+// WHY THE FACES. Each of the ten fill sites below DECLARES the Itanium name at
+// C linkage and calls it, because the definition it used to reach was an
+// extern "C" host copy in port/unmatched. The matched sources define __thiscall
+// METHODS, whose MSVC mangling is a different symbol, and an /alternatename
+// cannot bridge ecx against the stack. So each row here is a cdecl definition
+// of the C name onto the method, and NOT ONE FILL SITE CHANGES. This is
+// hal/actor_classes_bob_world.cpp's thirty-row block, one wave later.
+//
+// WHY A NEW FILE rather than that one: hal/actor_classes_bob_world.cpp names
+// the BoB/enemy headers it needs and pulling ten more class headers into it
+// would widen a file this lane does not own. This file is compiled into exactly
+// the three targets that carried the retired host copies -- walk_window,
+// walk_window_hires and smoke_player -- and no others, which is the constraint
+// that block's own header states (hal/cxxname_bridge.cpp is compiled into five
+// targets and only three link the slice, so a face there would be an unresolved
+// external in smoke_actor, smoke_persist and their narrow sibling).
+//
+// VERIFIED BY ROM ADDRESS, every row: the word at the class's own vtable slot
+// in config/arm9/overlays/<ov>/relocs.txt, the kind:function(arm,size=..)
+// record at the destination in that overlay's symbols.txt, and a real ARM push
+// as the body's first word. None of the sources carries the "recovered from
+// vtable slot identity" guess marker.
+//
+//   BowserPuzzleManager::Render  ov064  _ZTV19BowserPuzzleManager 0x0211c25c
+//        + 4*9 = 0x0211c280 -> 0x02119088  function(arm,size=0x28)  e92d4000
+//   Cannon::Render               ov098  _ZTV7daCnn_c 0x0213c6a0
+//        + 4*9 = 0x0213c6c4 -> 0x0213b214  function(arm,size=0x58)  e92d4010
+//   Klepto::Render               ov062  _ZTV9daJango_c 0x0211dd5c
+//        + 4*9 = 0x0211dd80 -> 0x0211c920  function(arm,size=0x2c)  e92d4000
+//   Koopa::Render                ov062  _ZTV8daNknk_c 0x0211dab4
+//        + 4*9 = 0x0211dad8 -> 0x02118f84  function(arm,size=0x168) e92d4010
+//   Bowser::Render               ov060  _ZTV7daKpa_c 0x0211a6b8
+//        + 4*9 = 0x0211a6dc -> 0x02115f0c  function(arm,size=0x50)  e92d4010
+//   PrincessPeach::Behavior      ov085  _ZTV9daPeach_c 0x0212ffc0
+//        + 4*6 = 0x0212ffd8 -> 0x0212a52c  function(arm,size=0x5c)  e92d4010
+//   Key::Render                  ov089  _ZTV3Key 0x02132ba8
+//        + 4*9 = 0x02132bcc -> 0x021320f0  function(arm,size=0xa4)  e92d4010
+//   RacingPenguin::Render        ov019  _ZTV13RacingPenguin 0x02113310
+//        + 4*9 = 0x02113334 -> 0x02112360  function(arm,size=0x34)  e92d4010
+//   Submarine::Render            ov026  _ZTV9Submarine 0x02113d54
+//        + 4*9 = 0x02113d78 -> 0x02111fd8  function(arm,size=0x34)  e92d4010
+//   Wiggler::Render              ov034  _ZTV7Wiggler 0x021144bc
+//        + 4*9 = 0x021144e0 -> 0x02112af4  function(arm,size=0x68)  e92d40f0
+//
+// Slot 9 is ActorBase::Render and slot 6 is ActorBase::Behavior throughout.
+//
+// SIX MORE ROWS IN THIS BATCH NEED NO FACE, and they are listed here so the
+// count adds up rather than being silently short:
+//   _ZN12daBakubaku_c6RenderEv        BUBBA's Render, an address-named C symbol its
+//                              matched source defines at C linkage already.
+//   _ZN10daPgDfdr_c6RenderEv        DA_PG_DFDR's Render, likewise. Its source
+//                              carries the guess marker and is ADJUDICATED
+//                              REAL_DECOMP at inferred_stub_adjudicated.txt
+//                              line 1803, so inferred_stub_guard admits it.
+//   _ZN15daObjRcCarpet_c6RenderEv        FLYING_CARPET's Render, likewise.
+//   _ZN7daPly_c19func_ov002_020e4768Ev        the Player head-model matrix seat, reached by an
+//                              arm_call from src/func_ov002_020e4bb8.c.
+//   _ZN16BowserShockwaves6RenderEv  its matched source already defines the
+//                              Itanium name at C linkage.
+//   _ZN10daIwante_c6RenderEv        hal/actor_classes_ov066.cpp's ov66_render calls
+//                              the C++ METHOD directly, so the matched TU
+//                              simply becomes the definition of the same
+//                              MSVC-mangled symbol the host copy provided.
+
+#include "daObjFl_Coin_c.h"
+#include "daCnn_c.h"
+#include "daJango_c.h"
+#include "Koopa.h"
+#include "daKpa_c.h"
+#include "daPeach_c.h"
+#include "daObjKey_c.h"
+#include "daPgRcer_c.h"
+#include "daObjWlSubmarine_c.h"
+#include "daHanachan_c.h"
+#include "daObjFl_Puzzle_c.h"
+#include "daWater_Tatumaki_c.h"
+
+extern "C" {
+/* ov064 0x02119088, slot 9 of the Piece's table 0x0211c25c; the Manager has no
+   Render of its own, so this used to reach the inherited base instead. */
+int _ZN16daObjFl_Puzzle_c6RenderEv(void *s) { return ((daObjFl_Puzzle_c *)s)->daObjFl_Puzzle_c::Render(); }
+int _ZN7daCnn_c6RenderEv(void *s)               { return ((daCnn_c *)s)->daCnn_c::Render(); }
+int _ZN9daJango_c6RenderEv(void *s)               { return ((daJango_c *)s)->daJango_c::Render(); }
+int _ZN8daNknk_c6RenderEv(void *s)                { return ((Koopa *)s)->Koopa::Render(); }
+int _ZN7daKpa_c6RenderEv(void *s)               { return ((daKpa_c *)s)->daKpa_c::Render(); }
+int _ZN9daPeach_c8BehaviorEv(void *s)     { return ((daPeach_c *)s)->daPeach_c::Behavior(); }
+int _ZN10daObjKey_c6RenderEv(void *s)                  { return ((daObjKey_c *)s)->daObjKey_c::Render(); }
+/* char*, not void*: hal/actor_classes_ov019_w3e.cpp declares this one
+   `int _ZN13RacingPenguin6RenderEv(char *self)` and calls it with a cast. */
+int _ZN10daPgRcer_c6RenderEv(char *s)       { return ((daPgRcer_c *)s)->daPgRcer_c::Render(); }
+/* ov026 0x02111fd8, slot 9 of the whirlpool's table 0x02113d54; Submarine's own
+   Render is 0x02111998 in table 0x02113c6c. */
+int _ZN18daWater_Tatumaki_c6RenderEv(void *s)            { return ((daWater_Tatumaki_c *)s)->daWater_Tatumaki_c::Render(); }
+int _ZN12daHanachan_c6RenderEv(void *s)              { return ((daHanachan_c *)s)->daHanachan_c::Render(); }
+}

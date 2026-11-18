@@ -1,0 +1,1124 @@
+# Gate-10 slice: Player spawns and stands. On the full prior stack.
+src/game/player/d_a_ply_methods.cpp
+# port/unmatched/Player_InitResources.cpp RETIRED -- the matched source hosts
+# itself now, through hostgen's ASM_EXCISION. It is built from
+# HOSTABI_RETIRE_SYMS in CMakeLists.txt rather than from a slice line, because
+# it needs --extern-data and a slice line carries no flags.
+port/unmatched/hostarm/Player.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player12St_Wait_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player12St_Walk_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player12St_Walk_MainEv.cpp
+src/engine/model/d_ext_model.cpp
+src/engine/collision/d_cc_ac.cpp
+src/engine/collision/d_bg_ch_actr.cpp
+src/ApproachAngle.cpp
+src/game/actors/d_a_star.cpp
+src/RandomIntInternal.c
+src/game/stages/d_s_stage_methods.cpp
+src/SublevelToLevel.cpp
+src/engine/view/d_camera_dtor.cpp
+src/engine/view/d_camera.cpp
+src/engine/sound/Sound.cpp
+src/engine/save/SaveData.cpp
+src/engine/collision/d_bg_ch.cpp
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_02035644.c
+src/unnamed/arm9/0203/func_0203d384.c
+# ---- ST_CLIMB (record 0x021106dc): the tree/pole grab ----------------------
+# All three halves were unhosted, which is the bush freeze: Init never ran, so
+# the climb anim never started and the horizontal speed Init zeroes stayed on
+# the clock while a no-op Main held the state. Init is matched but is not
+# declared in include/Player.h, so it goes through the shadow class in
+# port/unmatched/Player_St_Climb.cpp. Main (0x020cb5bc) is now matched source
+# (the div-9 near-miss closed by passing the pad halfword through to
+# _ZN7daPly_c19func_ov002_020cc05cEt); the climb-motion helpers ride along with it.
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player13St_Climb_MainEv.cpp
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d5c0.c
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d5fc.c
+# St_SwingPlayer_Main (0x020d9fec) runs from the matched Player.cpp body through
+# hal/player_bridges.cpp (PORTDROP1 retired the host transcription).
+port/unmatched/Player_St_Climb.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d22ec.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d36d8.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d4540.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d6368.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e3078.c
+# _ZN7daPly_c19func_ov002_020e5948Ev: HOST COPY at unmatched/TexSeq_Caller_ov002_020e5948.cpp
+# (wired in CMakeLists). Its TextureSequence::Prepare calls pass two arguments; the
+# host wrapper reshapes them into a 3-param thiscall and reads/derefs an unwritten
+# third stack slot, so the host copy passes the real third argument. See header.
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e6330.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e6350.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e63a4.c
+src/engine/collision/d_bg_ch_sph_crr.cpp
+src/engine/collision/d_bg_ch_lin.cpp
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/_ZN10dBgCh_Actr4InitEP8dActor_c5Fix12IiES3_P10Vector3_16S5_.c
+src/engine/collision/d_bg_ch_gnd.cpp
+# FOLDED into src/engine/collision/d_bg_ch_gnd.cpp (row 61): src/_ZN9dBgCh_GndC1Ev.cpp
+# FOLDED into src/engine/collision/d_bg_ch_gnd.cpp (row 61): src/_ZN9dBgCh_GndD1Ev.cpp
+# FOLDED into src/engine/model/MaterialChanger.cpp (row 13): src/_ZN15MaterialChangerD1Ev.cpp
+# FOLDED into src/engine/model/TextureSequence.cpp (row 12): src/_ZN15TextureSequenceD1Ev.cpp
+# RETIRED at SLICE1: body now in src/_ZN7dCcAc_cC1Ev.cpp. MSVC folds the ROM constructor variants into one symbol, so only one of a class two per-function constructor TUs can be compiled.
+#src/_ZN7dCcAc_cC2Ev.cpp
+# FOLDED into src/engine/collision/d_bg_ch.cpp (row 26): src/_ZN5dBgCh19StartDetectingWaterEv.cpp
+# FOLDED into src/engine/save/SaveData.cpp (row 25): src/_ZN8SaveData16HasPlayerLostCapEv.cpp
+src/AngleDiff.c
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_020116c4.c
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_02011934.c
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_02011ee4.c
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_02011f7c.c
+# RETIRED at SLICE1: body now in src/_ZN5dBgChD1Ev.cpp. MSVC folds the ROM destructor variants into one symbol, so only one of a class two per-function destructor TUs can be compiled.
+#src/_ZN5dBgChD2Ev.cpp
+# FOLDED into src/engine/collision/d_bg_ch_gnd.cpp (row 61): src/func_020374d4.c
+# RETIRED at SLICE1: body now in src/_ZN5dBgPiD1Ev.cpp. MSVC folds the ROM destructor variants into one symbol, so only one of a class two per-function destructor TUs can be compiled.
+#src/_ZN5dBgPiD2Ev.cpp
+# RETIRED at SLICE1: body now in src/_ZN5dBgPiC1Ev.cpp. MSVC folds the ROM constructor variants into one symbol, so only one of a class two per-function constructor TUs can be compiled.
+#src/_ZN5dBgPiC2Ev.cpp
+src/engine/collision/d_m3d_g_sph.cpp
+# RETIRED at SLICE1: body now in src/_ZN8dM3dGSphC1Ev.cpp. MSVC folds the ROM constructor variants into one symbol, so only one of a class two per-function constructor TUs can be compiled.
+#src/_ZN8dM3dGSphC2Ev.cpp
+src/engine/sound/Sound2.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d1204.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d5c6c.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d6334.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d674c.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020dd824.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020dde74.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e6780.c
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_02011698.c
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_02011ac4.c
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_020134d8.c
+# RETIRED at SLICE1: body now in src/_ZN5dBgPcD1Ev.cpp. MSVC folds the ROM destructor variants into one symbol, so only one of a class two per-function destructor TUs can be compiled.
+#src/_ZN5dBgPcD2Ev.cpp
+# RETIRED at SLICE1: body now in src/_ZN5dBgPcC1Ev.cpp. MSVC folds the ROM constructor variants into one symbol, so only one of a class two per-function constructor TUs can be compiled.
+#src/_ZN5dBgPcC2Ev.cpp
+src/engine/collision/d_bg_ch_sph_crr_query.cpp
+src/engine/link/unit0203d7b8.cpp
+src/engine/sound/SoundEngine.cpp
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f924.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204fa2c.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02050cdc.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_020510a4.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0205117c.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d600c.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d82f0.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/_ZN5dBgPiC1Ev.cpp
+src/engine/collision/d_cc.cpp
+# FOLDED into src/engine/model/TextureSequence.cpp (row 12): src/_ZN15TextureSequence7PrepareER8BMD_FileR8BTP_File.cpp
+# FOLDED into src/engine/model/TextureSequence.cpp (row 12): src/_ZN15TextureSequence7SetFileER8BTP_Filei5Fix12IiEj.c
+src/SharedFilePtr.cpp
+src/engine/heap/NestedHeapIterator.cpp
+# FOLDED into src/engine/heap/NestedHeapIterator.cpp (row 122): src/_ZN18NestedHeapIterator8PreviousEP13HeapAllocator.cpp
+src/engine/heap/SolidHeapAllocator.cpp
+# FOLDED into src/engine/heap/SolidHeapAllocator.cpp (row 124): src/_ZN18SolidHeapAllocator9SaveStateEj.cpp
+src/engine/collision/d_cc_ac.cpp
+src/runtime/actor/d_actor.cpp
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/_ZN6Camera11ChangeStateEPNS_5StateE.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player7IsStateERNS_5StateE.cpp
+# FOLDED into src/engine/save/SaveData.cpp (row 25): src/_ZN8SaveData16CanPlayerHaveCapEv.cpp
+# FOLDED into src/engine/animation/d_ext_frame_ctrl.cpp (row 131): src/_ZN9Animation8FinishedEv.cpp
+# RETIRED at SLICE1: body now in src/_ZN9AnimationD0Ev.cpp. MSVC folds the ROM destructor variants into one symbol, so only one of a class two per-function destructor TUs can be compiled.
+#src/_ZN9AnimationD2Ev.cpp
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_02011b38.c
+src/unnamed/arm9/0201/func_0201a96c.cpp
+# catchup1 (SLICE4, Stage C round 2): the watchdog alarm's constructor and
+# destructor chain. func_0201a96c.cpp (WatchdogAlarm's ctor) and
+# structor_faces_gen.cpp (its dtor) reference them. The veneer
+# func_0201aac8 now takes the alarm it passes to OS_CreateAlarm, so the
+# argument-dropping reason slice_ctor.txt gives (C1b) no longer holds.
+src/unnamed/arm9/0201/func_0201aa18.c
+src/unnamed/arm9/0201/func_0201aad4.c
+src/unnamed/arm9/0201/func_0201aac8.c
+src/unnamed/arm9/0201/func_0201aaec.c
+src/unnamed/arm9/0201/func_0201aab0.c
+src/unnamed/arm9/0201/func_0201aaa4.c
+src/unnamed/arm9/0201/func_0201a9ec.c
+src/unnamed/arm9/0201/func_0201a9fc.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f5a0.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_020509b0.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02050c14.cpp
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02050fb0.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02050fd4.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02051244.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02051918.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_020523e0.c
+src/engine/snd/SND_Interface.cpp
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/Player_PlaySoundEffect.c
+src/runtime/actor/ActorDerived.cpp
+# FOLDED into src/engine/collision/d_cc_ac.cpp (row 126): src/_ZN7dCcAc_c4InitEP8dActor_c5Fix12IiES3_jj.cpp
+# FOLDED into src/engine/heap/SolidHeapAllocator.cpp (row 124): src/_ZN18SolidHeapAllocator16AllocateForwardsEPvjj.cpp
+# FOLDED into src/engine/heap/SolidHeapAllocator.cpp (row 124): src/_ZN18SolidHeapAllocator5ResetEj.cpp
+# FOLDED into src/engine/heap/SolidHeapAllocator.cpp (row 124): src/_ZN18SolidHeapAllocator8AllocateEji.cpp
+# FOLDED into src/engine/collision/d_cc_ac.cpp (row 126): src/_ZN10dCcAcPos_c21SetPosRelativeToActorERK7Vector3.cpp
+# FOLDED into src/runtime/actor/d_actor.cpp (row 127): src/func_02010e78.c
+src/unnamed/arm9/0201/func_0201a8b4.c
+src/unnamed/arm9/0201/func_0201aa50.c
+src/unnamed/arm9/0201/func_0201aaa4.c
+src/unnamed/arm9/0204/func_02046d50.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f214.cpp
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f3e0.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02050a84.cpp
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02051064.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_020516d4.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0205179c.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_020518a0.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_020518dc.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02052494.c
+src/engine/os/OS_Tick.cpp
+src/engine/snd/SND_Command.cpp
+# src/IPCSend.c -- MOVED TO HOSTGEN (run link100, lane IPCSEND):
+#   CMakeLists.txt's GATE2IPC_SYMS, which the same three targets carry, so the
+#   link set is unchanged. Built plain its store to IPCFIFOSEND (0x04000188)
+#   latched in ntr's mapped I/O window instead of reaching ntr::ipc_reg_write,
+#   and this port therefore never made an ARM9->ARM7 send at all.
+src/Vec3_RotateYAndTranslate.c
+# FOLDED into src/engine/collision/d_cc.cpp (row 118): src/_ZN5dCc_c4InitE5Fix12IiES1_jj.cpp
+# FOLDED into src/engine/heap/SolidHeapAllocator.cpp (row 124): src/_ZN18SolidHeapAllocator10ResetStartEv.cpp
+# FOLDED into src/engine/heap/SolidHeapAllocator.cpp (row 124): src/_ZN18SolidHeapAllocator17AllocateBackwardsEPvjj.cpp
+# FOLDED into src/engine/heap/SolidHeapAllocator.cpp (row 124): src/_ZN18SolidHeapAllocator8ResetEndEv.cpp
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/_ZN5Sound17InfoSequenceEntry9GetWithIDEj.cpp
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/_ZN5Sound23InfoInstrumentBankEntry9GetWithIDEj.cpp
+# FOLDED into src/runtime/actor/ActorDerived.cpp (row 150): src/func_02013f28.c
+src/runtime/actor/ActorBase.cpp
+src/engine/model/Model4.cpp
+src/unnamed/arm9/0204/func_02047144.cpp
+src/func_020471ac.cpp
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f2d4.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f400.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f460.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02050b4c.cpp
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_020514b4.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02051514.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02051574.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_020515d4.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02051e60.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02051f1c.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02052458.c
+src/engine/os/OS_Alarm.cpp
+src/engine/snd/SND_Bank.cpp
+src/cstd6.cpp
+src/func_02013f4c.cpp
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02050994.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02050d2c.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_020513a8.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_020513e4.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02051420.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02051634.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02051a98.c
+src/engine/snd/SND_Work.cpp
+src/engine/model/dExtAnmTexPat_c_UpdateFileOffsets.cpp
+# _Z15InitCrashScreenv calls dScene_c::ResetHardwareRegisters, a STATIC, by its flat
+# name with no argument, as the ROM does (a bare bl). Its host copy
+# (unmatched/InitCrashScreen_ResetVeneer.cpp) is retired: the face in
+# hal/cxx_aliases.cpp takes no argument now (run linkfull, lane RS2PORT).
+src/InitCrashScreen.cpp
+src/ShowCrashScreen.cpp
+src/engine/heap/Heap.cpp
+src/runtime/actor/ActorBase.cpp
+# FOLDED into src/engine/model/Model4.cpp (row 191): src/func_02046234.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f600.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f630.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f63c.cpp
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f6f8.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f89c.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f914.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_020509d8.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02050a5c.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_020511d4.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02051454.c
+src/engine/os/OS_Interrupt.cpp
+src/engine/os/OS_Emulator.cpp
+src/engine/spi/PM.c
+src/engine/fs/FS_File.c
+src/ResetCrashScreen.cpp
+src/engine/gx/GX_BgCnt.c
+src/engine/gx/GX.cpp
+src/engine/gx/GXS.cpp
+src/engine/gx/GX_VramCnt.cpp
+src/engine/gx/GX_Init.cpp
+# FOLDED into src/engine/heap/Heap.cpp (row 236): src/_ZN5mHeap6Heap_t21MaxAllocationUnitSizeEv.cpp
+# FOLDED into src/engine/heap/Heap.cpp (row 236): src/_ZN5mHeap6Heap_t6IntactEv.cpp
+src/game/stages/d_scene.cpp
+src/GetActorDebugName.c
+src/GetStageDebugName.c
+src/fListNode.cpp
+# FOLDED into src/engine/model/Model4.cpp (row 191): src/func_02046288.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f364.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f4bc.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f934.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02050d3c.c
+src/nds_print.c
+src/nds_printf.c
+src/nds_printt.cpp
+src/engine/mi/MI_Dma.cpp
+src/engine/mi/MI_Memory.c
+# FOLDED into src/game/stages/d_scene.cpp (row 271): src/_ZN2GX15DisableAllBanksEv.cpp
+src/engine/gx/G2x.cpp
+# FOLDED into src/cstd6.cpp (row 213): src/_ZN4cstd6strlenEPKc.cpp
+# FOLDED into src/runtime/actor/ActorBase.cpp (row 239): src/_ZN7fBase_c7ProcessEMS_FivEMS_FbvEMS_FvjE.cpp
+src/nds_vprintf.c
+src/engine/collision/d_cc_pos.cpp
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_020524c4.c
+src/engine/fs/FS_Archive.cpp
+src/cstd4.cpp
+src/engine/os/OS_Thread.cpp
+src/engine/fs/FS_Command.cpp
+src/FSi_AppendToList.c
+# FOLDED into src/cstd4.cpp (row 329): src/func_0206e450.c
+# FOLDED into src/cstd4.cpp (row 329): src/func_0206e4a4.c
+# FOLDED into src/cstd6.cpp (row 213): src/_ZN4cstd6strchrEPKcc.cpp
+src/FSi_CutFromList.c
+# FOLDED into src/cstd4.cpp (row 329): src/func_0206e184.c
+# FOLDED into src/cstd4.cpp (row 329): src/func_0206e2cc.c
+# FOLDED into src/cstd4.cpp (row 329): src/func_0206e310.c
+src/float2str.c
+src/double2hex.c
+src/longlong2str.c
+src/long2str.c
+src/parse_format.c
+# FOLDED into src/cstd6.cpp (row 213): src/_ZN4cstd7strncpyEPcPKcj.cpp
+# FOLDED into src/cstd4.cpp (row 329): src/func_0206e218.c
+src/round_decimal.c
+# FOLDED into src/cstd6.cpp (row 213): src/func_020706b0.c
+src/fabs.c
+src/lib/msl/ansi_fp.c
+src/frexp.c
+src/ldexp.c
+src/copysign.c
+# FOLDED into src/engine/animation/d_ext_frame_ctrl.cpp (row 131): src/_ZN9Animation8GetFlagsEv.cpp
+# FOLDED into src/engine/animation/d_ext_frame_ctrl.cpp (row 131): src/_ZNK9Animation12WillHitFrameEi.cpp
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200cae4.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020bcdf0.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d2da0.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d2e74.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d2f24.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d2fdc.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d413c.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d45c0.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d4748.cpp
+# FOLDED into src/engine/heap/NestedHeapIterator.cpp (row 122): src/_ZN18NestedHeapIterator4NextEP13HeapAllocator.cpp
+src/Vec3_Sub.c
+src/engine/particle/Particle.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d4c30.cpp
+src/engine/particle/Particle_Manager.cpp
+src/engine/particle/Particle_SysTracker_Contents.cpp
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_0201251c.c
+# FOLDED into src/engine/particle/Particle_SysTracker_Contents.cpp (row 390): src/_ZN8Particle10SysTracker8Contents6CreateEjR7Vector3PK11Vector3_16fPN5dPa_c7level_c10callback_cE.cpp
+# FOLDED into src/engine/particle/Particle.cpp (row 387): src/func_02022d00.c
+# FOLDED into src/engine/particle/Particle_SysTracker_Contents.cpp (row 390): src/_ZN8Particle10SysTracker8Contents4LinkERNS1_5EntryE.cpp
+# FOLDED into src/engine/particle/Particle_SysTracker_Contents.cpp (row 390): src/_ZN8Particle10SysTracker8Contents5Entry10InitialiseEjjR7Vector3PK11Vector3_16fPN5dPa_c7level_c10callback_cE.cpp
+src/unnamed/arm9/0204/func_0204ae2c.c
+src/unnamed/arm9/0204/func_0204d958.c
+src/unnamed/arm9/0204/func_0204d9a0.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f7fc.c
+src/ov002_handles.cpp
+# FOLDED into src/game/actors/d_a_star.cpp (row 17): src/__sinit_ov002_02106e40.c
+src/__register_global_object.c
+src/runtime/actor/d_enemy_base.cpp
+src/game/actors/d_a_1up.cpp
+src/game/actors/d_a_coin.cpp
+src/game/actors/d_a_obj_block_l.cpp
+src/game/actors/d_a_obj_block_item_tag.cpp
+src/game/actors/d_a_obj_hatena_switch.cpp
+src/game/actors/d_a_obj_kurumajiku.cpp
+src/game/actors/d_a_obj_mario_cap.cpp
+src/game/actors/d_a_obj_pushblock.cpp
+src/game/actors/d_a_obj_power_up_item.cpp
+src/game/actors/d_a_obj_switch.cpp
+src/game/actors/d_a_obj_tatefuda.cpp
+src/game/actors/d_a_obj_wakame.cpp
+src/game/actors/d_a_obj_heart.cpp
+src/game/actors/d_a_obj_cannon_shutter.cpp
+src/game/actors/d_a_yegg.cpp
+src/runtime/actor/d_path_lift_actor.cpp
+src/game/actors/d_a_obj1up_logo.cpp
+src/game/actors/d_a_obj_bc_switch.cpp
+src/game/actors/d_a_demo.cpp
+src/game/actors/d_a_sound_obj.cpp
+src/ui/hud/d_map.cpp
+src/game/actors/d_a_propeller_heyho_fire.cpp
+src/unnamed/arm9/0201/func_020196cc.c
+src/unnamed/arm9/0203/func_0203b9b4.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/_ZN9dBgCh_Gnd10DetectClsnEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player16InitWingFeathersEb.cpp
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_02012790.c
+src/game/actors/d_a_obj_key.cpp
+src/Vec3_HorzDist.cpp
+# QUARANTINED at the main->port sync (lane SYNC5, the wave-7 fold merge): MSVC
+# refuses main's shape for this TU (C2600, the model family's destructor TUs:
+# main defines X::~X() where the host header spells the destructor as two
+# plain virtuals; port/unmatched/ModelFamily_Dtors_HostCopy.c carries the
+# merge base's own bodies instead). It is a decomp-side item, not a port one:
+# see lane SYNC5's report (run link100). The row returns when main lands
+# the fix.
+#src/_ZN5ModelD2Ev.cpp
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/_ZN5Sound6Play2DEjj.cpp
+# FOLDED into src/engine/collision/d_bg_ch_gnd.cpp (row 61): src/func_02037464.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/func_02037fec.c
+src/engine/collision/d_bg_w.cpp
+# FOLDED into src/engine/collision/d_bg_w.cpp (row 452): src/func_0203939c.c
+# FOLDED into src/engine/collision/d_bg_w.cpp (row 452): src/func_020393ac.c
+# FOLDED into src/engine/collision/d_bg_w.cpp (row 452): src/func_020393b4.c
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/_ZN5Sound8EndMusicEjj.cpp
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/_ZN5Sound8SetMusicEjj.cpp
+# QUARANTINED at the main->port sync (lane SYNC5, the wave-7 fold merge): MSVC
+# refuses main's shape for this TU (C2600, the model family's destructor TUs:
+# main defines X::~X() where the host header spells the destructor as two
+# plain virtuals; port/unmatched/ModelFamily_Dtors_HostCopy.c carries the
+# merge base's own bodies instead). It is a decomp-side item, not a port one:
+# see lane SYNC5's report (run link100). The row returns when main lands
+# the fix.
+#src/_ZN9ModelBaseD2Ev.cpp
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/func_02037f5c.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020db8bc.c
+src/Deallocate.cpp
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_02011dcc.c
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_02013078.c
+src/unnamed/arm9/0204/func_0204921c.c
+src/unnamed/arm9/0204/func_02049764.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02051fb4.cpp
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/Sound_PlayIfNotActive.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f82c.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f86c.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02051bd0.c
+# RETIRED at ALIAS2 (wave 8, the main -> port sync). This is the ONE retirement
+# in this lane that takes the SRC side rather than the host side, and the reason
+# is a standing PORT_HOST_ABI ruling, not a preference. Since main's langmode
+# migration this TU emits ?_Deallocate@Heap_t@mHeap@@QAEXPAX@Z, the same decorated name
+# hal/cxx_aliases.cpp defines, so the link reported it twice. The ruling in the
+# PORT_HOST_ABI block above Heap::_Deallocate in hal/cxx_aliases.cpp says this
+# body is a zero-argument ARM veneer whose this and ptr ride in on r0/r1, and
+# that linked under the MSVC name it would deallocate a garbage pointer from a
+# garbage heap on the first free. Retiring the host definition instead would
+# ship exactly that.
+#src/_ZN5mHeap6Heap_t11_DeallocateEPv.cpp
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_0201186c.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f720.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02051a28.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02051a48.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02051a68.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02051a88.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f504.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d454c.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d4d88.c
+src/unnamed/ov002/func_ov002_020effb8.cpp
+# FOLDED into src/ApproachAngle.cpp (row 16): src/_Z14ApproachLinearRiii.cpp
+# FOLDED into src/runtime/actor/d_actor.cpp (row 127): src/func_02010844.c
+src/Vec3_HorzLen.cpp
+src/cstd_atan2.cpp
+src/DecIfAbove0_Short.c
+# FOLDED into src/engine/collision/d_cc.cpp (row 118): src/_ZN5dCc_c5ClearEv.cpp
+# FOLDED into src/engine/collision/d_cc.cpp (row 118): src/_ZN5dCc_c6UpdateEv.cpp
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_02035684.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_0203568c.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d6790.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d80d0.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d8158.c
+# src/func_ov002_020d869c.cpp -- now daPly_c::func_ov002_020d869c in main's src/game/player/d_a_ply_methods.cpp, generated whole; a port-side hook at its top (d_a_ply_methods.cpp.patch) calls one host-side rule (inert with that rule's mode off)
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020db704.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e032c.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e4bb8.c
+src/IsPlayerWarping.c
+# FOLDED into src/engine/model/TextureSequence.cpp (row 12): src/_ZN15TextureSequence6UpdateER15ModelComponents.cpp
+# FOLDED into src/runtime/actor/d_actor.cpp (row 127): src/_ZN8dActor_c10FindWithIDEj.cpp
+# FOLDED into src/runtime/actor/d_actor.cpp (row 127): src/_ZN8dActor_c13SpawnSoundObjEj.cpp
+# FOLDED into src/runtime/actor/d_actor.cpp (row 127): src/_ZN8dActor_c16JumpedOnByPlayerER5dCc_cR6Player.cpp
+# FOLDED into src/runtime/actor/d_actor.cpp (row 127): src/_ZN8dActor_c9UpdatePosEP5dCc_c.cpp
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/_ZN6Camera9SetFlag_3Ev.cpp
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d064.c
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d0ac.c
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d3f8.c
+src/Message.cpp
+src/unnamed/arm9/0202/func_02020388.c
+# FOLDED into src/engine/particle/Particle.cpp (row 387): src/func_02022cbc.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_02035798.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d7430.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d8118.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d8360.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d85fc.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d9298.cpp
+# _ZN7daPly_c19func_ov002_020e444cEv RETIRED to its matched TU via hostgen's REG_RIDE_ARG
+# table (GATE10_SYMS): decl_common.h declares _ZN7daPly_c19func_ov002_020e3f90Ev (void) and
+# the matched body calls it argless because on ARM r0 still holds the Player
+# at the bl (0x020e4454 mov r4,r0 / 0x020e4458 bl 0x020e3f90), while
+# src/func_ov002_020e3f90.c defines it (char*) and dereferences it first
+# thing. hostgen's HEADER_SHADOW hides the (void) declaration for this TU and
+# REG_RIDE_ARG spells the one argument. This is the body that seats the head
+# model's world matrix. Was port/unmatched/func_ov002_020e444c_hostcopy.c,
+# which transcribed the whole hundred-line body to change that one call.
+# port/unmatched/func_ov002_020e4768_hostcopy.cpp  RETIRED (run link100, lane FOLD2);
+#   the matched TU(s) it stood in for are on port/slice_fold2.txt.
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e4990.c
+src/runtime/actor/d_bg_actor.cpp
+src/VEC_Add.c
+src/Matrix4x3_ApplyInPlaceToRotationX.c
+src/Matrix4x3_ApplyInPlaceToRotationY.c
+src/Matrix4x3_ApplyInPlaceToRotationZ.c
+src/Matrix4x3_ApplyInPlaceToTranslation.c
+src/Matrix4x3_FromTranslation.c
+src/SetBg1Offset.c
+src/SetBg3Offset.c
+src/SetSubBg1Offset.c
+src/VEC_Subtract.c
+src/Vec3_HorzAngle.cpp
+src/Vec3_VertAngle.cpp
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/_ZN5dBgPiD1Ev.cpp
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/_ZN9dBgCh_Lin10DetectClsnEv.cpp
+# FOLDED into src/engine/collision/d_bg_ch_lin.cpp (row 59): src/_ZN9dBgCh_Lin10GetClsnPosEv.cpp
+# FOLDED into src/engine/collision/d_bg_ch_lin.cpp (row 59): src/_ZN9dBgCh_Lin13SetObjAndLineERK7Vector3S2_P8dActor_c.cpp
+# FOLDED into src/engine/collision/d_bg_ch_lin.cpp (row 59): src/_ZN9dBgCh_LinD1Ev.cpp
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/_ZN10dBgCh_Actr13SetLimMovFlagEv.cpp
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/_ZN10dBgCh_Actr15ClearGroundFlagEv.cpp
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/_ZN10dBgCh_Actr15ClearLimMovFlagEv.cpp
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/_ZN10dBgCh_Actr18StopDetectingWaterEv.cpp
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/_ZN10dBgCh_Actr19StartDetectingWaterEv.cpp
+# FOLDED into src/engine/gx/G2x.cpp (row 298): src/_ZN3G2x18SetBlendBrightnessEPVtts.cpp
+# FOLDED into src/engine/collision/d_bg_ch.cpp (row 26): src/_ZN5dBgCh19StartDetectingToxicEv.cpp
+# FOLDED into src/engine/collision/d_bg_ch.cpp (row 26): src/_ZN5dBgCh21StopDetectingOrdinaryEv.cpp
+# FOLDED into src/runtime/actor/d_actor.cpp (row 127): src/_ZN8dActor_c19DropShadowRadHeightER11ShadowModelR9Matrix4x35Fix12IiES5_j.cpp
+# FOLDED into src/runtime/actor/d_actor.cpp (row 127): src/_ZN8dActor_c22UpdatePosWithOnlySpeedEP5dCc_c.cpp
+# FOLDED into src/runtime/actor/d_actor.cpp (row 127): src/_ZN8dActor_c28UpdatePosWithHorzSpeedAndAngEv.cpp
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/_ZN5Sound17ChangeMusicVolumeEj5Fix12IiE.c
+src/Timer.cpp
+# FOLDED into src/Timer.cpp (row 587): src/_ZN5Timer10StartTimerEv.cpp
+# FOLDED into src/Timer.cpp (row 587): src/_ZN5Timer7GetTimeEv.cpp
+# FOLDED into src/Timer.cpp (row 587): src/_ZN5Timer9StopTimerEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player4HurtERK7Vector3j5Fix12IiEjjj.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player7TryGrabER8dActor_c.cpp
+src/Message2.cpp
+src/engine/path/PathPtr.cpp
+# FOLDED into src/engine/path/PathPtr.cpp (row 594): src/_ZN7PathPtrC1Ev.cpp
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/_ZNK5dBgPi9GetClsnIDEv.cpp
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/_ZNK10dBgCh_Actr10IsOnGroundEv.cpp
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/_ZNK10dBgCh_Actr13GetWallResultEv.cpp
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/_ZNK10dBgCh_Actr14GetFloorResultEv.cpp
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/_ZNK10dBgCh_Actr8IsOnWallEv.cpp
+# FOLDED into src/engine/path/PathPtr.cpp (row 594): src/_ZNK7PathPtr7GetNodeER7Vector3j.cpp
+# FOLDED into src/engine/path/PathPtr.cpp (row 594): src/_ZNK7PathPtr8NumNodesEv.cpp
+# FOLDED into src/runtime/actor/d_actor.cpp (row 127): src/func_020105cc.c
+# FOLDED into src/Message.cpp (row 532): src/func_0201eaac.c
+# FOLDED into src/Message.cpp (row 532): src/func_0201fb4c.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_020355b4.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_020355c8.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_020355e8.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_020355fc.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_02035638.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_0203564c.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_020356c8.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_02035770.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_02035784.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_020357a0.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_020357c0.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_020357e0.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_02035800.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_020371fc.cpp
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_02037318.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/func_02037e58.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/func_020383e4.c
+# FOLDED into src/engine/path/PathPtr.cpp (row 594): src/func_0203ad54.c
+# FOLDED into src/runtime/actor/ActorBase.cpp (row 239): src/func_02043f98.c
+src/unnamed/arm9/0204/func_02046bbc.c
+# func_ov002_020bdb50: HOST COPY at unmatched/Player_ReleaseHeldDispatch.cpp
+# (wired in CMakeLists). The matched C calls func_ov002_020d5cec with no argument
+# and relies on the held object being live in ARM r0; cdecl drops it, so the host
+# copy passes *(char**)(c+0x360) explicitly. See that file's header.
+# src/game/player/Player.cpp -- HOST COPY: unmatched/Player_HeadBonk.cpp (slot 28 dispatch remodelled as a C++ virtual so both call sites are thiscall)
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d0580.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d06c0.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d225c.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d5338.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d718c.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d853c.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d8944.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d8d10.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020db5f4.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020de968.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e3f90.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e4374.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e640c.c
+# FOLDED into src/game/actors/d_a_yegg.cpp (row 422): src/func_ov002_020edca4.c
+# FOLDED into src/runtime/actor/d_bg_actor.cpp (row 553): src/func_ov002_020eed24.cpp
+src/Matrix4x3_ApplyInPlaceToRotationXYZExt.c
+src/Matrix4x3_FromRotationX.c
+src/Matrix4x3_FromRotationZ.c
+# _Z8NumStarsv: retired plain (lane shadow-A). The host copy existed because this
+# TU and IsStarCollected.c once disagreed about the width of the course id;
+# both spell it s8 now, and an s8 callee extends the byte itself under cdecl.
+# FOLDED into src/engine/save/SaveData.cpp (row 25): src/NumStars.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/Player_ReleaseHeldActor.c
+src/Vec3_Add.c
+src/Vec3_Asr.c
+# FOLDED into src/ApproachAngle.cpp (row 16): src/_Z15ApproachLinear2Rsss.cpp
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/_ZN5dBgPiaSERKS_.cpp
+src/engine/collision/d_m3d_g_lin.cpp
+# FOLDED into src/engine/model/d_ext_shadow_model.cpp (row 117): src/_ZN11ShadowModel9InitModelEP9Matrix4x35Fix12IiES3_S3_j.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/_ZN10dBgCh_Actr20UpdateExtraContinousEv.cpp
+# RE-KEYED at the main->port sync (lane SYNC7, the wave-9 fold merge): main's #2712
+# rewrote OAM::Render (arm9 0x02020994, size 0x690) as matching C and renamed the
+# file .cpp -> .c. Same address, new spelling. The C form DEFINES the flat name
+# _ZN3OAM6RenderEbP7OamAttriiiiiiii itself, which is what the port's
+# callers already ask for, so port/hal/reverse_bridges.cpp's terminator-guard
+# forwarder of the same flat name is retired in the same change.
+src/engine/oam/OAM.cpp
+# FOLDED into src/runtime/actor/d_actor.cpp (row 127): src/_ZN8dActor_c11UntrackStarERa.cpp
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/_ZN5Sound8PlayLongEjjjRK7Vector3s.cpp
+# FOLDED into src/runtime/actor/ActorBase.cpp (row 239): src/_ZN7fBase_c18MarkForDestructionEv.cpp
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d858.c
+# FOLDED into src/runtime/actor/d_actor.cpp (row 127): src/func_02010da4.c
+# FOLDED into src/engine/collision/d_cc.cpp (row 118): src/_ZN5dCc_c6UnlinkEv.cpp
+# The three MSG_GEN_TEXT_FUNCS embedded-text generators (arm9 0x0208ee80, a
+# 3-entry function-pointer table _ZN7Message10LayoutLineEv calls through on a 0xfe control
+# byte in the message stream: star count, controller-button glyph, digit run).
+# The table was zeroed auto_bss storage, so every real multi-page line whose
+# text carries a 0xfe (the buddy's msg 42, the sign line 43, ...) called a null
+# pointer and crashed at eip=0. hal/message_gen_text.cpp seats the table with
+# these real host addresses; _Z13func_020138dcv is _Z13func_0201aca4v's rabbit-count dep.
+src/Message2.cpp
+# FOLDED into src/Message2.cpp (row 697): src/func_0201ab6c.c
+# FOLDED into src/Message2.cpp (row 697): src/func_0201adac.c
+# FOLDED into src/engine/save/SaveData.cpp (row 25): src/func_020138dc.c
+# FOLDED into src/engine/particle/Particle.cpp (row 387): src/func_02022a4c.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_0203567c.c
+# FOLDED into src/engine/collision/d_bg_ch_lin.cpp (row 59): src/func_02037608.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr.cpp (row 58): src/func_02037880.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr.cpp (row 58): src/func_020378dc.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr.cpp (row 58): src/func_02037938.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/func_02037e48.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/func_02037e68.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/func_02037e84.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/func_02037e90.c
+# FOLDED into src/engine/collision/d_m3d_g_sph.cpp (row 83): src/func_0203abd4.c
+# FOLDED into src/engine/collision/d_m3d_g_sph.cpp (row 83): src/_ZN8dM3dGSphD1Ev.cpp
+# FOLDED into src/engine/path/PathPtr.cpp (row 594): src/func_0203acbc.c
+# FOLDED into src/engine/path/PathPtr.cpp (row 594): src/func_0203ad6c.c
+# FOLDED into src/engine/model/Model4.cpp (row 191): src/func_02045e2c.c
+src/engine/gx/G3X.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d0178.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d0d2c.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d5cec.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d71a0.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d91b8.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d91e0.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020dacb4.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e0478.cpp
+# FOLDED into src/game/actors/d_a_star.cpp (row 17): src/func_ov002_020e7218.c
+# FOLDED into src/game/actors/d_a_yegg.cpp (row 422): src/func_ov002_020ec610.c
+# FOLDED into src/game/actors/d_a_yegg.cpp (row 422): src/func_ov002_020ec728.c
+# FOLDED into src/engine/collision/d_m3d_g_lin.cpp (row 670): src/_ZN8dM3dGLinD2Ev.cpp
+# FOLDED into src/engine/save/SaveData.cpp (row 25): src/IsStarCollected.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/_ZN12dBgCh_SphCrr10DetectClsnEv.cpp
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr.cpp (row 58): src/_ZN12dBgCh_SphCrr14SetFloorResultERK5dBgPi.cpp
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr.cpp (row 58): src/_ZN12dBgCh_SphCrr15SetObjAndSphereERK7Vector35Fix12IiEP8dActor_c.cpp
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/_ZN10dBgCh_Actr19ClearAllGroundFlagsEv.cpp
+# FOLDED into src/runtime/actor/d_actor.cpp (row 127): src/_ZN8dActor_c10SpawnCoinsERK7Vector3j5Fix12IiEs.cpp
+# FOLDED into src/runtime/actor/d_actor.cpp (row 127): src/_ZN8dActor_c11SpawnNumberERK7Vector3jbtPS_.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player22IsBeingShotOutOfCannonEv.cpp
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/_ZNK5dBgPi6CopyToERS_.cpp
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/_ZNK10dBgCh_Actr16ShouldUpdatePosYEv.cpp
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_0201179c.c
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_020123c8.c
+# FOLDED into src/engine/particle/Particle.cpp (row 387): src/func_02022c80.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_020355a0.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_020355dc.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_020356d4.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_02035764.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_020371b0.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr.cpp (row 58): src/func_0203782c.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr.cpp (row 58): src/func_02037888.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/func_02037dc4.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/func_02038324.cpp
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/func_0203859c.cpp
+src/engine/collision/d_bg_w_kc.cpp
+# FOLDED into src/engine/collision/d_m3d_g_sph.cpp (row 83): src/func_0203abcc.c
+# FOLDED into src/engine/collision/d_m3d_g_sph.cpp (row 83): src/func_0203ac00.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020da9d4.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020db54c.cpp
+# FOLDED into src/game/actors/d_a_star.cpp (row 17): src/func_ov002_020e7554.c
+# FOLDED into src/game/actors/d_a_yegg.cpp (row 422): src/func_ov002_020ec628.c
+# FOLDED into src/game/actors/d_a_yegg.cpp (row 422): src/func_ov002_020ec640.c
+# FOLDED into src/game/actors/d_a_yegg.cpp (row 422): src/func_ov002_020ec80c.c
+# FOLDED into src/runtime/actor/d_bg_actor.cpp (row 553): src/func_ov002_020eedc0.cpp
+# FOLDED into src/engine/collision/d_m3d_g_lin.cpp (row 670): src/func_ov002_020fea4c.c
+# FOLDED into src/engine/collision/d_m3d_g_lin.cpp (row 670): src/func_ov002_020fea68.c
+# FOLDED into src/game/actors/d_a_star.cpp (row 17): src/LinkSilverStarAndStarMarker.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/_ZN10dBgCh_Actr13SetGroundFlagEv.cpp
+# FOLDED into src/runtime/actor/d_actor.cpp (row 127): src/_ZN8dActor_c15FindWithActorIDEjPS_.cpp
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/_ZNK10dBgCh_Actr13GetLimMovFlagEv.cpp
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d4b0.c
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d508.c
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_02011af8.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_0203573c.c
+# FOLDED into src/engine/collision/d_bg_ch_actr.cpp (row 15): src/func_02035860.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr.cpp (row 58): src/func_02037968.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr.cpp (row 58): src/func_0203799c.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr.cpp (row 58): src/func_020379d0.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr.cpp (row 58): src/func_02037a38.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr.cpp (row 58): src/func_02037b5c.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/func_02037f54.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/func_02037fc0.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/func_02038234.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/func_02038298.c
+# FOLDED into src/engine/collision/d_bg_w.cpp (row 452): src/func_020393cc.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d9c70.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020da95c.c
+src/game/actors/d_a_obj_number.cpp
+# _ZN11KuppaScript18StartDanceCutsceneEi IS NOT HERE: it declares _Z20GetStarCameraSettingi `extern s32` and
+# uses the full return as the sDanceCutsceneTable[] index, but the definition returns
+# unsigned char (AL only), so on x86 MSVC the dirty EAX high bytes produce an
+# out-of-range index (4097) and a garbage _ZN11KuppaScript3RunEPh pointer -> a c0000005 in
+# _ZN11KuppaScript7ProcessEv the first frame of the star-get cutscene. Hosted with the
+# u8 return masked to the ROM's own 0xf in port/hal/star_flow.cpp (the
+# _Z13HitDeathPlanei / sound_abi u8-ride-through pattern).
+# src/func_0200ee8c.c  (hosted in port/hal/star_flow.cpp)
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr.cpp (row 58): src/func_02037b1c.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/func_02037f64.c
+# FOLDED into src/engine/collision/d_bg_ch_sph_crr_query.cpp (row 103): src/func_02037f94.c
+# FOLDED into src/engine/collision/d_bg_w.cpp (row 452): src/func_020393bc.c
+# FOLDED into src/runtime/actor/ActorBase.cpp (row 239): src/func_02043f4c.c
+src/KuppaScript.cpp
+# FOLDED into src/engine/animation/d_ext_frame_ctrl.cpp (row 131): src/_ZN9Animation4CopyERKS_.cpp
+# FOLDED into src/engine/model/ModelAnim.cpp (row 606): src/_ZN9ModelAnim4CopyERKS_Pc.cpp
+# FOLDED into src/engine/collision/d_bg_ch.cpp (row 26): src/_ZN5dBgCh18StopDetectingWaterEv.cpp
+# RETIRED at SYNC6, on the file's own retirement condition. Its header says
+# "Adopted from the banked near-miss draft ... Semantics only; retires when the
+# function matches for real": main's src/game/player/Player.cpp defines
+# func_ov002_020bfa74 now, and the two collided (one LNK2005 row in
+# build_s2.log). The matched body is the one kept.
+#port/unmatched/func_ov002_020bfa74.c
+src/cstd.cpp
+src/GetSoundMode.c
+src/SetSoundMode.c
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_02011c8c.c
+# func_ov002_020bd664: HOST COPY at hal/intro_kuppa_dispatch.cpp. It is the
+# kuppa script's command dispatcher and it forms a pointer-to-member over an
+# INCOMPLETE class -- the gate-16 case -- so on MSVC each of its fourteen table
+# initialisers reads sixteen bytes out of an eight-byte ROM record. Harmless
+# while the intro gate was shut and nothing ran a script command; the opening
+# runs one immediately. (run lvled, lane intro-cutscene)
+# src/func_ov002_020bd664.cpp
+# _ZN8daDemo_c10RunCommandEPhii: HOST COPY at hal/intro_kuppa_dispatch.cpp. The SECOND
+# kuppa dispatcher -- the cutscene objects' own twenty-four commands, reached
+# through _ZN11KuppaScript14RunDemoCommandEPhii where the first is reached through _ZN11KuppaScript16RunPlayerCommandEPhii. Same
+# gate-16 pointer-to-member-over-incomplete-class case as its neighbour above.
+# (run lvled, lane intro-cutscene)
+# src/func_ov002_020f7d74.cpp
+# FOLDED into src/game/stages/d_scene.cpp (row 271): src/_ZN8dScene_c20SetAndStopColorFaderEv.cpp
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/_ZN5Sound6Player19SetPlayableSeqCountEii.cpp
+# FOLDED into src/engine/save/SaveData.cpp (row 25): src/_ZN8SaveData19IsCharacterUnlockedEj.cpp
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_02011d5c.c
+# FOLDED into src/game/stages/d_scene.cpp (row 271): src/_ZN8dScene_c9SetFadersEP15FaderBrightness.cpp
+src/unnamed/arm9/0204/func_02049c48.cpp
+# FOLDED into src/engine/oam/OAM.cpp (row 679): src/_ZN3OAM11GetObjWidthEii.cpp
+# FOLDED into src/engine/oam/OAM.cpp (row 679): src/_ZN3OAM12GetObjHeightEii.cpp
+# FOLDED into src/engine/oam/OAM.cpp (row 679): src/_ZN3OAM16LoadAffineParamsEP7OamAttrPiP9Matrix2x2.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player12St_Fall_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player12St_Fall_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player12St_Jump_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player20St_StomachSlide_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player20St_StomachSlide_MainEv.cpp
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d544.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020dba0c.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020dc174.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020dc560.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020dd2f4.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e0ccc.cpp
+# _ZN7daPly_c12St_Jump_MainEv RETIRED to its matched TU via hostgen's
+# CALL_STATE_FN table (GATE10_SYMS): its non-virtual PMF branch routes through
+# hal_call_state_fn on the DS code word, the virtual branch stays a raw host
+# vtable walk. Was port/unmatched/Player_St_Jump_Main.cpp.
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e200c.c
+# Luigi's and Yoshi's rows of the same airborne-gravity table
+# data_ov002_0211073c (Wario shares Mario's 020e200c). _Z13func_02012120jjjPK7Vector3s is
+# the per-character voice helper both call: baseId + data_02075250[ch]
+# into Sound::PlayLong.
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e1e70.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e1c20.c
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_02012120.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e2be4.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e2b6c.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e2ad0.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e25f0.c
+# FOLDED into src/runtime/actor/d_bg_actor.cpp (row 553): src/func_ov002_020eeca8.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player12St_Land_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player12St_Land_MainEv.cpp
+# FOLDED into src/engine/collision/d_bg_w_kc.cpp (row 759): src/_ZN7dBgW_Kc7SetFileEP8KCL_FileR10CLPS_Block.cpp
+# FOLDED into src/engine/collision/d_bg_w_kc.cpp (row 759): src/_ZN7dBgW_KcC1Ev.cpp
+# FOLDED into src/engine/collision/d_bg_w.cpp (row 452): src/_ZN4dBgW6EnableEP8dActor_c.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e04a4.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e0a64.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e25d4.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e2664.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e28d4.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e2c84.c
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d8c8.c
+# FOLDED into src/runtime/actor/d_actor.cpp (row 127): src/func_0200fccc.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e2ea0.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e301c.c
+# FOLDED into src/runtime/actor/d_actor.cpp (row 127): src/func_0200fc44.c
+src/DecIfAbove0_Byte.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player12St_Bonk_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player12St_Bonk_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player13St_Crawl_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player13St_Crawl_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player14St_Crouch_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player14St_Crouch_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player16St_LongJump_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player16St_LongJump_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player16St_SideFlip_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player16St_SideFlip_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_PunchKick_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_PunchKick_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_SlideKick_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_SlideKick_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_SlopeJump_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_SlopeJump_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player19St_GroundPound_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player19St_GroundPound_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player22St_GroundPound_CleanupEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player21St_SmallLaunchUp_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player21St_SmallLaunchUp_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d1164.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d12b0.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020dc020.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e2ba8.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020dbaec.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020dd5ec.c
+# FOLDED into src/runtime/actor/d_bg_actor.cpp (row 553): src/func_ov002_020eee3c.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020dbc94.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020dd908.c
+# FOLDED into src/runtime/actor/d_bg_actor.cpp (row 553): src/func_ov002_020ef2a4.cpp
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d580.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d8a50.c
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200cb58.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d8854.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020dbbc0.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020dbd94.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020dbe70.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020dbf4c.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020dd8f4.c
+# src/func_ov002_020eeeb8.cpp -- HOST COPY: unmatched/Actor_OnKickedDispatch.cpp (slot 24 dispatch remodelled as a C++ virtual so the site is thiscall)
+# src/func_ov002_020ef070.cpp -- HOST COPY: unmatched/Actor_OnAttacked2Dispatch.cpp (slot 23 dispatch remodelled as a C++ virtual so the site is thiscall)
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d8838.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player15St_Balloon_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player15St_Balloon_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player18St_Balloon_CleanupEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player16St_BurnFire_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player16St_BurnFire_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_ButtSlide_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_ButtSlide_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player14St_Cannon_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player14St_Cannon_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_Cannon_CleanupEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player19St_CrazedCrate_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player19St_CrazedCrate_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player22St_CrazedCrate_CleanupEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player18St_DizzyStars_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player18St_DizzyStars_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player21St_DizzyStars_CleanupEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player19St_Electrocute_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player19St_Electrocute_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player11St_Fly_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player11St_Fly_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player22St_GrabBowserTail_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player22St_GrabBowserTail_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player25St_GrabBowserTail_CleanupEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player15St_Grabbed_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player15St_Grabbed_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player18St_Grabbed_CleanupEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_HoldHeavy_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_HoldHeavy_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_HoldLight_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_HoldLight_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player20St_HoldLight_CleanupEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player12St_Hurt_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player12St_Hurt_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player15St_Hurt_CleanupEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player20St_InYoshiMouth_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player20St_InYoshiMouth_InitEv.cpp
+src/minigames/d_s_mg_bomroom.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player21St_JumpQuicksand_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player21St_JumpQuicksand_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_LedgeGrab_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_LedgeGrab_InitEv.cpp
+# ST_LEDGE_HANG (data_ov002_0210ffec). Its three slots are the sinit's
+# lo/hi/tail at 0x0210a41c/0x0210a06c/0x02109eec, which relocate to
+# St_LedgeHang_Init/_Main/_Cleanup. This is the state the ledge grab
+# (_ZN7daPly_c19func_ov002_020d0580Ev, already in this manifest) changes into, and it was
+# hosted nowhere: landing on a hedge edge left Main no-op'd every frame.
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_LedgeHang_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_LedgeHang_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player20St_LedgeHang_CleanupEv.cpp
+# The helpers St_LedgeHang_Main reaches for. 020d0948 is the LET GO path
+# (nudges him off the wall and changes to ST_FALL); 020cfaf0 and 020cfbdc
+# are the wall-still-there and shimmy-forward raycast probes. The fourth,
+# _ZN7daPly_c19func_ov002_020cfea4Ev, has no source anywhere -- port/unmatched.
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d0948.c
+# _ZN7daPly_c19func_ov002_020cfbdcEv is NOT here: decl_common.h declares it taking void* and
+# its own TU defines it taking char*, which was two symbols while the header
+# was C++-mangled and is one extern "C" overload since main's sweep. It goes
+# through hostgen (GATE10_SYMS in CMakeLists.txt), which shadows the header's
+# declaration for that one name.
+# RETIRED at the main->port sync (lane SYNC7, wave 9): the named trap has a
+# body now. main recovered _ZN7daPly_c19func_ov002_020cfea4Ev and gave it its own delink
+# block, ov002 .text 0x020cfea4..0x020d0178, which is exactly the 0x2d4 bytes
+# the trap's banner names, so the ROM's own code answers the name and the
+# unconditional 0 this file returned is gone with it. The trap is the second
+# way out of the ledge hang and into the climb, so returning 0 for it was a
+# live behaviour difference, not a placeholder for an unreachable path.
+#port/unmatched/func_ov002_020cfea4.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020cfea4.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player11St_Owl_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player11St_Owl_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player14St_Owl_CleanupEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player12St_Spin_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player12St_Spin_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player15St_Spin_CleanupEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player15St_Swallow_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player15St_Swallow_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_SweepKick_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_SweepKick_InitEv.cpp
+# _ZN7daPly_c12St_Swim_MainEv: HOST COPY at unmatched/Player_SwimMain.cpp (wired in
+# CMakeLists). The matched C calls Player::GetHealth() with no argument and relies
+# on `this` being live in ARM r0; cdecl drops it, so the host copy passes `this`
+# explicitly. This is the JRB SIG-SWIM crash. See that file's header.
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player13St_Throw_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player13St_Throw_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player14St_Thrown_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player14St_Thrown_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_Thrown_CleanupEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player19St_TornadoSpin_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player19St_TornadoSpin_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player18St_TurnAround_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player18St_TurnAround_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player15St_Wait_CleanupEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player21St_WaitQuicksand_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player21St_WaitQuicksand_InitEv.cpp
+# St_WallJump_Main dispatches the per-character airborne-gravity function
+# out of the sinit-built table data_ov002_0211073c and called row[0] RAW --
+# a DS code address, so on the host it jumped into the mounted ov002 data
+# image and killed the process (the walljump crash). RETIRED to its matched TU
+# via hostgen's CALL_STATE_FN table (GATE10_SYMS): both branches route through
+# hal_call_state_fn, following St_NoControl_Init (the table's ptr words are all
+# zero, so the virtual branch is dead and row[0] would be a DS vtable byte
+# offset). Was port/unmatched/Player_St_WallJump_Main.cpp.
+src/minigames/d_s_mg_curling.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_WallSlide_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_WallSlide_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_WindCarry_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_WindCarry_InitEv.cpp
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d10c.c
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d1e4.c
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d63c.c
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d6b4.c
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d768.c
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d7a4.c
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d89c.c
+# src/func_0201fc88.c -- dropped: its (void) form drops the object-message id on
+#   the host ride-through; hal/cxx_aliases.cpp carries a veneer that spells it
+#   through to ObjectMessageIDToActualMessageID (the sign-box open path).
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d1f78.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d3498.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d5ab4.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d93ac.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d9dcc.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020daa74.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020dcafc.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020e0f38.cpp
+src/game/actors/d_a_door.cpp
+src/Vec3_MulScalarInPlace.c
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/_ZN5Sound22LoadAndSetMusic_Layer1Ei.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player9DropActorEv.cpp
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200cf40.c
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d678.c
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d6f0.c
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d7e0.c
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_02012194.c
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_02012694.cpp
+# FOLDED into src/engine/particle/Particle.cpp (row 387): src/func_02022d44.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d5ed0.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d6998.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d71ec.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d94cc.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d98b4.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d99a4.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d9a4c.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d9aac.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020dc09c.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020de3d0.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020de428.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020df8f0.c
+# src/func_ov002_020ed63c.cpp -- gate 210: YoshiEgg's state setter is an mwcc
+# pointer-to-member over data_ov002_02110a5c; host copy in
+# unmatched/YoshiEgg_StateDispatch.cpp (the MSVC build of this TU called a raw
+# DS word). Nothing dispatched it before the egg was seated.
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/_ZN5Sound7PlaySubEjjj5Fix12IiEb.cpp
+# FOLDED into src/cstd.cpp (row 825): src/func_02053274.c
+# FOLDED into src/game/actors/d_a_door.cpp (row 1084): src/func_ov100_02145014.c
+# FOLDED into src/Message.cpp (row 532): src/ObjectMessageIDToActualMessageID.c
+src/Vec3_LslInPlace.c
+src/Vec3_MulScalar.c
+# FOLDED into src/runtime/actor/d_actor.cpp (row 127): src/_ZN8dActor_c11LandingDustEb.cpp
+# Sound front doors. These were held out while data_020a5bb8 was null:
+# Sound::Play opens with func_02050cdc(), which walks the sound player
+# through that root, so the first Play in a level took the process with it
+# (St_Swim_Main's underwater loop found it). hal/sdat/sdat.cpp seats a real
+# parsed SDAT there and hal/sdat/consumer.cpp hosts the ARM7 behind the
+# command queue, so all four are back on their matched src.
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/_ZN5Sound4PlayEjjRK7Vector3.cpp
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/_ZN5Sound9PlayBank0EjRK7Vector3.cpp
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/_ZN5Sound13PlayCharVoiceEjjRK7Vector3.cpp
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/_ZN5Sound22StopLoadedMusic_Layer1Ej.cpp
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/_ZN5Sound9PlayBank3EjRK7Vector3.cpp
+# Sound init, run by hal/sdat/consumer.cpp's sd_sound_init_host in place of
+# _Z13func_020133bcv (Sound::Init), which is in no slice and whose remaining steps
+# are the card open, the 1MB sound heap and the ARM9 sound thread.
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f1e8.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02050950.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204fc40.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f94c.c
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_02011a28.c
+# Sound MAINTENANCE, run once a frame by sd_sound_frame_host. func_0204fafc is
+# the only function in the game that gives a voice BACK: it walks the active
+# voice list, asks the ARM7 which players are still sounding, and recycles
+# every voice whose player has gone quiet. Without it the 16 voice records and
+# the 3D positional slots are one-way, and once the pool is spent the game's
+# own allocator starts refusing sound effects and cutting the ones it does
+# start. SND_GetPlayerStatus is the read of the ARM7's player bitmask it decides on;
+# the other three are the volume-ramp helpers it drives.
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204fafc.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02052438.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_02052420.c
+# The OTHER half of the frame's sound maintenance, one level up from the
+# voices, and the last thing func_020132d8 does before the frame ends.
+#
+# func_0201226c is "start this looping sound, or refresh the one I started
+# last frame": it looks the caller's handle up in data_0209b53c and, finding
+# it, marks the entry +6 and returns the same handle; finding nothing, it
+# starts a new sound and hands back a new handle. Refresh, therefore, is the
+# ONLY thing keeping a looping sound alive, and _Z13func_020119c8Pv is the other
+# side of that contract. Once a frame it walks all 0x40 entries, clears the
+# +6 flag on everything that was refreshed, and on everything that was not
+# calls _Z13func_02011654PcS_ -> _Z13func_02011aa0Pv -> func_0204fa2c: stop the sound,
+# free the slot, point the allocation cursor at it.
+#
+# Nothing in the port ran it, so the table was one-way in exactly the way the
+# voice pool above used to be, with a louder failure. Player::ChangeState
+# zeroes mLoopingSoundHandle on every transition, so the next entry into a
+# sliding state cannot find its old handle and starts a SECOND sound on top
+# of the first, which was never stopped and never will be. Every wall slide,
+# butt slide, hard turn and walk adds one more permanent copy of the same
+# looping effect, summing louder each time.
+# and the level-change half of the same contract. Scene::BeforeCleanupResources
+# (vtable slot 4) fires _Z13func_02011974Pv(&data_0209b53c) on every level change: it
+# walks the same 0x40 entries as _Z13func_020119c8Pv but stops EVERY live handle,
+# ignoring the +6 refreshed flag the per-frame reaper spares. The port keeps the
+# Scene alive across levels so the slot never dispatches; hal/level_change.cpp
+# calls it by hand at teardown (through sd_sound_level_reap) so a loop whose
+# owner is torn down mid-change does not carry into the next level. Matched src,
+# was in no slice, called from nowhere.
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_020119c8.c
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_02011654.c
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_02011aa0.c
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_02011974.c
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200ca14.c
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200cce4.c
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d72c.c
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d954.c
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_02011b7c.c
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_0201267c.cpp
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_02013524.c
+# _Z13func_02012d64v is the first line of the game's sound frame: it ramps the MAIN
+# music volume gMusicVolume toward its target sMusicVolumeTarget<<12 and pushes the
+# new volume at the music player. Nothing in the port ramped it, so every
+# Sound::PlaySub duck was stamped as a target and never travelled. Called from
+# sd_sound_fade_host, which is where the ROM's func_020132d8 calls it. Matched
+# src, was in no slice; its two callees (_Z14ApproachLinearRiii, _Z13func_02013524P12NNSSndHandleii)
+# are both already linked.
+# FOLDED into src/engine/sound/Sound.cpp (row 24): src/func_02012d64.c
+# FOLDED into src/engine/particle/Particle.cpp (row 387): src/func_020229f0.c
+# _ZN7daPly_c19func_ov002_020d6c60EPS_ goes through hostgen for the same reason as 020cfbdc:
+# decl_common.h declares it (char*, void*) and its TU defines it (char*,
+# char*), which is one extern "C" overload since main's sweep.
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d6dac.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d7030.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020db8d8.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player18St_YoshiPower_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player18St_YoshiPower_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player21St_YoshiPower_CleanupEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/func_ov002_020d5f34.cpp
+# FOLDED into src/runtime/actor/d_actor.cpp (row 127): src/_ZN8dActor_c17HugeLandingDustAtER7Vector3b.cpp
+# FOLDED into src/runtime/actor/d_actor.cpp (row 127): src/_ZN8dActor_c4NextEPKS_.cpp
+src/engine/collision/d_clipper.cpp
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 106): src/func_0204f8cc.c
+# FOLDED into src/engine/collision/d_clipper.cpp (row 1220): src/_ZN7Clipper13Func_0201559CEv.cpp
+# FOLDED into src/engine/collision/d_bg_ch.cpp (row 26): src/func_02035468.c
+src/VEC_CrossProduct.c
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player12St_Dive_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player17St_WaterJump_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player21St_HeadstandJump_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player16St_BackFlip_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player24St_SlideKickRecover_InitEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player16St_BurnLava_MainEv.cpp
+# FOLDED into src/game/player/Player.cpp (row 7): src/_ZN6Player16St_BurnLava_InitEv.cpp
+# FOLDED into src/game/stages/d_scene.cpp (row 271): src/_ZN8dScene_c14StartSceneFadeEjjt.cpp
+# FOLDED into src/game/stages/d_scene.cpp (row 271): src/_ZN8dScene_c15SetSceneToSpawnEjj.cpp
+# _ZN7daPly_c17St_NoControl_InitEv RETIRED to its matched TU via hostgen's
+# CALL_STATE_FN table (GATE10_SYMS): both branches route through
+# hal_call_state_fn (the table's ptr words are all zero, so the virtual branch
+# is dead and m->adj would be a DS vtable byte offset). Was
+# port/unmatched/Player_St_NoControl_Init.cpp.
+# the door-walk ENTRY (NoControl kind 7): plays the per-side door anim from
+# data_ov002_020ff118 and advances the step so 020c8cb0 above runs the walk.
+# Unwired until 2026-08-08, which is why doors zoomed and never warped.
+# FOLDED into src/game/actors/d_a_star.cpp (row 17): src/func_ov002_020e7090.cpp
+src/Math_Function_0203b14c.c
+# ShowMessage2 is BACK IN (2026-08-08, the dialogue-pipeline session). It was
+# held out with a refusing stub in hal/actor_vtables.cpp because its yes-branch
+# enters the message state and nothing ticked the box. The box now ticks --
+# hal/message_pump.cpp runs Message::UpdateWindow + Message::Update every frame
+# (Stage::UpdateMessage's own dialogue arm), and the engine-A 2D composite in
+# walk_window rasters the box over the 3D frame. Its box setup _Z13func_0201f32ci is
+# ordinary matched src writing the 2D engine registers; it does not run off the
+# map. The stub is gone, so THIS matched symbol links.
+# Message::UpdateWindow -- the box open/close animation and its WIN0/DISPCNT
+# register writes. Matched src, but was in no slice; the pump calls it, so it
+# links here.
+# Player::StartTalk is LIVE (2026-08-08, the talk-entry session). It was held
+# out with a refusing stub in hal/actor_vtables.cpp because its yes-branch puts
+# the player into the talk state, whose Main drives the (then-absent) Message
+# box. The box now ticks and composites and ShowMessage2 is live, so the whole
+# talk chain is real: the sign's planted-state check func_ov002_020bb520 ->
+# StartTalk -> ChangeState into ST_TALK (data_ov002_0211046c) -> St_Talk_Main ->
+# ShowMessage2. Its callees are already linked: IsState is here (above);
+# ChangeState is the host copy port/unmatched/Player_ChangeState.cpp (slice line
+# 8); all nine State records it reads are in the ov002 mount; the two controller
+# globals data_020a0e40/data_0209f49e are backed in hal/actor_vtables.cpp. The
+# stub is gone, so THIS matched symbol links.
+# FOLDED into src/game/actors/d_a_star.cpp (row 17): src/func_ov002_020e6fbc.cpp
+# FOLDED into src/game/actors/d_a_star.cpp (row 17): src/func_ov002_020e9464.c
+# FOLDED into src/engine/save/SaveData.cpp (row 25): src/CollectStarInLevel.c
+# FOLDED into src/game/actors/d_a_star.cpp (row 17): src/func_ov002_020ea3a4.cpp
+# FOLDED into src/engine/save/SaveData.cpp (row 25): src/CollectStar.c
+# The tree-grab chain. CylinderClsn::Process is the frame's overlap pass over
+# the list Update threads onto _ZN5dCc_c8listHeadE (Stage::Render calls it after the
+# transparent pass; the port calls it from the same spot in walk_window's
+# frame). Its notify bit (flags & 8) reaches _Z13func_02014f44jP5dCc_c -> _Z13func_02014f5cP5dCc_cj,
+# which finds the PLAYER (0xbf) by unique id and hands the cylinder to
+# _ZN7daPly_c10StartClimbEP5dCc_c -- the grab test that parks it at Player+0x37c and
+# enters ST_CLIMB (data_ov002_021106dc).
+#
+# Process is a HOST COPY in port/unmatched/ and the matched TU is deliberately
+# NOT here: it reaches GetPos/GetOwnerID through include/CylinderClsn.h, where
+# MSVC folds the Itanium D1/D0 pair into one slot and shifts every later
+# virtual down one -- so GetPos dispatches onto D0 and the first overlap pass
+# frees a tree cylinder mid-heap. The ROM slot order is pinned from the other
+# end by _ZN7daPly_c10StartClimbEP5dCc_c, which reads GetPos at slot 2. See the file
+# header.
+port/unmatched/CylinderClsn_Process.cpp
+# FOLDED into src/engine/collision/d_cc.cpp (row 118): src/func_02014f44.c
+# FOLDED into src/engine/collision/d_cc.cpp (row 118): src/func_02014f5c.c
+
+# the rest of the NoControl kind-entry family (the door's kind 7 came in
+# with the warp; these are the other nineteen kinds' entries -- pipes,
+# cutscene holds, talk/key/star doors -- wired in player_states.inc)
+# kind 0x10 (white/star door) swings the camera to state 0x0209b118
+# FOLDED into src/engine/view/d_camera.cpp (row 23): src/func_0200d148.c

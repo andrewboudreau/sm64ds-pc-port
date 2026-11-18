@@ -1,0 +1,21 @@
+diff --git a/src/game/actors/d_a_f_ring.cpp b/src/game/actors/d_a_f_ring.cpp
+--- a/src/game/actors/d_a_f_ring.cpp
++++ b/src/game/actors/d_a_f_ring.cpp
+@@ -54,8 +54,17 @@
+ extern FRingTexSequenceFilePtr data_ov060_0211b200;
+ extern FRingModelFilePtr data_ov060_0211b208;
+ 
++#ifdef _MSC_VER
++/* Host: the ROM words at 0x021115e4 / 0x021115f4 are defined under their C
++   names (the ov046 mount, routed by port/hal/portsync3_link_aliases.cpp);
++   MSVC decorates a C++ data declaration with its type, so declare them C. */
++extern "C" {
++#endif
+ extern BMA_File data_ov048_021115e4;
+ extern BTA_File data_ov048_021115f4;
++#ifdef _MSC_VER
++}
++#endif
+ 
+ 
+ daFRing_c::~daFRing_c() {}

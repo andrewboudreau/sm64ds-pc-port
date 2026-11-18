@@ -1,0 +1,34 @@
+diff --git a/src/engine/heap/Heap.cpp b/src/engine/heap/Heap.cpp
+--- a/src/engine/heap/Heap.cpp
++++ b/src/engine/heap/Heap.cpp
+@@ -91,7 +91,15 @@
+    THE HOST KEEPS ITS OWN GLOBAL OPERATORS. Defining them here would replace
+    the CRT's for the whole PC port, so on the host every new and delete,
+    array or not, is the CRT's. Nothing here reaches MSVC. */
+-#ifndef _MSC_VER
++
++/* PC port: the two bodies build on the host. The four global operators
++   stay off MSVC: operator new and new[] remain the CRT's, so host C++
++   allocations never touch the game heap (as at the pin), and the global
++   operator delete is port/hal/os_arena.cpp's, which sends a pointer inside
++   the DS arena to func_0203cbf0 below and anything else to free(). The ROM's
++   flat callers reach the game heap through _Znwm and _Znam below (the pin's
++   src/_Znwj.cpp and Memory::operator_new2); _ZdaPv frees through the same
++   global router. */
+ 
+ /* func_0203cc0c at 0x0203cc0c -- allocate from the default heap with the
+  * default alignment. The body of operator new and operator new[]. */
+@@ -106,6 +114,13 @@
+     Memory::defaultHeapPtr->_Deallocate(ptr);
+ }
+ 
++#ifdef _MSC_VER
++extern "C" {
++void *_Znwm(size_t size) { return func_0203cc0c(size); }
++void *_Znam(size_t size) { return func_0203cc0c(size); }
++void _ZdaPv(void *ptr) { ::operator delete(ptr); }
++}
++#else
+ /* operator new(size_t) at 0x0203cbe4. Every new-expression in src/ resolves
+  * here. */
+ void *operator new(size_t size) {

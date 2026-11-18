@@ -1,0 +1,17 @@
+# Gate-7 slice: ModelAnim -- the game's own animated-model class, where
+# Animation::Advance owns frame progression (speed, loop/clamp mode bits)
+# instead of a harness counter. Sits on the gate-4/5 stack.
+
+src/engine/model/d_ext_model.cpp
+# RETIRED at SLICE1: body now in src/_ZN9ModelAnimC1Ev.cpp. MSVC folds the ROM constructor variants into one symbol, so only one of a class two per-function constructor TUs can be compiled.
+#src/_ZN9ModelAnimC2Ev.cpp
+# FOLDED into src/engine/model/ModelAnim.cpp (row 8): src/_ZN9ModelAnim11UpdateVertsEv.cpp
+# FOLDED into src/engine/model/ModelAnim.cpp (row 8): src/_ZN9ModelAnim6RenderEPK7Vector3.cpp
+# FOLDED into src/engine/model/ModelAnim.cpp (row 8): src/_ZN9ModelAnim9Virtual10ER9Matrix4x3.cpp
+# RETIRED at SLICE1: body now in src/_ZN9AnimationC1Ev.cpp. MSVC folds the ROM constructor variants into one symbol, so only one of a class two per-function constructor TUs can be compiled.
+#src/_ZN9AnimationC2Ev.cpp
+# FOLDED into src/engine/animation/d_ext_frame_ctrl.cpp (row 15): src/_ZN9Animation8SetFlagsEi.cpp
+# FOLDED into src/engine/animation/d_ext_frame_ctrl.cpp (row 15): src/_ZN9Animation7AdvanceEv.cpp
+# FOLDED into src/engine/animation/d_ext_frame_ctrl.cpp (row 15): src/_ZN9Animation8FinishedEv.cpp
+# FOLDED into src/engine/animation/d_ext_frame_ctrl.cpp (row 15): src/_ZN9Animation8GetFlagsEv.cpp
+# FOLDED into src/engine/model/ModelAnim.cpp (row 8): src/_ZN9ModelAnim9Virtual18EjPK7Vector3.cpp

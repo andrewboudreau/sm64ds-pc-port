@@ -1,0 +1,107 @@
+# Gate 14: the real level boot -- Stage::LoadClsnAndObjects over the castle
+# grounds' own LVL_Overlay (ov009, mounted whole; see tools/ovdata.py).
+#
+# Everything here is MATCHED in src. The boot is one function plus the
+# fifteen sub-loaders it dispatches through sObjectLoaders and the
+# pointer-store setters those write into. What it replaces in the harness:
+# a hand-constructed MeshCollider over handle 1941, an invented spawn point,
+# a zeroed CLPS block, and two 0xff pins that stood in for a path table
+# nobody had loaded.
+#
+# The seam is hal/level_boot.cpp: LoadFile(handle) over SharedFilePtr, the
+# 32-entry host copy of the loader dispatch table (the ROM's is 15 entries
+# and the `kind & 0x1f` index is unguarded), and storage for the globals the
+# setters fill.
+
+# ---- the boot itself
+src/game/stages/LevelObjects.cpp
+# FOLDED into src/game/stages/LevelObjects.cpp (row 17): src/_Z11LoadObjectsRN11LVL_Overlay8ObjTableEij.cpp
+
+# ---- the fifteen sub-loaders, in dispatch-table order (index 0..14)
+# FOLDED into src/game/stages/LevelObjects.cpp (row 17): src/_Z19LoadStandardObjectsRN11LVL_Overlay11ObjSubTableEij.cpp
+# LoadEntranceObjects is back (run linkfull, lane RS4PORT). Its last call used
+# to ride the wipe type through ARM r0 into _Z22StartEntranceFaderWipei, so
+# port/unmatched/LoadEntranceObjects.cpp hosted it. main #3106 (f0f946a92)
+# passes the table value it tests; this per-function file carries that one
+# hunk from main's src/game/stages/LevelObjects.cpp (the SYNC8C route (a) back-port),
+# byte-identical under mwccarm 2004/b56, and the host copy is retired.
+# port/hal/cxx_aliases.cpp gives the flat name the port's dispatch calls its
+# alias onto the C++ definition, the same row its fourteen siblings have.
+# FOLDED into src/game/stages/LevelObjects.cpp (row 17): src/_Z19LoadEntranceObjectsRN11LVL_Overlay11ObjSubTableEij.cpp
+# FOLDED into src/game/stages/LevelObjects.cpp (row 17): src/_Z19LoadPathNodeObjectsRN11LVL_Overlay11ObjSubTableEij.cpp
+# FOLDED into src/game/stages/LevelObjects.cpp (row 17): src/_Z15LoadPathObjectsRN11LVL_Overlay11ObjSubTableEij.cpp
+# FOLDED into src/game/stages/LevelObjects.cpp (row 17): src/_Z15LoadViewObjectsRN11LVL_Overlay11ObjSubTableEij.cpp
+# FOLDED into src/game/stages/LevelObjects.cpp (row 17): src/_Z17LoadSimpleObjectsRN11LVL_Overlay11ObjSubTableEij.cpp
+# FOLDED into src/game/stages/LevelObjects.cpp (row 17): src/_Z25LoadTeleportSourceObjectsRN11LVL_Overlay11ObjSubTableEij.cpp
+# FOLDED into src/game/stages/LevelObjects.cpp (row 17): src/_Z23LoadTeleportDestObjectsRN11LVL_Overlay11ObjSubTableEij.cpp
+# FOLDED into src/game/stages/LevelObjects.cpp (row 17): src/_Z14LoadFogObjectsRN11LVL_Overlay11ObjSubTableEij.cpp
+# FOLDED into src/game/stages/LevelObjects.cpp (row 17): src/_Z15LoadDoorObjectsRN11LVL_Overlay11ObjSubTableEij.cpp
+# FOLDED into src/game/stages/LevelObjects.cpp (row 17): src/_Z15LoadExitObjectsRN11LVL_Overlay11ObjSubTableEij.cpp
+# FOLDED into src/game/stages/LevelObjects.cpp (row 17): src/_Z22LoadMinimapTileObjectsRN11LVL_Overlay11ObjSubTableEij.cpp
+# FOLDED into src/game/stages/LevelObjects.cpp (row 17): src/_Z23LoadMinimapScaleObjectsRN11LVL_Overlay11ObjSubTableEij.cpp
+# FOLDED into src/game/stages/LevelObjects.cpp (row 17): src/_Z23LoadUnusedType13ObjectsRN11LVL_Overlay11ObjSubTableEij.cpp
+# FOLDED into src/game/stages/LevelObjects.cpp (row 17): src/_Z21LoadStarCameraObjectsRN11LVL_Overlay11ObjSubTableEij.cpp
+
+# ---- the pointer-store setters the sub-loaders are veneers over
+src/engine/path/PathPtr.cpp
+# FOLDED into src/engine/path/PathPtr.cpp (row 46): src/func_0203accc.c
+src/game/stages/d_s_stage_methods.cpp
+
+# ---- world-Y bounds from the octree, and the minimap-change list
+
+# ---- the octree extent the world-Y bounds come out of
+src/engine/collision/d_bg_w_kc_itcm.cpp
+# FOLDED into src/engine/collision/d_bg_w_kc_itcm.cpp (row 60): src/_ZNK7dBgW_Kc13GetUnkOctreeYEv.cpp
+
+# ---- the two tails LoadClsnAndObjects ends in
+src/KuppaScript.cpp
+
+# The kuppa/intro tails call into Sound:: and the solid-heap state stack.
+# Both are dead on the boot the port drives (gSavedKuppaScript is 0, so
+# _ZN11KuppaScript19ContinueIfNecessaryEv returns on its first line) but the link
+# still needs them, and the real files are cheaper than the stubs would be
+# honest. func_0203d974 reads the DS's 0x027ffc40 hardware word directly:
+# harmless while nothing called it -- and the day something did has arrived.
+# The debug character swap calls Player::SetRealCharacter, which reaches it two
+# frames down the voice-bank load, so the host owns it now (see below).
+src/engine/sound/Sound.cpp
+# Sound::LoadGroupAndSetBank compiles from src/ again: main #3102 passes
+# _Z13func_020134d8PvP7SndHeap's return to func_0203d7d4 explicitly, the value the ROM leaves
+# in r0, so the host copy that did the same in port/unmatched/ is gone.
+# FOLDED into src/engine/sound/Sound.cpp (row 75): src/_ZN5Sound19LoadGroupAndSetBankEii.cpp
+# src/_ZN5Sound6Player19SetPlayableSeqCountEii.cpp is also listed in
+# slice_gate10.txt, which is the one place it compiles from. It used to be
+# filtered there and hosted in hal/sdat/sound_abi.cpp (it wrote through
+# data_020a4d84); it writes data_020a4d6c's record field +0x18 now
+# (include/SoundPlayerRecord.h) and links as it is.
+# FOLDED into src/engine/sound/Sound.cpp (row 75): src/DisableSoundPlayersForCredits.c
+# src/func_0203d974.c is the same case: also listed in slice_gate10.txt, where
+# SLICE10_CAM_SOURCES filters it out, and hosted in hal/sdat/sound_abi.cpp
+# because its 0x027ffc40 read is unmapped on the host and the DS-faithful
+# answer walks into a null sound heap. Left live here it would come straight
+# back into the link, since gate 14 is appended unfiltered.
+src/engine/link/unit0203d7b8.cpp
+# FOLDED into src/engine/sound/Sound.cpp (row 75): src/func_020134d8.c
+src/engine/sound/SoundEngine.cpp
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 93): src/func_020510a4.c
+
+# ---- Stage A2: the entrance spawns the Player and the Camera.
+# The two factories the registry calls, the Actor init hooks the spawn
+# spine's Process dispatches, and the St_LevelEnter trio with the seven
+# entrance-step handlers its Main dispatches through the ov002 PMF table.
+src/game/player/d_a_ply.cpp
+src/runtime/actor/d_actor.cpp
+# _ZN8dActor_c18AfterInitResourcesEj is C++ inside a .c (the gate-9 case
+# again); it goes through hostgen, see GATE14_SYMS in CMakeLists.txt
+src/game/player/d_a_ply_methods.cpp
+port/unmatched/hostarm/Player.cpp
+# func_ov002_020c6fe4 does void-pointer arithmetic on the anim probe
+# (the NoControl case); hostgen retypes the deref -- GATE14_SYMS
+# the ring the step handlers reach: the death-table guard the init hook
+# tests, the message/star-count branches steps 2 and 3 take, and the ov089
+# animation setter step 1 calls.
+# FOLDED into src/runtime/actor/d_actor.cpp (row 101): src/_ZN8dActor_c18GetBitInDeathTableEv.cpp
+src/game/actors/d_a_obj_key.cpp
+src/engine/save/SaveData.cpp
+src/game/actors/d_a_door.cpp
+src/GetLevelPart.cpp

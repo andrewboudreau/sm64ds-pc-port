@@ -1,0 +1,49 @@
+# Gate-4b slice: the Model pipeline -- load, rebase, VRAM upload, bone walk,
+# material bind, display-list submit -- on top of slices 2/3a/3b and the
+# gate-4a pump. MMIO-touching files build via hostgen (see CMakeLists);
+# everything here compiles as-is.
+
+# Model
+src/engine/model/d_ext_model.cpp
+# RETIRED at SLICE1: body now in src/_ZN5ModelC1Ev.cpp. MSVC folds the ROM constructor variants into one symbol, so only one of a class two per-function constructor TUs can be compiled.
+#src/_ZN5ModelC2Ev.cpp
+src/SharedFilePtr.cpp
+# FOLDED into src/engine/model/Model.cpp (row 7): src/_ZN5Model9DoSetFileEPcii.cpp
+src/engine/model/Model4.cpp
+# FOLDED into src/engine/model/Model4.cpp (row 12): src/_ZN5Model13LoadTexAndPalER8BMD_File.cpp
+# FOLDED into src/engine/model/Model4.cpp (row 12): src/_ZN5Model17LoadTextureToVramEPcj.cpp
+# FOLDED into src/engine/model/Model4.cpp (row 12): src/_ZN5Model27LoadCompressedTextureToVramEPcjS0_.cpp
+# FOLDED into src/engine/model/Model4.cpp (row 12): src/_ZN5Model13GetVramOffsetEj.cpp
+# FOLDED into src/engine/model/Model.cpp (row 7): src/_ZN5Model6RenderEPK7Vector3.cpp
+# ModelComponents::Render: HOST copy in port/unmatched -- the matched TU
+# passes the material index by leaving it in r1 (see the file header there).
+port/unmatched/ModelComponents_Render.cpp
+src/engine/model/ModelComponents.cpp
+
+# GX upload path (no textual MMIO; VRAM windows come from HAL globals)
+src/engine/gx/GX.cpp
+# FOLDED into src/engine/gx/GX.cpp (row 26): src/_ZN2GX11LoadTexPlttEPKvjj.cpp
+
+# render walk + math. _ZN15ModelComponents13func_02044534EiP9Matrix4x3P7Vector3/_ZN15ModelComponents13func_0204488cEiP7Vector3/VEC_Normalize are in the
+# HOSTGEN list instead: they touch MMIO textually (geometry ports, the
+# hardware divider) and an untransformed build latches those writes
+# silently -- the exact failure hostgen exists to prevent.
+# FOLDED into src/engine/model/Model4.cpp (row 12): src/func_020462d0.c
+# FOLDED into src/engine/model/Model4.cpp (row 12): src/func_02046564.c
+src/MTX_Concat43.c
+src/func_020458a8.c
+# FOLDED into src/engine/model/ModelComponents.cpp (row 23): src/func_02045074.c
+# FOLDED into src/engine/model/ModelComponents.cpp (row 23): src/func_02045178.c
+src/func_02048234.c
+# FOLDED into src/engine/model/Model4.cpp (row 12): src/func_02046008.c
+src/MTX_Concat33.c
+src/engine/mi/MI_Dma.cpp
+src/engine/heap/Heap.cpp
+# FOLDED into src/engine/model/Model4.cpp (row 12): src/func_0204605c.c
+
+# gate 4c additions: the animation path (UpdateBones recursion)
+# FOLDED into src/engine/model/ModelComponents.cpp (row 23): src/_ZN15ModelComponents11UpdateBonesEP8BCA_Filei.cpp
+# FOLDED into src/engine/model/ModelComponents.cpp (row 23): src/func_020453c0.c
+src/func_0204547c.cpp
+src/cstd4.cpp
+src/engine/animation/dExtFrameCtrl_c_UpdateFileOffsets.cpp

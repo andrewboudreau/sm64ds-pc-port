@@ -1,0 +1,24 @@
+diff --git a/include/private/watchdog_alarm.h b/include/private/watchdog_alarm.h
+--- a/include/private/watchdog_alarm.h
++++ b/include/private/watchdog_alarm.h
+@@ -25,6 +25,10 @@
+ #include "types.h"
+ #include "nitro/os/alarm.h"
+ 
++#ifdef _MSC_VER
++/* The ROM packs the two u64s on 4 (0x44 bytes); MSVC would round the struct to 8 (0x48). Same packing as OSAlarm (nitro/os/alarm.h). */
++#pragma pack(push, 4)
++#endif
+ typedef struct WatchdogAlarm {
+     OSAlarm alarm; /* 0x00 */
+     int unread_2c; /* 0x2c -- zeroed by func_0201aa18, never read */
+@@ -37,6 +41,9 @@
+     ~WatchdogAlarm();
+ #endif
+ } WatchdogAlarm;
++#ifdef _MSC_VER
++#pragma pack(pop)
++#endif
+ 
+ #ifdef __cplusplus
+ extern "C" {

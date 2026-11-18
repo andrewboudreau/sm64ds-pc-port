@@ -1,0 +1,66 @@
+# Gate 51: the CAP (WaterfallMist / daObjMarioCap_c, actor 269), ov002.
+#
+# Mario's cap on the ground: metal, vanish and wing variants. Its class was
+# BUILT at gate 33 (vtable fill, faces, the six WaterfallMist method TUs) but
+# left unregistered because WaterfallMist::Behavior dispatches a
+# pointer-to-member out of the object's +0x3bc, and the nine state tables
+# __sinit_ov002_02101064 fills (data_ov002_0210df04..0210df84) were left holding
+# DS code addresses. Cap_StateDispatch.cpp seats them; this slice adds the
+# eighteen state functions those tables point at and the closure they reach
+# that no earlier gate linked.
+#
+# All eighteen are the {function, 0} form (a complete class, the butterfly
+# case), so the seat is a plain function-pointer rewrite with no host copy of
+# the dispatcher.
+
+# ---- the eighteen state Init/Main functions --------------------------------
+src/game/actors/d_a_obj_mario_cap.cpp
+
+# ---- the closure the states reach that no earlier gate linked --------------
+# The angle helper, the shared collision-clear the states call, a tuning helper
+# and SaveData::PlayerLoseCap (its sibling HasPlayerLostCap is already linked at
+# gate 10). The metal/vanish/wing form-change closure (Player::InitMetalWario,
+# InitVanishLuigi and their file loads) is already linked -- the cap's
+# InitResources reached it when the class was built at gate 33.
+src/ApproachAngle.cpp
+src/engine/save/SaveData.cpp
+# FOLDED into src/engine/save/SaveData.cpp (row 26): src/func_020139b8.c
+# FOLDED into src/engine/save/SaveData.cpp (row 26): src/_ZN8SaveData13PlayerLoseCapEv.cpp
+# the metal/vanish form-change entry points func_ov002_020b6fcc dispatches
+src/game/player/d_a_ply_methods.cpp
+port/unmatched/hostarm/Player.cpp
+
+# ---- EXCLAMATION_SWITCH (11): the ten state halves + closure ----------------
+# StarSwitch's five-state machine, the ten records data_ov002_0210e00c holds.
+# Its two dispatchers are host copies (ExclamationSwitch_StateDispatch.cpp);
+# these are the states they call and the two arm9/ov002 helpers they reach that
+# no earlier gate linked. func_ov002_020ba4d8/020ba520 are EXCLUDED from
+# slice_gate33 -- see the note there.
+src/game/actors/d_a_obj_switch.cpp
+# FOLDED into src/game/actors/d_a_obj_switch.cpp (row 38): src/func_ov002_020ba3a8.c
+# FOLDED into src/game/actors/d_a_obj_switch.cpp (row 38): src/func_ov002_020ba4c0.c
+# FOLDED into src/game/actors/d_a_obj_switch.cpp (row 38): src/func_ov002_020ba2d0.c
+# FOLDED into src/game/actors/d_a_obj_switch.cpp (row 38): src/func_ov002_020ba2ac.c
+# FOLDED into src/game/actors/d_a_obj_switch.cpp (row 38): src/func_ov002_020ba1ac.c
+# FOLDED into src/game/actors/d_a_obj_switch.cpp (row 38): src/func_ov002_020ba0f8.cpp
+# FOLDED into src/game/actors/d_a_obj_switch.cpp (row 38): src/func_ov002_020ba0bc.c
+src/engine/sound/Sound.cpp
+src/game/actors/d_a_star.cpp
+
+# ---- ROLLING_IRON_BALL (220, ov100): the four state functions + helpers -----
+# RollingIronBall::Behavior dispatches gIblKindHandlers[idx] as a plain
+# {function, delta} pair (the butterfly case, no host copy); the seat is in
+# hal/actor_overlays.cpp. These are the four state functions and the ov100/ov002
+# helpers they reach that no earlier gate linked. The particle/collision/Actor
+# closure and the FS/decompress path are already host-provided (the ntr layer
+# and earlier gates), so nothing below descends into them.
+src/game/actors/d_a_ibl.cpp
+# FOLDED into src/game/actors/d_a_ibl.cpp (row 56): src/func_ov100_02142918.cpp
+# FOLDED into src/game/actors/d_a_ibl.cpp (row 56): src/func_ov100_021424c0.c
+# FOLDED into src/game/actors/d_a_ibl.cpp (row 56): src/func_ov100_0214272c.cpp
+# FOLDED into src/game/actors/d_a_ibl.cpp (row 56): src/func_ov100_02141fb0.cpp
+# FOLDED into src/game/actors/d_a_ibl.cpp (row 56): src/func_ov100_02142130.cpp
+# FOLDED into src/game/actors/d_a_ibl.cpp (row 56): src/func_ov100_02142264.cpp
+# FOLDED into src/game/actors/d_a_ibl.cpp (row 56): src/func_ov100_0214233c.cpp
+src/runtime/actor/d_enemy_base.cpp
+# FOLDED into src/engine/sound/Sound.cpp (row 46): src/func_02012694.cpp

@@ -1,0 +1,18 @@
+diff --git a/include/dFader_c.h b/include/dFader_c.h
+--- a/include/dFader_c.h
++++ b/include/dFader_c.h
+@@ -69,6 +69,14 @@
+        destructor variants and vtable group, while enrollment isolates the
+        licensed variant and binds `_ZTV8dFader_c` to the ROM-proven address point. */
+     virtual ~dFader_c();                                /* slots 0 (D1), 1 (D0) */
++#ifdef _MSC_VER
++    /* HOST ONLY (the port). The ROM's table spends slot 1 on the deleting destructor
++       D0; MSVC spends one slot on both, which put every virtual below one slot early
++       and made the ROM-index dispatchers (func_02018efc calls slot 2 expecting
++       AdvanceFade) land on SetBackwardTime, whose `ret 4` ate the caller's frame.
++       This filler restores the ROM numbering for every fader class. Never called. */
++    virtual void HostRomD0SlotPad() {}                  /* slot 1 */
++#endif
+ 
+     /* Pure, all eight: the corresponding words in data_0208eafc are null. */
+     virtual void AdvanceFade() = 0;                  /* slot 2 */

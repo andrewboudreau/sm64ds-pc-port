@@ -1,0 +1,44 @@
+diff --git a/include/MgBanner.h b/include/MgBanner.h
+--- a/include/MgBanner.h
++++ b/include/MgBanner.h
+@@ -12,6 +12,12 @@
+ struct MgBanner;
+ typedef void (MgBanner::*ElemFn)();
+ typedef char ElemFn_size_must_be_0x8[sizeof(ElemFn) == 0x8 ? 1 : -1];
++#ifdef _MSC_VER
++/* host: MSVC aligns a member pointer to 8 under /vmg /vmm, which pads the
++   record to 0x138; pack(4) keeps every member at its ROM offset (asserted
++   below) and the size at 0x134. */
++#pragma pack(push, 4)
++#endif
+ struct MgBanner {
+     ElemFn mBehavior; /* 0x00 run by Banner_Update */
+     ElemFn mRender;   /* 0x08 run by Banner_Draw; 0 draws plainly */
+@@ -35,6 +41,27 @@
+     MgBanner();
+     ~MgBanner() {}
+ };
++#ifdef _MSC_VER
++#pragma pack(pop)
++#include <stddef.h>
++static_assert(sizeof(MgBanner) == 0x134, "MgBanner is 0x134 bytes in the ROM");
++static_assert(offsetof(MgBanner, mBehavior) == 0x00, "MgBanner.mBehavior");
++static_assert(offsetof(MgBanner, mRender) == 0x08, "MgBanner.mRender");
++static_assert(offsetof(MgBanner, mX) == 0x10, "MgBanner.mX");
++static_assert(offsetof(MgBanner, mY) == 0x12, "MgBanner.mY");
++static_assert(offsetof(MgBanner, mTargetX) == 0x14, "MgBanner.mTargetX");
++static_assert(offsetof(MgBanner, mTargetY) == 0x16, "MgBanner.mTargetY");
++static_assert(offsetof(MgBanner, mPriority) == 0x18, "MgBanner.mPriority");
++static_assert(offsetof(MgBanner, mScreen) == 0x1c, "MgBanner.mScreen");
++static_assert(offsetof(MgBanner, mFileIndex) == 0x20, "MgBanner.mFileIndex");
++static_assert(offsetof(MgBanner, mTimer) == 0x24, "MgBanner.mTimer");
++static_assert(offsetof(MgBanner, mTimerEnd) == 0x28, "MgBanner.mTimerEnd");
++static_assert(offsetof(MgBanner, mOamCount) == 0x2c, "MgBanner.mOamCount");
++static_assert(offsetof(MgBanner, mStyle) == 0x2e, "MgBanner.mStyle");
++static_assert(offsetof(MgBanner, mGfxSlot) == 0x30, "MgBanner.mGfxSlot");
++static_assert(offsetof(MgBanner, mArrived) == 0x32, "MgBanner.mArrived");
++static_assert(offsetof(MgBanner, mOam) == 0x34, "MgBanner.mOam");
++#endif
+ typedef char MgBanner_size_must_be_0x134[sizeof(MgBanner) == 0x134 ? 1 : -1];
+ 
+ #endif

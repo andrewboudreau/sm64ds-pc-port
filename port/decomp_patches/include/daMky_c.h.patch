@@ -1,0 +1,19 @@
+diff --git a/include/daMky_c.h b/include/daMky_c.h
+--- a/include/daMky_c.h
++++ b/include/daMky_c.h
+@@ -155,7 +155,14 @@
+     void CallStateEnter();
+     void ChangeState(int idx);
+ 
+-    virtual ~daMky_c();            /* slots 16 (D1), 17 (D0) */
++    #ifdef _MSC_VER
++    /* host two-arm destructor spelling; ruling in include/ModelBase.h */
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~daMky_c();   /* no slot */
++    #else
++    virtual ~daMky_c();
++    #endif            /* slots 16 (D1), 17 (D0) */
+ 
+     virtual s32  InitResources();         /* slot  0 */
+     virtual s32  CleanupResources();      /* slot  3 */

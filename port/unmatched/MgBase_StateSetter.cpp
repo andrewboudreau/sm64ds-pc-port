@@ -1,0 +1,973 @@
+// PORT_HOST_ABI. The mwcc POINTER-TO-MEMBER WALL, the framework's STATE SETTER:
+// src/_ZN10dMgState_c8SetStateEi.cpp, host-copied against an address switch. Run mg5,
+// lane BASESET.
+//
+// This is the TU port/mg_fanout_costs.txt section 4 calls "worth more than any
+// single minigame", the one thing in the minigame stack that was still a
+// reporting trap after the fan-out landed. It is paid once for all thirty.
+//
+// ---- 1. WHAT THE TRAP COST A PLAYER ---------------------------------------
+//
+// Reported from real play on 0.2.8.108, twice on the same day. In Wanted!
+// (scene 366) the score collapse after a fifth win asks the framework to change
+// state and the game froze there, with the frame loop and the music still
+// running. In Coincentration (scene 378) a tap did the same thing. Both left
+// one line in the playlog:
+//
+//   [scene] mwcc POINTER-TO-MEMBER WALL: _ZN10dMgState_c8SetStateEi(idx=1) is the
+//   state-setter for dScMgBase_c and MSVC cannot compile its TU ... No state
+//   was set and nothing was dispatched.
+//
+// A trap that sets no state IS the freeze. The framework's message object keeps
+// its old fields, its index stays -1, its per-frame tick is never installed, and
+// nothing in the class can advance, so the scene runs forever on the frame that
+// asked.
+//
+// ---- 2. WHAT THE ROM DOES, DISASSEMBLED ------------------------------------
+//
+// Read out of extracted/overlays/overlay_0004.bin at base 0x020ad660. The delink
+// block is `.text start:0x020b87e0 end:0x020b8a70`, 0x290 bytes, of which the
+// first 0x1c0 are the ONE-TIME table build and the last 0x74 are the assign and
+// the dispatch. A twenty-two word literal pool follows at 0x020b8a14.
+//
+// The table build, gated on a .bss guard word at 0x020bfd08 - 4:
+//
+//     020b87e8  ldr   r2, [pc, #0x224]     ; r2 = 0x020bfd04, the guard
+//     020b87ec  ldr   r3, [r2]
+//     020b87f0  ands  r4, r3, #1
+//     020b87f4  bne   0x020b89a0           ; built already, skip to the assign
+//     020b87fc  orr   r3, r3, #1
+//     020b8800  str   r3, [r2]
+//     ...       forty ldr/str pairs, copying twenty EIGHT-BYTE records out of
+//               twenty named .data globals into the 0xa0 static at 0x020bfd08
+//
+// The assign and the dispatch:
+//
+//     020b89a0  str   r1, [r0, #0x18]        ; self->index = idx
+//     020b89a4  ldr   r4, [r0, #0x18]        ; and it is READ BACK
+//     020b89b0  add   r2, r3, r4, lsl #3     ; &table[index], STRIDE EIGHT
+//     020b89b4  ldr   r3, [r3, r4, lsl #3]   ;   code
+//     020b89b8  ldr   r2, [r2, #4]           ;   adjustment
+//     020b89bc  str   r3, [r0]               ; self->pmf0.code = code
+//     020b89c0  str   r2, [r0, #4]           ; self->pmf0.adj  = adj
+//     020b89c4  ldr   r2, [r1]               ; data_02086b58, the NULL pair
+//     020b89c8  ldr   r1, [r1, #4]
+//     020b89cc  str   r2, [r0, #0x10]        ; self->pmf2 = the null pair
+//     020b89d0  str   r1, [r0, #0x14]
+//     020b89d4  ldr   r2, [r0]
+//     020b89d8  cmp   r2, #0                 ; the ROM's own null-CODE guard
+//     020b89e4  bxeq  lr                     ;   and it tests the code word only
+//     020b89e8  ldr   r1, [r0, #4]           ; adjustment
+//     020b89ec  add   r3, r0, r1, asr #1     ; this += adj >> 1  (arithmetic)
+//     020b89f0  ands  r1, r1, #1             ; virtual bit, the adjustment's LSB
+//     020b89f4  ldrne r0, [r3]               ;   virtual: r0 = the vtable
+//     020b89f8  ldrne r1, [r0, r2]           ;            fn = vtable[code]
+//     020b89fc  ldreq r1, [r0]               ;   direct:  fn = code
+//     020b8a00  mov   r0, r3                 ; `this`, adjusted
+//     020b8a04  blx   r1
+//
+// So the dispatch is a ZERO-ARGUMENT call with `this` in r0, which is exactly
+// what port_mg_call0 in unmatched/MgBase_StateDispatch.cpp implements, and this
+// file routes through that one entry point rather than growing a second opinion
+// about what an adjustment word means.
+//
+// ---- 3. WHY MSVC CANNOT COMPILE THE SRC TU --------------------------------
+//
+// Three failures, any one fatal, and section 4 of mg_fanout_costs has them:
+//
+//   the SIZE. mwcc's pointer-to-member is eight bytes, {code, adjustment}.
+//   MSVC's single-inheritance one is four. The TU's own `struct C` puts
+//   field_8 at +8 after a leading PMF, which is only true at eight bytes, so
+//   the object is laid out wrong before any dispatch happens.
+//   the NAME. MSVC encodes the member-pointer TYPE into the symbol, so the
+//   twenty globals come out as ?pmf_dMgState_c_RoundClearTop_Enter@@3P8C@@AEXXZQ1@ and the
+//   mount's C symbol _pmf_dMgState_c_RoundClearTop_Enter can never satisfy them. Twenty-one
+//   of the first minigame link's ninety-five unresolved externals were this
+//   one TU.
+//   the DISPATCH. The five-instruction ARM Itanium sequence above has no MSVC
+//   equivalent.
+//
+// The remedy is the one the port has now used four times: the src body verbatim
+// in structure, the member-pointer table re-typed as {code, adjustment} int
+// pairs, and the call site replaced by an address switch.
+//
+// ---- 4. THE TWENTY, RESOLVED OUT OF THE ROM -------------------------------
+//
+// Section 4 warns that an address sweep over a pair range catches non-pairs, so
+// these were NOT swept. The twenty global names come from the src TU's own table
+// initialiser, in its order, and each name's code word was read two ways that
+// agree: the eight bytes at (addr - 0x020ad660) in overlay_0004.bin, and the
+// overlay's own load relocation row. EVERY ADJUSTMENT WORD READS ZERO, so every
+// dispatch this seat can reach is the DIRECT case.
+//
+//   slot  .data global            code word   config/arm9/overlays/ov004/relocs
+//    0    pmf_dMgState_c_RoundClear_Enter     020b8688    line 2091
+//    1    pmf_dMgState_c_NextRound_Enter     020b853c    line 2090
+//    2    pmf_dMgState_c_RoundBanner5_Enter     020b83ac    line 2089
+//    3    pmf_dMgState_c_RetryPrompt_Enter     020b81f8    line 2088
+//    4    pmf_dMgState_c_Win_Enter     020b7f5c    line 2087
+//    5    pmf_dMgState_c_Lose_Enter     020b7e38    line 2086
+//    6    pmf_dMgState_c_LoseResume_Enter     020b7b90    line 2085
+//    7    pmf_dMgState_c_Draw_Enter     020b79b0    line 2082
+//    8    pmf_dMgState_c_Tie_Enter     020b798c    line 2083
+//    9    pmf_dMgState_c_RoundClearTop_Enter     020b7854    line 2092
+//   10    pmf_dMgState_c_RetryPromptB_Enter     020b7744    line 2093
+//   11    pmf_dMgState_c_ScoreThenRound_Enter     020b7594    line 2096
+//   12    pmf_dMgState_c_RetryPromptWide_Enter     020b7460    line 2097   THE VENEER, section 6
+//   13    pmf_dMgState_c_RetryPromptWideB_Enter     020b743c    line 2116
+//   14    pmf_dMgState_c_DigitsThenRound_Enter     020b724c    line 2100
+//   15    pmf_dMgState_c_BannerEThenRound_Enter     020b70b4    line 2103
+//   16    pmf_dMgState_c_Results_Enter     020b7020    line 2104
+//   17    pmf_dMgState_c_ResultsNewRecord_Enter     020b6f14    line 2106
+//   18    pmf_dMgState_c_GameOver_Enter     020b6d6c    line 2107
+//   19    pmf_dMgState_c_Finished_Enter     020b6c10    line 2110
+//
+// ALL TWENTY HAVE A MATCHED src TU, A DELINK BLOCK AND A LINE ALREADY IN
+// port/slice_mg1.txt. Nothing here is a decomp gap and no case in the switch
+// below is a floor. The seat is wiring, which is the good news the fan-out was
+// promised and did not get from any earlier lane.
+//
+// data_02086b58 is arm9 .data, eight bytes by span (the next config symbol is
+// .p__sinit_d_camera.cpp at 0x02086b60), and it reads {0, 0} in extracted/arm9_dec
+// .bin with no relocation on either word. It is the NULL member pointer, and
+// the port already hosts it that way: build/port/host-src/romdata.c defines
+// `data_02086b58[8] = { 0,0,0,0,0,0,0,0 }`. So `self->pmf2 = data_02086b58` is
+// a CLEAR, not a call, and the ROM's own reader (_ZN10dMgState_c6RenderEv) skips a
+// zero code word.
+//
+// ---- 5. THE OBJECT, AND THE HALF OF THE SEAT THE COST FILE DOES NOT NAME ---
+//
+// The setter's `self` is the framework's MESSAGE object, at scene + 0xcc. Its
+// only caller is src/Mg_SetSharedState.cpp:
+//
+//     _ZN10dMgState_c8SetStateEi((char *)gMgScene + 0xcc, c);
+//
+// and the layout the disassembly above forces, offset by offset, is
+//
+//     +0x00  pmf0    the state, ASSIGNED AND DISPATCHED ONCE by this function
+//     +0x08  pmf1    the per-frame tick, installed by the state body
+//     +0x10  pmf2    a second per-frame slot, cleared here, sometimes installed
+//     +0x18  index   the message id, and -1 means "no message"
+//     +0x1c  timer   counted down by ApproachLinear
+//
+// THE SEAT IS NOT DONE AT TWENTY, AND THIS IS THE FINDING THAT MATTERS FOR
+// ANYONE COSTING THE REST. +0x18 is the gate on the framework's two per-frame
+// self-field dispatchers, both already host-copied in
+// unmatched/MgBase_StateDispatch.cpp:
+//
+//     _ZN10dMgState_c6RenderEv   if (*(int *)(c + 0x18) == -1) return;   pmf at +0x10
+//     _ZN10dMgState_c8BehaviorEv   if (*(int *)(c + 0x18) == -1) return;   pmf at +0x08
+//
+// While the setter was a trap, +0x18 was never written, so both returned on
+// their first line on every frame of every minigame and NEITHER pmf slot was
+// ever dispatched. The measurement says so: a 2400 frame scene 378 run on the
+// trap build reports 576 framework dispatch calls and ZERO unhandled addresses,
+// which is only possible because none of the tick addresses was ever reached.
+//
+// Seating the setter un-gates both. The twenty state bodies install twenty-three
+// pair globals between them, which resolve to TWENTY DISTINCT further code
+// addresses, and every one of those would print an UNHANDLED report on the first
+// frame after a message opened. Worse, a state that enters and never ticks is
+// still a wedge: the tick bodies are what read the timer, poll the A button and
+// write +0x18 back to -1 to CLOSE the message. So the second twenty is not scope
+// creep, it is the other half of the same seat, and the switch below carries
+// both groups.
+//
+// The second twenty were resolved the same two ways as the first, out of the
+// image and out of the relocation rows, and every adjustment word is zero:
+//
+//   installed by  pair global            code word   slot it lands in
+//    020b853c     pmf_dMgState_c_NextRound_Update    020b841c    +0x08
+//    020b83ac     pmf_dMgState_c_RoundBanner5_Update    020b8284    +0x08
+//    020b7594     pmf_dMgState_c_DrawScore    020b6ad8    +0x10
+//    020b81f8     pmf_dMgState_c_RetryPrompt_Update    020b8098    +0x08
+//    020b7020     pmf_dMgState_c_Results_Update    020b6f88    +0x08
+//    020b7f5c     pmf_dMgState_c_Win_Update    020b7eac    +0x08
+//    020b7e38     pmf_dMgState_c_Lose_Update    020b7cd0    +0x08
+//    020b743c     pmf_dMgState_c_UpdateRetryPrompt    020b72d4    +0x08
+//    020b7b90     pmf_dMgState_c_LoseResume_Update    020b7b20    +0x08
+//    020b7020     pmf_dMgState_c_DrawRecordTable    020b68e8    +0x10
+//    020b6d6c     pmf_dMgState_c_GameOver_Update    020b6c9c    +0x08
+//    020b724c     pmf_dMgState_c_UpdateFadeThenResume    020b7124    +0x08
+//    020b79b0     pmf_dMgState_c_UpdateWaitThenResume    020b78f4    +0x08
+//    020b724c     pmf_dMgState_c_DrawScoreDigits    020b6948    +0x10
+//    020b6f14     pmf_dMgState_c_ResultsNewRecord_Update    020b6ddc    +0x08
+//    020b7854     pmf_dMgState_c_RoundClearTop_Update    020b77b4    +0x08
+//    020b7744     pmf_dMgState_c_RetryPromptB_Update    020b75e4    +0x08
+//    020b70b4     pmf_dMgState_c_UpdateFadeThenResume_2    020b7124    +0x08   (shared with bc994)
+//    020b8688     pmf_dMgState_c_RoundClear_Update    020b8560    +0x08
+//    020b7594     pmf_dMgState_c_ScoreThenRound_Update    020b746c    +0x08
+//    020b6f14     pmf_dMgState_c_DrawRecordTable_2    020b68e8    +0x10   (shared with bc91c)
+//    020b798c     pmf_dMgState_c_UpdateWaitThenResume_2    020b78f4    +0x08   (shared with bc9ac)
+//    020b6c10     pmf_dMgState_c_Finished_Update    020b6b40    +0x08
+//
+// Twenty-three pairs, twenty distinct addresses, and all twenty have a matched
+// src TU, a delink block and a line already in port/slice_mg1.txt. Not one of
+// the forty cases below is a floor.
+//
+// ---- 6. THE ONE DEFECT THE SEAT UNCOVERED, AND IT WOULD HAVE CRASHED -------
+//
+// SLOT 12 IS A TAIL-JUMP VENEER AND THE src TU DROPS ITS POINTER. 0x020b7460 is
+// three words in the ROM:
+//
+//     020b7460  ldr   ip, [pc]
+//     020b7464  bx    ip
+//     020b7468  .word 0x020b743c
+//
+// which preserves every register, so r0 arrives at 0x020b743c untouched. Its
+// target writes through that pointer on its first instruction pair
+// (`mov r2,#0xa; str r2,[r0,#0x1c]`). src/State12_Enter.c spelled the
+// veneer as
+//
+//     extern void State13_Enter(void);
+//     void State12_Enter(void) { State13_Enter(); }
+//
+// with no parameter on either side, which is correct on ARM and is a dropped
+// pointer on the host: MSVC's __cdecl pushes nothing and 0x020b743c reads
+// whatever is on the stack, then stores 10 through it. That is a wild write,
+// not a wrong value.
+//
+// IT IS REACHED THREE WAYS AND ALL THREE ARE OPENED BY THIS SEAT. Slot 12 of the
+// table above is one. The other two are src/State17_Update.c:39 and
+// src/State16_Update.c:24, which are tick bodies of states 17 and 16, so
+// they only ever run once +0x18 is written. BOTH CALLERS ALREADY PASS THE
+// POINTER: each declares `extern void State12_Enter(void *c);` locally.
+// Only the definition drops it, which is why nothing in the tree diagnoses it
+// and why the byte gate is right to be silent (the ROM bytes and the src agree).
+//
+// FIXED AT THE SOURCE (main #3166; run linkfull, lane ASMCPORT). The src TU now
+// spells the veneer with the pointer both callers pass,
+// `void State12_Enter(void *c) { State13_Enter(c); }`, still
+// byte-identical to the ROM, so it is back on port/slice_mg1.txt and the host
+// copy that stood in this file (the same one parameter, forwarded) is retired.
+// Slot 12's face below and the two tick bodies call the ROM's own veneer.
+//
+// ---- 7. WHAT IS NOT HERE ---------------------------------------------------
+//
+// The twenty state bodies and the twenty tick bodies are matched src TUs and are
+// NOT copied here. They keep their slice lines and their credit; this file only
+// gives them a caller. port/tools/stategen.py cannot generate this switch and
+// says so in its own docstring: it reads a constructor filling a .bss table out
+// of a .data pair block, and this TU has neither, so the seat is hand work with
+// the ROM open. Its --reconstruct still covers the two artifacts it does own.
+//
+// ---- 8. THE UNIVERSE, CLOSED, AND THE DEFECT THAT CLOSING IT FOUND --------
+//
+// READ THIS BEFORE ROUTING ANOTHER ov004 ADDRESS, and read the second half of
+// it before touching a vtable thunk in hal/scene_mg.cpp.
+//
+// THE UNIVERSE IS BOUNDED AND IT IS EIGHTY. Every ov004 src TU was read, every
+// `*(...) = data_ov004_XXXX;` install of a .data word pair into an object slot
+// was collected, and each pair was kept only when its FIRST word carries a
+// `load` relocation in config/arm9/overlays/ov004/relocs.txt to an address
+// inside the overlay. That is section 4's discipline rather than a byte sweep:
+// a consumer names the global and the ROM's own relocation says it is an
+// address. The answer is SIXTY distinct code words, every adjustment zero,
+// every one with a matched src TU and a delink block, plus the setter's own
+// twenty out of its in-function table, which no install pattern can see.
+// lane baseset's report (run mg5) is the listing.
+//
+// ALL EIGHTY ARE ROUTED. Fifty-six here (group A's twenty, group B's twenty,
+// group C's sixteen) and twenty-four in unmatched/MgBase_StateDispatch.cpp,
+// which are __sinit_ov004_020b955c's three tables: lane FWK routed two of them
+// and left twenty-two with the note that each would report the day a scene
+// reached it, and seating the setter reached seven of the twenty-two on the
+// first run. A scene 378 sweep that reported 700 UNHANDLED dispatches with the
+// set half-routed reports ZERO with it closed.
+//
+// WHY IT IS THE WHOLE SET AND NOT THE ONES A RUN WITNESSED. FWK's rule was that
+// routing an address no run touches buys a slice line and no evidence, and that
+// rule is right for a heterogeneous set. This one is not heterogeneous: it is
+// one overlay's own state machine, every pair resolved from the consumer that
+// names it, every adjustment word zero, every body matched and delinked, and
+// every dispatch site zero-argument with `this` in r0. The evidence is
+// per-family and the runs are its witness. The cost of the other rule is a dead
+// end a PLAYER meets, which is the defect this lane exists to remove.
+//
+// ---- THE DEFECT CLOSING IT FOUND, AND IT WAS A CRASH ----------------------
+//
+// The first build with the closure routed FAULTED, on scene 378 at frame 2103
+// and on a scene 366 drive at frame 300, both times with a wild execute at an
+// address that MOVED WITH THE BUILD. It is a stack imbalance in the port's own
+// vtable thunks and nothing to do with the sixteen bodies:
+//
+//   src/Mg_CallStartRound.cpp is `void Mg_CallStartRound(Base *c, void *arg)
+//   { c->v18(arg); }` and the ROM agrees word for word at 0x020b29a0
+//   (`ldr r2,[r0]; ldr r2,[r2,#0x48]; blx r2`). MSVC compiles that as a
+//   __thiscall call WITH ONE PUSHED ARGUMENT, so the CALLEE owes four bytes:
+//       0004cb53  mov  ecx, [ebp+8]        ; this
+//       0004cb56  push [ebp+0xc]           ; arg
+//       0004cb59  mov  eax, [ecx]
+//       0004cb5b  call [eax+0x48]          ; vtable slot 18
+//
+//   hal/scene_mg.cpp's slot 18 thunks were declared with NO stack parameter,
+//   `static int __fastcall mc_reset(void *s, void *)`, so both parameters sat
+//   in ecx and edx and MSVC emitted a bare `ret`, popping nothing.
+//
+// FOUR BYTES LEAKED ON EVERY SLOT-18 DISPATCH, Mg_CallStartRound ran
+// `pop ebp; ret` on a shifted stack, and a few frames later a `ret` took a
+// garbage return address. Slot 19 had the same shape through mb_v19.
+//
+// THE FIX IS IN hal/scene_mg.cpp AND IT IS EVIDENCED, NOT GUESSED. Both slots
+// were scanned out of the two overlay images word by word;
+// lane baseset's report (run mg5) is the listing and it REPRODUCES the
+// twenty-two site slot-18 census that file's dScMgLuigi_c block already
+// recorded. Offset 0x48: 22 sites, 21 set r1 first, and the one that does not
+// is Mg_CallStartRound, whose own src forwards its second parameter so the
+// host pushes one there too. Offset 0x4c: 14 sites, all fourteen set r1, every
+// one of them `ldr r1,[rX,#0x18]`. So the argument count is ONE at every site
+// of both slots and there is no caller for which a popping thunk is wrong.
+// Four slot-18 thunks and one slot-19 thunk gained the ride-through parameter;
+// mgl_reset already had it, and its block had already named the other two as
+// somebody else's to look at.
+//
+// WHAT IT CHANGED IN THE 378 SWEEP, AND IT IS NOT A REGRESSION. With the
+// closure routed the class finally answers its own message, so slot 18,
+// dScMgCoin_c::StateReset, is DISPATCHED FOR THE FIRST TIME IN THIS PORT'S
+// HISTORY (once), and the round state index reads 1 where it read 5. Behavior
+// and Render are 2399 and 2400 either way, so the scene is alive and drawing
+// the whole run; what moved is that a round reset now happens instead of not
+// happening.
+
+#include <cstdio>
+#include <cstdlib>   /* std::abort, for the seat and the two refusals (lane MGWRITER) */
+#include "dMgState_c.h"
+
+/* The eight-byte mwcc member pointer, in the only spelling that is true on both
+   machines: two words, no member-pointer type anywhere. The same struct
+   unmatched/MgBase_StateDispatch.cpp declares, redeclared rather than shared so
+   neither file gains a header dependency on the other. */
+namespace { struct MgPmf { unsigned code; int adj; }; }
+
+extern "C" {
+
+/* ---- the mount's twenty pair globals, re-typed -------------------------- */
+/* build/port/host-src/ov004_syms.c defines each as `u8 data_ov004_XXXX[8]` at
+   its ROM offset, so these are the mount's own bytes at C linkage. Declared one
+   by one rather than as an array because the ROM names them one by one and they
+   are NOT contiguous in slot order (slot 13 is 0x020bca3c, above slot 19). */
+extern MgPmf pmf_dMgState_c_RoundClear_Enter;
+extern MgPmf pmf_dMgState_c_NextRound_Enter;
+extern MgPmf pmf_dMgState_c_RoundBanner5_Enter;
+extern MgPmf pmf_dMgState_c_RetryPrompt_Enter;
+extern MgPmf pmf_dMgState_c_Win_Enter;
+extern MgPmf pmf_dMgState_c_Lose_Enter;
+extern MgPmf pmf_dMgState_c_LoseResume_Enter;
+extern MgPmf pmf_dMgState_c_Draw_Enter;
+extern MgPmf pmf_dMgState_c_Tie_Enter;
+extern MgPmf pmf_dMgState_c_RoundClearTop_Enter;
+extern MgPmf pmf_dMgState_c_RetryPromptB_Enter;
+extern MgPmf pmf_dMgState_c_ScoreThenRound_Enter;
+extern MgPmf pmf_dMgState_c_RetryPromptWide_Enter;
+extern MgPmf pmf_dMgState_c_RetryPromptWideB_Enter;
+extern MgPmf pmf_dMgState_c_DigitsThenRound_Enter;
+extern MgPmf pmf_dMgState_c_BannerEThenRound_Enter;
+extern MgPmf pmf_dMgState_c_Results_Enter;
+extern MgPmf pmf_dMgState_c_ResultsNewRecord_Enter;
+extern MgPmf pmf_dMgState_c_GameOver_Enter;
+extern MgPmf pmf_dMgState_c_Finished_Enter;
+
+/* arm9 .data, the null pair. build/port/host-src/romdata.c defines it. */
+extern MgPmf data_02086b58;
+
+/* ---- run link100 lane MGWRITER: THE OTHER THIRTY-SIX PAIR GLOBALS --------
+   The twenty above are the ones this function's own in-function table holds.
+   These thirty-six are the rest of what the seat at the bottom of this file
+   rewrites: the twenty-three the state bodies install as the per-frame tick at
+   the object's +0x08 and +0x10, the six more the tick bodies install one level
+   further down, and the seven that belong to the OTHER dScMgBase_c object --
+   the one Banner_Init fills and _Z11Banner_DrawP8MgBanner and _020b321c
+   dispatch. Every one was read out of extracted/overlays/overlay_0004.bin at
+   its own address with the overlay's own `load` relocation row confirming the
+   code word and the second word reading zero
+   (lane MGWRITER, run link100). */
+extern MgPmf pmf_Banner_UpdateWave;
+extern MgPmf pmf_Banner_DrawSpin;
+extern MgPmf pmf_Banner_DrawWave;
+extern MgPmf pmf_Banner_UpdateSpin;
+extern MgPmf pmf_Banner_UpdatePressed;
+extern MgPmf pmf_Banner_UpdatePressed_2;
+extern MgPmf pmf_Banner_DrawPressed;
+extern MgPmf pmf_dMgState_c_NextRound_Update;
+extern MgPmf pmf_dMgState_c_RoundBanner5_Update;
+extern MgPmf pmf_dMgState_c_DrawScore;
+extern MgPmf pmf_dMgState_c_RetryPrompt_Update;
+extern MgPmf pmf_dMgState_c_UpdateRetryFadeOut;
+extern MgPmf pmf_dMgState_c_Results_Update;
+extern MgPmf pmf_dMgState_c_Win_Update;
+extern MgPmf pmf_dMgState_c_Lose_Update;
+extern MgPmf pmf_dMgState_c_UpdateRetryPrompt;
+extern MgPmf pmf_dMgState_c_UpdateGameOverToMenu;
+extern MgPmf pmf_dMgState_c_LoseResume_Update;
+extern MgPmf pmf_dMgState_c_UpdateRetryFadeOut_2;
+extern MgPmf pmf_dMgState_c_DrawRecordTable;
+extern MgPmf pmf_dMgState_c_GameOver_Update;
+extern MgPmf pmf_dMgState_c_UpdateAfterHidden;
+extern MgPmf pmf_dMgState_c_UpdateGameOverToMenu_2;
+extern MgPmf pmf_dMgState_c_UpdateFadeThenResume;
+extern MgPmf pmf_dMgState_c_UpdateWaitThenResume;
+extern MgPmf pmf_dMgState_c_UpdateWaitThenResume_2;
+extern MgPmf pmf_dMgState_c_DrawScoreDigits;
+extern MgPmf pmf_dMgState_c_ResultsNewRecord_Update;
+extern MgPmf pmf_dMgState_c_RoundClearTop_Update;
+extern MgPmf pmf_dMgState_c_RetryPromptB_Update;
+extern MgPmf pmf_dMgState_c_UpdateFadeThenResume_2;
+extern MgPmf pmf_dMgState_c_UpdateRetryFadeOut_3;
+extern MgPmf pmf_dMgState_c_RoundClear_Update;
+extern MgPmf pmf_dMgState_c_ScoreThenRound_Update;
+extern MgPmf pmf_dMgState_c_DrawRecordTable_2;
+extern MgPmf pmf_dMgState_c_Finished_Update;
+
+/* ---- the twenty state bodies the table holds --------------------------- */
+/* Every one of them is reached ONLY through the switch below, so before this
+   file none of them had a caller in the build and /OPT:REF had dropped all
+   twenty despite the slice lines. PORTSYNC2: main made all twenty dMgState_c
+   members (include/dMgState_c.h), so the faces call them qualified and the flat
+   extern "C" declarations that stood here are retired. */
+
+/* ---- the twenty per-frame tick bodies the state bodies install ---------- */
+/* DrawScoreDigits and DrawScore REALLY DO TAKE NO ARGUMENT: both
+   src bodies read only globals and the ROM slots that hold them are the same
+   zero-argument slots as the rest, so calling them (void) is exact rather than
+   a dropped pointer. This is the benign ARM ride-through
+   unmatched/MgCurling_StateDispatch.cpp documents for Scene_Idle, not
+   the scene_actor_faces defect class: there is no callee behind them that
+   wanted a pointer. Checked body by body against the disassembly, not assumed
+   from the declaration. */
+void _ZN10dMgState_c15DrawRecordTableEv(int *c);
+void _ZN10dMgState_c15DrawScoreDigitsEv(void *c);   /* INT093F: a flat face now (receiver on the stack) */
+void _ZN10dMgState_c9DrawScoreEv(void *c);
+void _ZN10dMgState_c15Finished_UpdateEv(void *c);
+void _ZN10dMgState_c15GameOver_UpdateEv(void *c);
+void _ZN10dMgState_c23ResultsNewRecord_UpdateEv(char *c);
+void _ZN10dMgState_c14Results_UpdateEv(char *c);
+void _ZN10dMgState_c20UpdateFadeThenResumeEv(char *c);
+void _ZN10dMgState_c17UpdateRetryPromptEv(char *c);
+void _ZN10dMgState_c21ScoreThenRound_UpdateEv(char *c);
+void _ZN10dMgState_c19RetryPromptB_UpdateEv(char *c);
+void _ZN10dMgState_c20RoundClearTop_UpdateEv(char *c);
+void _ZN10dMgState_c20UpdateWaitThenResumeEv(char *c);
+void _ZN10dMgState_c17LoseResume_UpdateEv(char *c);
+void _ZN10dMgState_c11Lose_UpdateEv(char *c);
+void _ZN10dMgState_c10Win_UpdateEv(char *c);
+void _ZN10dMgState_c18RetryPrompt_UpdateEv(char *c);
+void _ZN10dMgState_c19RoundBanner5_UpdateEv(char *c);
+void _ZN10dMgState_c16NextRound_UpdateEv(char *c);
+void _ZN10dMgState_c17RoundClear_UpdateEv(char *c);
+
+/* ---- group C: the rest of the ov004 member-pointer universe -------------- */
+/* THE CLOSURE, AND HOW IT WAS BOUNDED RATHER THAN GUESSED AT. Routing the forty
+   above turned the framework on, and the framework installs further states out
+   of its own bodies, so the first runs after the seat each ended with a shorter
+   list of UNHANDLED addresses than the one before. Chasing that one wave at a
+   time is the shape that never converges, so the set was closed instead.
+   Section 8 of the header is the derivation, the bound and the artifact. These
+   sixteen are the remainder of the sixty. Each takes one pointer, its src TU's
+   own spelling, and none needed a host copy. */
+void _Z15Banner_DrawSpinP8MgBanner(char *c);
+void _Z17Banner_UpdateSpinP8MgBanner(char *c);
+void _Z15Banner_DrawWaveP8MgBanner(char *c);
+void _Z17Banner_UpdateWaveP8MgBanner(char *c);
+void _Z18Banner_DrawPressedP8MgBanner(char *c);
+void _Z20Banner_UpdatePressedP8MgBanner(char *c);
+void Coin_FlyToCounter(char *c);
+void Coin_MoveThenRefund(char *c);
+void Coin_RiseSpent(char *c);
+void Coin_MoveThenRiseSpent(char *c);
+void Coin_Rise(char *c);
+void Coin_MoveThenRise(char *c);
+void Coin_Move(char *c);
+void _ZN10dMgState_c17UpdateAfterHiddenEv(char *c);
+void _ZN10dMgState_c20UpdateGameOverToMenuEv(char *c);
+void _ZN10dMgState_c18UpdateRetryFadeOutEv(char *c);
+
+/* the boot installer that puts host bodies in the three .bss framework tables,
+   called by the seat at the bottom of this file so there is one entry point for
+   the whole family. unmatched/MgBase_StateDispatch.cpp. */
+void port_mg_framework_tables_seat(void);
+
+}  /* extern "C" */
+
+// ---- the address switch ----------------------------------------------------
+
+static unsigned g_setter_calls;
+static unsigned g_setter_dispatched;
+/* Which message indices a run actually asked for, and how often. The census
+   prints it because "the setter ran" and "the setter ran the state the game
+   asked for" are different claims and the old line could only make the first. */
+static unsigned g_setter_idx[20];
+static unsigned g_base_state_hits;
+static unsigned g_base_tick_hits;
+static unsigned g_base_closure_hits;
+
+/* One line per distinct out-of-range index, for the reason mg_unhandled gives in
+   MgBase_StateDispatch: a per-frame loop must not be able to flood the log and a
+   single occurrence must not be able to hide in one. */
+static void setter_bad_index(int idx)
+{
+    static int said[8];
+    static int nsaid;
+    for (int i = 0; i < nsaid; ++i)
+        if (said[i] == idx)
+            return;
+    if (nsaid < 8)
+        said[nsaid++] = idx;
+    std::fprintf(stderr, "  [scene] _ZN10dMgState_c8SetStateEi: message index %d is "
+                 "outside the ROM's twenty-entry table. The ROM has no bounds "
+                 "check and would read the .bss word after the table; the host "
+                 "refuses rather than reading past a 20 entry array. No state "
+                 "was set. port/unmatched/MgBase_StateSetter.cpp\n", idx);
+    std::fflush(stderr);
+}
+
+/* port_mg_try_base_state IS GONE, run link100 lane MGWRITER, and it is gone
+   because every one of its fifty-six arms is UNREACHABLE rather than merely
+   unused. Its three groups went three different ways.
+
+   GROUP A, the twenty this function's own table holds. The setter still
+   dispatches them, but it now dispatches the HOST address the seat put in the
+   pair global, directly, with no switch: mgbase_dispatch_seated below.
+
+   GROUP B, the twenty the state bodies install as the per-frame tick. Their
+   only two dispatchers were the host copies of _ZN10dMgState_c6RenderEv (the pmf at
+   +0x10) and _ZN10dMgState_c8BehaviorEv (the pmf at +0x08). Both are src/ TUs again
+   on port/slice_mgwriter.txt, and both compile their dispatch to a TAIL JUMP
+   through the object's own field, so they reach the seated host word with
+   nothing in between.
+
+   GROUP C, the sixteen of the closure. NINE of them reach an object field this
+   lane seats: six through _Z21Banner_StartWaveBurstP8MgBanner, _020b37f0 and _020b422c into
+   the 020b3278 object at +0x00 and +0x08, and three (0x020b7a18, 0x020b7c04,
+   0x020b7fec) through State06_Update, _020b7a18, _020b7cd0, _020b72d4,
+   _020b75e4 and _020b8098 into the setter's own object at +0x08. The other
+   SEVEN (0x020b4aa4, _020b4c30, _020b4d50, _020b4dfc, _020b4f44, _020b4ff0,
+   _020b5288) belong to dScMgMemory2_c, whose pairs live in the
+   gMgCoinsShowDelta block and reach _Z11Coin_UpdateP6Sprite, and
+   port/unmatched/MgMemory2_FieldPmf.cpp's own mem2_field_try switch has routed
+   all seven since it was written -- it tries them BEFORE handing anything on to
+   the framework, so this arm never saw them. That class is the next gate's
+   work, and its nine pairs are the only ones the sweep in
+   lane MGWRITER's report (run link100) leaves unseated in this overlay.
+
+   A switch left standing beside a seated table is not a safety net: it is a
+   second opinion about an address that can no longer arrive. */
+
+
+// ---- the host copy -- RETIRED, run linkfull lane PMFMG1 --------------------
+//
+// src/_ZN10dMgState_c8SetStateEi.cpp runs from src. Section 3's "MSVC cannot
+// compile the src TU" was re-tested on this tree under the port's own flags and
+// is no longer true: the TU compiles clean to the real member
+// ?SetState@dMgState_c@@QAEXH@Z (lane PMFMG1, run linkfull,
+// _ZN10dMgState_c8SetStateEi.asm). Its three failures are each answered:
+//
+//   the SIZE: /vmg /vmm (port/CMakeLists.txt block R8) make every member
+//     pointer eight bytes, so `mEnter` at +0, `mRender` at +0x10 and `mState`
+//     at +0x18 are the ROM's offsets (the listing stores [esi], [esi+4],
+//     [esi+16], [esi+20], [esi+24]);
+//   the NAME: the twenty-one pair globals come in decorated as
+//     ?data_ov004_020bcXXX@@3P8dMgState_c@@AEXXZQ1@, and the twenty-one
+//     /alternatename rows below bind each to the mount's C symbol;
+//   the DISPATCH: `(this->*mEnter)()` compiles to `lea ecx, [edi+esi] / call
+//     edx`, nothing pushed, so the twenty group-A pair globals now hold
+//     zero-argument __fastcall faces (the seat below, seats_ecx_a) where they
+//     held the raw cdecl bodies the host copy's plain call pushed a receiver
+//     for.
+//
+// port/faces_sync.txt's row for the member flips F -> R with this change: the
+// generated file used to define the member as a forwarder onto this file's C
+// body; it now defines the C name as a forwarder onto the matched member, so
+// every C-spelled caller reaches the ROM's own compiled setter.
+//
+// THE FUNCTION-LOCAL STATIC. sEnterTable is initialised from twenty extern
+// objects, so MSVC guards it with its thread-safe-statics helpers
+// (__Init_thread_header / _footer / _epoch and the TLS slot). All of them are
+// already in the image (LIBCMT thread_safe_statics.obj and tlssup.obj in the
+// INT45 map), so the import table does not move; the gate row says so. The
+// table is built on the first call from the pair globals, which the seat below
+// has rewritten by then, exactly as the host copy's own g_table was.
+//
+// THE CENSUS MOVES INTO THE FACES. hal/scene_mg.cpp prints calls, dispatched,
+// states and the per-index histogram from port_mg_base_setter_counts. The
+// matched setter cannot count, so each group-A face counts what the host copy
+// counted for its index: all twenty group-A code words are distinct and all are
+// nonzero, so one face is one index, and "called" and "dispatched" are the same
+// number (the host copy's out-of-range arm had no reachable caller, section 4).
+
+static unsigned g_writer_seated;
+
+/* The census, for hal/scene_mg.cpp. The framework dispatch counters in
+   MgBase_StateDispatch.cpp already say how many calls went through the switch;
+   these say how many of them this seat is responsible for, which is the number
+   that distinguishes "the setter ran" from "the setter set a state and something
+   dispatched". */
+extern "C" void port_mg_base_setter_counts(unsigned *calls, unsigned *dispatched,
+                                           unsigned *states, unsigned *ticks,
+                                           unsigned *closure)
+{
+    if (calls)      *calls      = g_setter_calls;
+    if (dispatched) *dispatched = g_setter_dispatched;
+    if (states)     *states     = g_base_state_hits;
+    if (ticks)      *ticks      = g_base_tick_hits;
+    if (closure)    *closure    = g_base_closure_hits;
+}
+
+/* The per-index histogram, for the census line. Returns the number of entries
+   written; the caller passes a twenty-slot array. */
+extern "C" unsigned port_mg_base_setter_index_hits(unsigned *out, unsigned n)
+{
+    unsigned i;
+    for (i = 0; i < n && i < 20; ++i)
+        out[i] = g_setter_idx[i];
+    return i;
+}
+
+/* ---- THE COUNTING WRAPPERS -----------------------------------------------
+   Twenty-nine of the fifty-six code words go into the pair globals through a
+   wrapper rather than bare, and the reason is a witness rather than a
+   preference. hal/scene_mg.cpp has always printed how many state bodies, ticks
+   and closure entries the framework actually dispatched, and it read those off
+   this file's switch. Once the ROM's own dispatchers read the object field
+   directly there is nothing left in this file for a counter to sit on, so the
+   count would silently become zero and a reader would see a regression where
+   there is none. A wrapper keeps the number and the meaning: same convention in
+   and out, same body called, one increment. It is the shape lane PMFB3 used for
+   the tapped-pad witness (snd1_state1_0211bc8c).
+
+   THE CONVENTION IS PER DISPATCHER, run link100 lane PMFSWEEP2, and the seat
+   block below carries the disassembly. The six bw_ wrappers keep __cdecl: their
+   cells land in the 020b3278 object, whose two readers are FLAT C dispatchers
+   f(self) that tail jump, so the wrapper reads the receiver at [esp+4] exactly
+   where the body would and cleans nothing, because the argument belongs to the
+   dispatcher's caller. The twenty-three bwf_ wrappers are __fastcall: their
+   cells land in the dMgState_c message object at +0x08 and +0x10, whose only two
+   readers are ?Behavior@dMgState_c@@QAEXXZ and ?Render@dMgState_c@@QAEXXZ,
+   __thiscall members with no stack argument that tail jump with ecx = this plus
+   the adjustment and NOTHING pushed. Group A does not get a wrapper at all: the
+   setter dispatches those itself, three lines above, with a plain cdecl call
+   that pushes the receiver, and counts there. */
+static void bw_020b369c(void *c) { ++g_base_closure_hits; _Z15Banner_DrawSpinP8MgBanner((char *)c); }
+static void bw_020b37c4(void *c) { ++g_base_closure_hits; _Z17Banner_UpdateSpinP8MgBanner((char *)c); }
+static void bw_020b38ac(void *c) { ++g_base_closure_hits; _Z15Banner_DrawWaveP8MgBanner((char *)c); }
+static void bw_020b3978(void *c) { ++g_base_closure_hits; _Z17Banner_UpdateWaveP8MgBanner((char *)c); }
+static void bw_020b410c(void *c) { ++g_base_closure_hits; _Z18Banner_DrawPressedP8MgBanner((char *)c); }
+static void bw_020b4214(void *c) { ++g_base_closure_hits; _Z20Banner_UpdatePressedP8MgBanner((char *)c); }
+static void __fastcall bwf_020b68e8(void *c, void *) { ++g_base_tick_hits; _ZN10dMgState_c15DrawRecordTableEv((int *)c); }
+static void __fastcall bwf_020b6948(void *c, void *) { ++g_base_tick_hits; _ZN10dMgState_c15DrawScoreDigitsEv(c); }
+static void __fastcall bwf_020b6ad8(void *c, void *) { ++g_base_tick_hits; _ZN10dMgState_c9DrawScoreEv(c); }
+static void __fastcall bwf_020b6b40(void *c, void *) { ++g_base_tick_hits; _ZN10dMgState_c15Finished_UpdateEv(c); }
+static void __fastcall bwf_020b6c9c(void *c, void *) { ++g_base_tick_hits; _ZN10dMgState_c15GameOver_UpdateEv(c); }
+static void __fastcall bwf_020b6ddc(void *c, void *) { ++g_base_tick_hits; _ZN10dMgState_c23ResultsNewRecord_UpdateEv((char *)c); }
+static void __fastcall bwf_020b6f88(void *c, void *) { ++g_base_tick_hits; _ZN10dMgState_c14Results_UpdateEv((char *)c); }
+static void __fastcall bwf_020b7124(void *c, void *) { ++g_base_tick_hits; _ZN10dMgState_c20UpdateFadeThenResumeEv((char *)c); }
+static void __fastcall bwf_020b72d4(void *c, void *) { ++g_base_tick_hits; _ZN10dMgState_c17UpdateRetryPromptEv((char *)c); }
+static void __fastcall bwf_020b746c(void *c, void *) { ++g_base_tick_hits; _ZN10dMgState_c21ScoreThenRound_UpdateEv((char *)c); }
+static void __fastcall bwf_020b75e4(void *c, void *) { ++g_base_tick_hits; _ZN10dMgState_c19RetryPromptB_UpdateEv((char *)c); }
+static void __fastcall bwf_020b77b4(void *c, void *) { ++g_base_tick_hits; _ZN10dMgState_c20RoundClearTop_UpdateEv((char *)c); }
+static void __fastcall bwf_020b78f4(void *c, void *) { ++g_base_tick_hits; _ZN10dMgState_c20UpdateWaitThenResumeEv((char *)c); }
+static void __fastcall bwf_020b7a18(void *c, void *) { ++g_base_closure_hits; _ZN10dMgState_c17UpdateAfterHiddenEv((char *)c); }
+static void __fastcall bwf_020b7b20(void *c, void *) { ++g_base_tick_hits; _ZN10dMgState_c17LoseResume_UpdateEv((char *)c); }
+static void __fastcall bwf_020b7c04(void *c, void *) { ++g_base_closure_hits; _ZN10dMgState_c20UpdateGameOverToMenuEv((char *)c); }
+static void __fastcall bwf_020b7cd0(void *c, void *) { ++g_base_tick_hits; _ZN10dMgState_c11Lose_UpdateEv((char *)c); }
+static void __fastcall bwf_020b7eac(void *c, void *) { ++g_base_tick_hits; _ZN10dMgState_c10Win_UpdateEv((char *)c); }
+static void __fastcall bwf_020b7fec(void *c, void *) { ++g_base_closure_hits; _ZN10dMgState_c18UpdateRetryFadeOutEv((char *)c); }
+static void __fastcall bwf_020b8098(void *c, void *) { ++g_base_tick_hits; _ZN10dMgState_c18RetryPrompt_UpdateEv((char *)c); }
+static void __fastcall bwf_020b8284(void *c, void *) { ++g_base_tick_hits; _ZN10dMgState_c19RoundBanner5_UpdateEv((char *)c); }
+static void __fastcall bwf_020b841c(void *c, void *) { ++g_base_tick_hits; _ZN10dMgState_c16NextRound_UpdateEv((char *)c); }
+static void __fastcall bwf_020b8560(void *c, void *) { ++g_base_tick_hits; _ZN10dMgState_c17RoundClear_UpdateEv((char *)c); }
+
+typedef void (*SeatFn)(void *);
+
+/* ---- THE SEAT ------------------------------------------------------------
+   Fifty-six .data pair globals, every one of them a place the ROM's own code
+   copies an eight-byte {code, adjust} pair out of and into an object field one
+   of this gate's five retired dispatchers reads. Each row carries the code word
+   the cartridge itself holds at that address, read out of
+   extracted/overlays/overlay_0004.bin and confirmed by the overlay's own `load`
+   relocation row, and the seat compares before it writes: a wrong code word or
+   a nonzero adjustment is a loud abort, never a silent wrong dispatch.
+
+   THE SET IS COMPLETE AND THAT IS MEASURED, not asserted. See section 2 of
+   port/unmatched/MgBase_StateDispatch.cpp's seat block: an address-targeted
+   relocation sweep over the whole overlay finds ninety-nine pairs holding one
+   of the eighty-four routed code words, and they account exactly as 4 + 30 + 7
+   + 9 + 49. The forty-nine and the seven are here; the thirty and the four are
+   sinit sources whose destinations are seated instead; the nine belong to
+   dScMgMemory2_c and are the next gate's.
+
+   ONE OF THE FIFTY-SIX IS NOT AN INSTALL, and it is the one that would have
+   broken quietly. pmf_Banner_UpdatePressed_2 is never copied into an object at all:
+   src/Banner_IsPressFinished.c COMPARES the object's own pair against it
+   (`o[0] == d[0] && (o[1] == d[1] || o[0] == 0)`), which is an identity test on
+   the code word. Seating the field without seating the sentinel would make that
+   test answer false forever, silently, with no crash and no report. It holds
+   the same word as pmf_Banner_UpdatePressed, which _Z12Banner_PressP8MgBanner installs into
+   the same field, so both sides move together and the test answers what the
+   cartridge answers. */
+/* One writer for both halves of the seat below. The row shape is the same in
+   each: the cell, its name for the refusal, the cartridge's own code word and
+   the host body. The compare-before-write is the ROM's own word, exactly as it
+   was while the two halves were one array. */
+namespace {
+struct SeatRow { MgPmf *cell; const char *name; unsigned rom; SeatFn host; };
+}
+
+static void mgbase_seat_rows(const SeatRow *rows, unsigned n)
+{
+    for (unsigned i = 0; i < n; ++i) {
+        if ((unsigned)(rows[i].cell->code) < 0x02000000u || (unsigned)(rows[i].cell->code) >= 0x02400000u) continue;  /* PORTSYNC3: a mount word that is not a DS code address: the class TU owns the live table */
+        if (rows[i].cell->code != rows[i].rom || rows[i].cell->adj != 0) {
+            std::fprintf(stderr, "FATAL: dScMgBase_c pair global data_ov004_%s: "
+                         "the mount holds %08x/%d, the ROM's own bytes say "
+                         "%08x/0 -- WRONG BYTES\n", rows[i].name,
+                         rows[i].cell->code, rows[i].cell->adj, rows[i].rom);
+            std::abort();
+        }
+        rows[i].cell->code = (unsigned)(size_t)rows[i].host;
+        ++g_writer_seated;
+    }
+}
+
+/* ---- GROUP A'S FACES, run linkfull lane PMFMG1 -------------------------
+   The twenty pair globals the matched setter's sEnterTable is built from. Its
+   one dispatch is `lea ecx, [edi+esi] / call edx` with nothing pushed
+   (lane PMFMG1, run linkfull), so each holds a
+   zero-argument __fastcall face; the index in each face's name is the slot
+   the ROM's table puts that pair in (section 4), and the face counts what the
+   retired host copy counted for it. pmf_dMgState_c_RetryPromptWide_Enter is section 6's veneer,
+   the ROM's own body again (src/State12_Enter.c takes the pointer). */
+/* PORTDROP2: main renamed these (symbols.txt, by address); the macro below pastes the
+   old address-spelled name, so each is aliased to its new name here. */
+#define func_ov004_020b8688 RoundClear_Enter
+#define func_ov004_020b853c NextRound_Enter
+#define func_ov004_020b83ac RoundBanner5_Enter
+#define func_ov004_020b81f8 RetryPrompt_Enter
+#define func_ov004_020b7f5c Win_Enter
+#define func_ov004_020b7e38 Lose_Enter
+#define func_ov004_020b7b90 LoseResume_Enter
+#define func_ov004_020b79b0 Draw_Enter
+#define func_ov004_020b798c Tie_Enter
+#define func_ov004_020b7854 RoundClearTop_Enter
+#define func_ov004_020b7744 RetryPromptB_Enter
+#define func_ov004_020b7594 ScoreThenRound_Enter
+#define func_ov004_020b7460 RetryPromptWide_Enter
+#define func_ov004_020b743c RetryPromptWideB_Enter
+#define func_ov004_020b724c DigitsThenRound_Enter
+#define func_ov004_020b70b4 BannerEThenRound_Enter
+#define func_ov004_020b7020 Results_Enter
+#define func_ov004_020b6f14 ResultsNewRecord_Enter
+#define func_ov004_020b6d6c GameOver_Enter
+#define func_ov004_020b6c10 Finished_Enter
+
+#define SA_FACE(i, code)                                                           static void __fastcall sa_##i(void *c, void *)                                 {                                                                                  ++g_setter_calls;                                                              ++g_setter_idx[i];                                                             ++g_setter_dispatched;                                                         ++g_base_state_hits;                                                           ((dMgState_c *)c)->dMgState_c::func_ov004_##code();                                              }
+SA_FACE(0, 020b8688)
+SA_FACE(1, 020b853c)
+SA_FACE(2, 020b83ac)
+SA_FACE(3, 020b81f8)
+SA_FACE(4, 020b7f5c)
+SA_FACE(5, 020b7e38)
+SA_FACE(6, 020b7b90)
+SA_FACE(7, 020b79b0)
+SA_FACE(8, 020b798c)
+SA_FACE(9, 020b7854)
+SA_FACE(10, 020b7744)
+SA_FACE(11, 020b7594)
+SA_FACE(12, 020b7460)
+SA_FACE(13, 020b743c)
+SA_FACE(14, 020b724c)
+SA_FACE(15, 020b70b4)
+SA_FACE(16, 020b7020)
+SA_FACE(17, 020b6f14)
+SA_FACE(18, 020b6d6c)
+SA_FACE(19, 020b6c10)
+
+/* THE TWENTY-ONE NAMES THE MATCHED SETTER ASKS FOR. src/_ZN10dMgState_c8SetStateEi.cpp
+   declares each pair global as `extern dMgState_c::Callback`, a member pointer
+   at C++ linkage, so MSVC spells the references below (read off the listing's
+   EXTRN lines) while the ov004 mount and build/port/host-src/romdata.c define
+   the plain C names. Nothing in the tree defines any of these LHS, so none can
+   be silently defeated. */
+#pragma comment(linker, "/alternatename:?pmf_dMgState_c_RoundClear_Enter@@3P8dMgState_c@@AEXXZQ1@=_pmf_dMgState_c_RoundClear_Enter")
+#pragma comment(linker, "/alternatename:?pmf_dMgState_c_NextRound_Enter@@3P8dMgState_c@@AEXXZQ1@=_pmf_dMgState_c_NextRound_Enter")
+#pragma comment(linker, "/alternatename:?pmf_dMgState_c_RoundBanner5_Enter@@3P8dMgState_c@@AEXXZQ1@=_pmf_dMgState_c_RoundBanner5_Enter")
+#pragma comment(linker, "/alternatename:?pmf_dMgState_c_RetryPrompt_Enter@@3P8dMgState_c@@AEXXZQ1@=_pmf_dMgState_c_RetryPrompt_Enter")
+#pragma comment(linker, "/alternatename:?pmf_dMgState_c_Win_Enter@@3P8dMgState_c@@AEXXZQ1@=_pmf_dMgState_c_Win_Enter")
+#pragma comment(linker, "/alternatename:?pmf_dMgState_c_Lose_Enter@@3P8dMgState_c@@AEXXZQ1@=_pmf_dMgState_c_Lose_Enter")
+#pragma comment(linker, "/alternatename:?pmf_dMgState_c_LoseResume_Enter@@3P8dMgState_c@@AEXXZQ1@=_pmf_dMgState_c_LoseResume_Enter")
+#pragma comment(linker, "/alternatename:?pmf_dMgState_c_Draw_Enter@@3P8dMgState_c@@AEXXZQ1@=_pmf_dMgState_c_Draw_Enter")
+#pragma comment(linker, "/alternatename:?pmf_dMgState_c_Tie_Enter@@3P8dMgState_c@@AEXXZQ1@=_pmf_dMgState_c_Tie_Enter")
+#pragma comment(linker, "/alternatename:?pmf_dMgState_c_RoundClearTop_Enter@@3P8dMgState_c@@AEXXZQ1@=_pmf_dMgState_c_RoundClearTop_Enter")
+#pragma comment(linker, "/alternatename:?pmf_dMgState_c_RetryPromptB_Enter@@3P8dMgState_c@@AEXXZQ1@=_pmf_dMgState_c_RetryPromptB_Enter")
+#pragma comment(linker, "/alternatename:?pmf_dMgState_c_ScoreThenRound_Enter@@3P8dMgState_c@@AEXXZQ1@=_pmf_dMgState_c_ScoreThenRound_Enter")
+#pragma comment(linker, "/alternatename:?pmf_dMgState_c_RetryPromptWide_Enter@@3P8dMgState_c@@AEXXZQ1@=_pmf_dMgState_c_RetryPromptWide_Enter")
+#pragma comment(linker, "/alternatename:?pmf_dMgState_c_RetryPromptWideB_Enter@@3P8dMgState_c@@AEXXZQ1@=_pmf_dMgState_c_RetryPromptWideB_Enter")
+#pragma comment(linker, "/alternatename:?pmf_dMgState_c_DigitsThenRound_Enter@@3P8dMgState_c@@AEXXZQ1@=_pmf_dMgState_c_DigitsThenRound_Enter")
+#pragma comment(linker, "/alternatename:?pmf_dMgState_c_BannerEThenRound_Enter@@3P8dMgState_c@@AEXXZQ1@=_pmf_dMgState_c_BannerEThenRound_Enter")
+#pragma comment(linker, "/alternatename:?pmf_dMgState_c_Results_Enter@@3P8dMgState_c@@AEXXZQ1@=_pmf_dMgState_c_Results_Enter")
+#pragma comment(linker, "/alternatename:?pmf_dMgState_c_ResultsNewRecord_Enter@@3P8dMgState_c@@AEXXZQ1@=_pmf_dMgState_c_ResultsNewRecord_Enter")
+#pragma comment(linker, "/alternatename:?pmf_dMgState_c_GameOver_Enter@@3P8dMgState_c@@AEXXZQ1@=_pmf_dMgState_c_GameOver_Enter")
+#pragma comment(linker, "/alternatename:?pmf_dMgState_c_Finished_Enter@@3P8dMgState_c@@AEXXZQ1@=_pmf_dMgState_c_Finished_Enter")
+#pragma comment(linker, "/alternatename:?data_02086b58@@3P8dMgState_c@@AEXXZQ1@=_data_02086b58")
+
+extern "C" void port_mg_base_writer_seat(void)
+{
+    static int done;
+    if (done)
+        return;
+    done = 1;
+
+    /* the three .bss framework tables first, so the whole family is seated by
+       the time anything can dispatch out of either object */
+    port_mg_framework_tables_seat();
+
+
+    /* ---- THE TABLE IS SPLIT BY DISPATCHER, run link100 lane PMFSWEEP2 -------
+       The fifty-six rows were one array while every row held a __cdecl word.
+       They are two arrays now, because the fifty-six cells are reached by THREE
+       different dispatchers, only one of the three puts a receiver on the stack,
+       and a table that mixes the two conventions cannot be checked by
+       port/tools/pmf_guard.py, whose criterion is per table.
+
+       seats_ecx, TWENTY-NINE cells, every one installed by a state body into the
+       dMgState_c message object at +0x08 or +0x10 (the header's section 5 table
+       lists the slot per pair global, and every one of those bodies writes
+       *(P2 *)(c + 8) or *(P2 *)(c + 0x10)). Those two fields have exactly two
+       readers in the whole image, both matched __thiscall members that take NO
+       stack argument. Read off this build:
+
+           ?Render@dMgState_c@@QAEXXZ     +0x0  mov   eax, ecx
+                                          +0x2  cmp   [eax+0x18], -1
+                                          +0x8  mov   edx, [eax+0x10]   the code
+                                          +0xf  mov   ecx, [eax+0x14]   the adjust
+                                          +0x12 add   ecx, eax          this + adj
+                                          +0x14 jmp   edx
+           ?Behavior@dMgState_c@@QAEXXZ   +0x1  mov   esi, ecx
+                                          +0x16 mov   eax, [esi+8]      the code
+                                          +0x20 mov   ecx, [esi+0xc]    the adjust
+                                          +0x23 add   ecx, esi
+                                          +0x26 jmp   eax
+
+       and their own callers push nothing, because a QAEXXZ member has no stack
+       argument to push:
+
+           ?BeforeBehavior@dScMgBase_c@@UAEHXZ +0x92 push ebx
+                                               +0x93 push edi
+                                               +0x96 lea  ecx, [esi+0xcc]
+                                               +0x9c call ?Behavior@dMgState_c@@QAEXXZ
+           ?BeforeRender@dScMgBase_c@@UAEHXZ   +0x8d call ?Render@dMgState_c@@QAEXXZ
+
+       So at the jmp the word at [esp+4] is the caller's saved edi, not a
+       receiver. All twenty-nine now hold a __fastcall wrapper. This is
+       5ae983797's correction (FlameChomp) at the minigame framework base, the
+       shape 27a24ff5a, 651b5e853, f9936e798, 45ce69707, 00732a5ab and PMFSWEEP's
+       five classes each had to make one class over.
+
+       seats_cdecl, SEVEN cells now, and a thunk on any of them would break
+       what works. It held twenty-seven until run linkfull lane PMFMG1: the
+       other twenty were group A, the setter's own table, dispatched by the
+       host copy's plain cdecl call that PUSHED the receiver. The matched setter
+       dispatches them with the receiver in ecx and nothing pushed, so they are
+       seats_ecx_a above. The object's +0x00 field still has no other reader:
+       dMgState_c has three members in the whole image, SetState, which writes
+       +0x00, Behavior, which reads +0x08, and Render, which reads +0x10. The
+       other seven land in the 020b3278 object (the header's group C:
+       _Z16Banner_StartSpinP8MgBanner, _020b39a4 and _020b422c write them at +0x00 and
+       +0x08, and pmf_Banner_UpdatePressed_2 is the sentinel _Z22Banner_IsPressFinishedP8MgBanner
+       compares against). That object's two readers are FLAT C dispatchers whose
+       first stack argument IS the receiver, and both tail jump, so [esp+4]
+       really does hold it:
+
+           __Z13Banner_UpdateP8MgBanner  +0x3  mov eax, [ebp+8] / +0xc  mov edx, [eax]
+                                 +0x12 mov ecx, [eax+4] / add ecx, eax
+                                 +0x17 pop ebp / +0x18 jmp edx
+           __Z11Banner_DrawP8MgBanner  +0x3  mov eax, [ebp+8] / +0xc  mov edx, [eax+8]
+                                 +0x13 mov ecx, [eax+0xc] / add ecx, eax
+                                 +0x18 pop ebp / +0x19 jmp edx
+
+       and ?BeforeBehavior@dScMgBase_c@@UAEHXZ+0xb6 reaches the second as
+       push edi; call __Z13Banner_UpdateP8MgBanner; add esp, 4. This is the BabyPenguin
+       case 00732a5ab left alone on purpose. */
+    static const SeatRow seats_ecx[] = {
+    { &pmf_dMgState_c_NextRound_Update, "020bc8bc", 0x020b841cu, (SeatFn)bwf_020b841c },
+    { &pmf_dMgState_c_RoundBanner5_Update, "020bc8c4", 0x020b8284u, (SeatFn)bwf_020b8284 },
+    { &pmf_dMgState_c_DrawScore, "020bc8cc", 0x020b6ad8u, (SeatFn)bwf_020b6ad8 },
+    { &pmf_dMgState_c_RetryPrompt_Update, "020bc8d4", 0x020b8098u, (SeatFn)bwf_020b8098 },
+    { &pmf_dMgState_c_UpdateRetryFadeOut, "020bc8dc", 0x020b7fecu, (SeatFn)bwf_020b7fec },
+    { &pmf_dMgState_c_Results_Update, "020bc8e4", 0x020b6f88u, (SeatFn)bwf_020b6f88 },
+    { &pmf_dMgState_c_Win_Update, "020bc8ec", 0x020b7eacu, (SeatFn)bwf_020b7eac },
+    { &pmf_dMgState_c_Lose_Update, "020bc8f4", 0x020b7cd0u, (SeatFn)bwf_020b7cd0 },
+    { &pmf_dMgState_c_UpdateRetryPrompt, "020bc8fc", 0x020b72d4u, (SeatFn)bwf_020b72d4 },
+    { &pmf_dMgState_c_UpdateGameOverToMenu, "020bc904", 0x020b7c04u, (SeatFn)bwf_020b7c04 },
+    { &pmf_dMgState_c_LoseResume_Update, "020bc90c", 0x020b7b20u, (SeatFn)bwf_020b7b20 },
+    { &pmf_dMgState_c_UpdateRetryFadeOut_2, "020bc914", 0x020b7fecu, (SeatFn)bwf_020b7fec },
+    { &pmf_dMgState_c_DrawRecordTable, "020bc91c", 0x020b68e8u, (SeatFn)bwf_020b68e8 },
+    { &pmf_dMgState_c_GameOver_Update, "020bc924", 0x020b6c9cu, (SeatFn)bwf_020b6c9c },
+    { &pmf_dMgState_c_UpdateAfterHidden, "020bc93c", 0x020b7a18u, (SeatFn)bwf_020b7a18 },
+    { &pmf_dMgState_c_UpdateGameOverToMenu_2, "020bc98c", 0x020b7c04u, (SeatFn)bwf_020b7c04 },
+    { &pmf_dMgState_c_UpdateFadeThenResume, "020bc994", 0x020b7124u, (SeatFn)bwf_020b7124 },
+    { &pmf_dMgState_c_UpdateWaitThenResume, "020bc9ac", 0x020b78f4u, (SeatFn)bwf_020b78f4 },
+    { &pmf_dMgState_c_UpdateWaitThenResume_2, "020bc9b4", 0x020b78f4u, (SeatFn)bwf_020b78f4 },
+    { &pmf_dMgState_c_DrawScoreDigits, "020bc9c4", 0x020b6948u, (SeatFn)bwf_020b6948 },
+    { &pmf_dMgState_c_ResultsNewRecord_Update, "020bc9cc", 0x020b6ddcu, (SeatFn)bwf_020b6ddc },
+    { &pmf_dMgState_c_RoundClearTop_Update, "020bc9e4", 0x020b77b4u, (SeatFn)bwf_020b77b4 },
+    { &pmf_dMgState_c_RetryPromptB_Update, "020bc9fc", 0x020b75e4u, (SeatFn)bwf_020b75e4 },
+    { &pmf_dMgState_c_UpdateFadeThenResume_2, "020bca04", 0x020b7124u, (SeatFn)bwf_020b7124 },
+    { &pmf_dMgState_c_UpdateRetryFadeOut_3, "020bca14", 0x020b7fecu, (SeatFn)bwf_020b7fec },
+    { &pmf_dMgState_c_RoundClear_Update, "020bca1c", 0x020b8560u, (SeatFn)bwf_020b8560 },
+    { &pmf_dMgState_c_ScoreThenRound_Update, "020bca24", 0x020b746cu, (SeatFn)bwf_020b746c },
+    { &pmf_dMgState_c_DrawRecordTable_2, "020bca2c", 0x020b68e8u, (SeatFn)bwf_020b68e8 },
+    { &pmf_dMgState_c_Finished_Update, "020bca34", 0x020b6b40u, (SeatFn)bwf_020b6b40 },
+    };
+
+    /* run linkfull lane PMFMG1: GROUP A, the matched setter's twenty, now
+       __fastcall faces (the block above this function). */
+    static const SeatRow seats_ecx_a[] = {
+    { &pmf_dMgState_c_RoundClear_Enter, "020bc974", 0x020b8688u, (SeatFn)sa_0 },
+    { &pmf_dMgState_c_NextRound_Enter, "020bc96c", 0x020b853cu, (SeatFn)sa_1 },
+    { &pmf_dMgState_c_RoundBanner5_Enter, "020bc964", 0x020b83acu, (SeatFn)sa_2 },
+    { &pmf_dMgState_c_RetryPrompt_Enter, "020bc95c", 0x020b81f8u, (SeatFn)sa_3 },
+    { &pmf_dMgState_c_Win_Enter, "020bc954", 0x020b7f5cu, (SeatFn)sa_4 },
+    { &pmf_dMgState_c_Lose_Enter, "020bc94c", 0x020b7e38u, (SeatFn)sa_5 },
+    { &pmf_dMgState_c_LoseResume_Enter, "020bc944", 0x020b7b90u, (SeatFn)sa_6 },
+    { &pmf_dMgState_c_Draw_Enter, "020bc92c", 0x020b79b0u, (SeatFn)sa_7 },
+    { &pmf_dMgState_c_Tie_Enter, "020bc934", 0x020b798cu, (SeatFn)sa_8 },
+    { &pmf_dMgState_c_RoundClearTop_Enter, "020bc97c", 0x020b7854u, (SeatFn)sa_9 },
+    { &pmf_dMgState_c_RetryPromptB_Enter, "020bc984", 0x020b7744u, (SeatFn)sa_10 },
+    { &pmf_dMgState_c_ScoreThenRound_Enter, "020bc99c", 0x020b7594u, (SeatFn)sa_11 },
+    { &pmf_dMgState_c_RetryPromptWide_Enter, "020bc9a4", 0x020b7460u, (SeatFn)sa_12 },
+    { &pmf_dMgState_c_RetryPromptWideB_Enter, "020bca3c", 0x020b743cu, (SeatFn)sa_13 },
+    { &pmf_dMgState_c_DigitsThenRound_Enter, "020bc9bc", 0x020b724cu, (SeatFn)sa_14 },
+    { &pmf_dMgState_c_BannerEThenRound_Enter, "020bc9d4", 0x020b70b4u, (SeatFn)sa_15 },
+    { &pmf_dMgState_c_Results_Enter, "020bc9dc", 0x020b7020u, (SeatFn)sa_16 },
+    { &pmf_dMgState_c_ResultsNewRecord_Enter, "020bc9ec", 0x020b6f14u, (SeatFn)sa_17 },
+    { &pmf_dMgState_c_GameOver_Enter, "020bc9f4", 0x020b6d6cu, (SeatFn)sa_18 },
+    { &pmf_dMgState_c_Finished_Enter, "020bca0c", 0x020b6c10u, (SeatFn)sa_19 },
+    };
+
+    static const SeatRow seats_cdecl[] = {
+    { &pmf_Banner_UpdateWave, "020bc17c", 0x020b3978u, (SeatFn)bw_020b3978 },
+    { &pmf_Banner_DrawSpin, "020bc1b4", 0x020b369cu, (SeatFn)bw_020b369c },
+    { &pmf_Banner_DrawWave, "020bc1ec", 0x020b38acu, (SeatFn)bw_020b38ac },
+    { &pmf_Banner_UpdateSpin, "020bc20c", 0x020b37c4u, (SeatFn)bw_020b37c4 },
+    { &pmf_Banner_UpdatePressed, "020bc224", 0x020b4214u, (SeatFn)bw_020b4214 },
+    { &pmf_Banner_UpdatePressed_2, "020bc254", 0x020b4214u, (SeatFn)bw_020b4214 },
+    { &pmf_Banner_DrawPressed, "020bc274", 0x020b410cu, (SeatFn)bw_020b410c },
+    };
+
+    mgbase_seat_rows(seats_ecx, sizeof seats_ecx / sizeof seats_ecx[0]);
+    mgbase_seat_rows(seats_ecx_a, sizeof seats_ecx_a / sizeof seats_ecx_a[0]);
+    mgbase_seat_rows(seats_cdecl, sizeof seats_cdecl / sizeof seats_cdecl[0]);
+
+    /* The setter's function-local static table is a COPY of the twenty
+       group-A globals, built on the setter's first call. It is the matched
+       TU's own static now (sEnterTable, behind MSVC's thread-safe guard), so
+       it cannot be cleared from here the way the host copy's was; it does not
+       need to be: hal/scene_mg.cpp runs this beside the overlay constructors,
+       before any minigame object exists, and the setter is only ever called by
+       one (run linkfull lane PMFMG1). */
+}
+
+extern "C" unsigned port_mg_base_writer_seat_count(void)
+{
+    return g_writer_seated;
+}

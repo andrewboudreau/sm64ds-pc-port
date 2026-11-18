@@ -1,0 +1,15 @@
+diff --git a/src/engine/pxi/PXI_Fifo.c b/src/engine/pxi/PXI_Fifo.c
+--- a/src/engine/pxi/PXI_Fifo.c
++++ b/src/engine/pxi/PXI_Fifo.c
+@@ -175,7 +175,11 @@
+         if (ret_code == PXI_FIFO_FAIL_RECV_ERR)
+             continue;
+ 
++#ifdef _MSC_VER   /* the host compiles this as C++, which wants the enum cast */
++        tag = (PXIFifoTag)fifomsg.e.tag;
++#else
+         tag = fifomsg.e.tag;
++#endif
+ 
+         if (tag) {
+             if (FifoRecvCallbackTable[tag]) {

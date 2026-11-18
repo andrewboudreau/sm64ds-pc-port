@@ -1,0 +1,21 @@
+diff --git a/include/dMgJump3DMario_c.h b/include/dMgJump3DMario_c.h
+--- a/include/dMgJump3DMario_c.h
++++ b/include/dMgJump3DMario_c.h
+@@ -3,6 +3,9 @@
+ 
+ #include "dExtAnmModel_c.h"
+ #include "nitro/fx/fx.h"
++#ifdef _MSC_VER
++#pragma pack(push, 4) /* host only: MSVC aligns pointer-to-member fields to 8, mwccarm to 4 */
++#endif
+ 
+ /* dMgJump3DMario_c -- one of the three Marios in Bounce and Pounce (MG_JUMP)
+  * and its sequel (MG_JUMP2), ov006.
+@@ -134,4 +137,7 @@
+     sizeof(dMgJump3DMario_c) == 0xb8 ? 1 : -1];
+ #endif
+ 
++#ifdef _MSC_VER
++#pragma pack(pop)
+ #endif
++#endif

@@ -1,0 +1,629 @@
+/* THE BOWSER FIGHT'S STATE MACHINES -- ov060's SEVEN runtime pointer-to-member
+ * dispatch tables, filled from SIX source runs, seated with host bodies, plus
+ * host copies of the five dispatchers whose pointer-to-member STRIDE does not
+ * match the ROM record.
+ *
+ * Six and seven are both right and they count different things, which is what
+ * the lane's "six tables" wording elided: there are six runs of source statics
+ * that a sinit copies, and BOWSER FIRE's run (sixteen records at 0x0211a734)
+ * fills TWO runtime tables out of one run, its init half and its behaviour
+ * half.  The seven below are the runtime bss tables the dispatchers read, and
+ * that is the count that governs the seats.
+ *
+ * run linkw wave 6, lane w6-A.
+ *
+ * ==== THE SEVEN TABLES, RE-DERIVED FROM THE OVERLAY IMAGE ===================
+ *
+ * Every one is bss, filled by an ov060 sinit out of 8-byte {code, adj} source
+ * statics in .data, and every one of the 50 source records reads adj == 0 (the
+ * non-virtual complete-class Itanium form) -- read from
+ * extracted/overlays/overlay_0060.bin and cross-checked word for word against
+ * config/arm9/overlays/ov060/relocs.txt.  The three arm9-side widths are the
+ * next-symbol landings.
+ *
+ *   bss table            slots  built by                dispatched by
+ *   0x0211aeb4 (0x20)      4    __sinit_ov060_021195dc  func_ov060_02112434
+ *                                                       (BOWSER, idx +0x410)
+ *   0x0211aed4 (0xa0)     20    __sinit_ov060_021195dc  func_ov060_021128c0
+ *                                                       (BOWSER, idx +0x40c)
+ *   0x0211ae9c (0x18)      3    __sinit_ov060_021195dc  func_ov060_02115b84
+ *                                                       (BOWSER TAIL, idx +0x110)
+ *   0x0211af74 (0x40)      8    __sinit_ov060_02119df0  BowserFire::InitResources
+ *                                                       (idx +0x35c)
+ *   0x0211afb4 (0x40)      8    __sinit_ov060_02119df0  BowserFire::Behavior
+ *                                                       (idx +0x35c)
+ *   0x0211b1d8 (0x20)      4    __sinit_ov060_0211a388  SpikeBomb::Behavior
+ *                                                       (8-byte records -- it
+ *                                                       reads the table as
+ *                                                       int[] and indexes
+ *                                                       [idx*2], idx +0x170)
+ *   0x0211b1ac (0x18)      3    __sinit_ov060_0211a000  _ZN17BowserSkyPlatform8BehaviorEv
+ *                                                       (SKY PLATFORM, idx +0x328)
+ *
+ * The lane brief carried a banked reading that "Bowser's two state-pair tables"
+ * are 0x0211a4e0.. and 0x0211a734..  Corrected here from the readers: the
+ * 0x0211a734 run is BOWSER FIRE's (both of its halves), and 0x0211a4e0 itself
+ * is not a dispatch record at all -- it is the four-halfword message-id table
+ * func_ov060_02115518 indexes with the actor's +0x414 variant byte.  Bowser's
+ * own dispatch starts one record later, at 0x0211a4e8.  There are six source
+ * runs and seven runtime tables, not two of anything, and one of them
+ * (SpikeBomb's) was not in the bank at all.
+ *
+ * ==== WHY FIVE DISPATCHERS WERE HOST COPIES AND TWO WERE NOT ================
+ *
+ * NONE IS A HOST COPY ANY MORE, and the record below is the history. Lanes
+ * PMFB5 and FWD retired copies 2 to 5 for their matched TUs, and run linkfull
+ * lane SEATS3 retired the last, HOST COPY 1 (func_ov060_02112434). What made
+ * each retirement possible is the global /vmg /vmm pair in port/CMakeLists.txt,
+ * which makes every pointer-to-member MSVC forms the ROM's eight-byte {code,
+ * adjust} pair whatever the class looks like, together with the __fastcall
+ * faces in THE SEAT below, which take the receiver in ECX the way a matched
+ * TU's `(this->*pmf)()` hands it over. The measurements that follow were made
+ * WITHOUT that pair and stay as the record of why the copies existed.
+ *
+ * The ROM record is 8 bytes.  MSVC's pointer-to-member size depends on what it
+ * knows about the class at the point the type is formed, and none of the
+ * pointer-to-member shapes in this pack lands on 8.  RE-MEASURED at the wave-6
+ * close with this build's compiler (MSVC 19.44 x86, the same switches the port
+ * builds with).  The first row below was banked as 4 while the lane ran and is
+ * corrected here -- the forward-declared-C case measures 16:
+ *
+ *   forward-declared C, DEFINED later in the same TU  ->  16
+ *     (func_ov060_02112434, func_ov060_02115b84, _ZN17BowserSkyPlatform8BehaviorEv)
+ *   complete empty `struct Actor { }`                 ->  4
+ *     (_ZN10BowserFire13InitResourcesEv)
+ *   forward-declared, never defined                   ->  16
+ *     (_ZN10BowserFire8BehaviorEv)
+ *   plain `struct { int a, b; }` + manual decode      ->  8   <-- correct
+ *     (func_ov060_021128c0, _ZN9SpikeBomb8BehaviorEv)
+ *
+ * The last row is not a pointer-to-member at all, it is two ints read by hand,
+ * so NOTHING this pack hands MSVC as a pointer-to-member measures the ROM's 8.
+ * All six host copies of this landing stay justified: the five here and Key's
+ * dispatcher in port/unmatched/Ov089_StateDispatch.cpp, whose complete
+ * single-inheritance class with a vtable measures 4.
+ *
+ * Either wrong stride destroys the table, in opposite directions.  A 16-byte
+ * stride over-steps by exactly two records, so state 1 calls record 2's
+ * function and the back half of the table runs off its own end into whatever
+ * bss follows.  A 4-byte stride under-steps: it reads record 0 correctly and
+ * then walks the adj words, so state 0 runs and every other state calls
+ * through a zero.  Both shapes survive a short census -- the fight opens in
+ * state 0 either way -- and die once it advances, which is exactly the failure
+ * this pack exists to keep out.  On top of the stride, MSVC
+ * emits a __thiscall through a pointer-to-member (receiver in ecx) while every
+ * ov060 state body is a cdecl `func_ov060_xxxxxxxx(char *)` -- so even a
+ * correctly strided read would hand the body a garbage argument.  Both faults
+ * are the Crate / Chuckya / MontyMole case; the fix is the same one
+ * port/unmatched/Crate_StateDispatch.cpp writes down: read the record as a
+ * plain {function, adj} pair and call the function with `this`.
+ *
+ * func_ov060_021128c0 and _ZN9SpikeBomb8BehaviorEv already decode the
+ * record by hand into a two-int struct and call through a cdecl function
+ * pointer, so they are RIGHT as matched src and stay in the slice.  They still
+ * need the seat: the words they call are DS code addresses.
+ *
+ * ==== BOTH NAMED HOLES ARE REAL DECOMP NOW =================================
+ *
+ * w7a wrote host copies of BOTH named holes on the reading that neither had a
+ * matched TU.  That reading was true of the tree w7a could see and it is false
+ * of both rows today, for the same reason twice over: this branch forked from
+ * main at 7b2f913fe (2026-08-04) and each TU landed after the check that said
+ * it did not exist.
+ *
+ *   func_ov060_021140c0 (BOWSER state 9)        src/func_ov060_021140c0.c.
+ *     Matched in 83691debd (2026-09-13), which is AFTER the "main has no TU of
+ *     this name either (checked against origin/main at bc93fa767)" line this
+ *     header used to carry.  Carried by port/slice_l15stale.txt (run link100
+ *     wave 15, lane SEAT15A).  HOST COPY 7 is retired below.
+ *   _ZN11daKpaFire_c19func_ov060_02116d78Ev (BOWSER FIRE state 5)   src/func_ov060_02116d78.c.
+ *     Byte-matched decomp, carried by port/slice_w9harvest.txt.  The host
+ *     copy that used to sit below HOST COPY 7 is gone.
+ *
+ * The old abort-and-name stubs (the Koopa-0x02117724 / Rabbit-0x0212b8dc
+ * precedent) are gone from both states either way: both RUN.
+ */
+#include <cstdio>
+#include <cstdlib>
+#include "hal/pmf_tc.h"
+#include "daKpaFire_c.h"
+
+extern "C" {
+
+/* The ROM's record, as the overlay image lays it out: {code address, adj}. */
+struct PortPmf { unsigned fn; int adj; };
+
+/* ---- BOWSER: 0x0211aeb4, four records (sinit 021195dc copy order) -------- */
+extern PortPmf data_ov060_0211a578[], data_ov060_0211a510[],
+    data_ov060_0211a518[], data_ov060_0211a520[];
+/* ---- BOWSER TAIL: 0x0211ae9c, three records ----------------------------- */
+extern PortPmf data_ov060_0211a558[], data_ov060_0211a550[],
+    data_ov060_0211a548[];
+/* ---- BOWSER FIRE: 0x0211afb4 (behaviour) and 0x0211af74 (init) ---------- */
+extern PortPmf data_ov060_0211a794[], data_ov060_0211a78c[],
+    data_ov060_0211a76c[], data_ov060_0211a77c[], data_ov060_0211a764[],
+    data_ov060_0211a774[], data_ov060_0211a744[], data_ov060_0211a784[];
+extern PortPmf data_ov060_0211a75c[], data_ov060_0211a754[],
+    data_ov060_0211a73c[], data_ov060_0211a74c[], data_ov060_0211a734[],
+    data_ov060_0211a7ac[], data_ov060_0211a7a4[], data_ov060_0211a79c[];
+/* ---- SKY PLATFORM: 0x0211b1ac, three records ---------------------------- */
+extern PortPmf data_ov060_0211a938[], data_ov060_0211a940[],
+    data_ov060_0211a930[];
+
+/* the runtime tables the dispatchers read (bss, filled by the sinits) */
+extern PortPmf data_ov060_0211aeb4[];
+extern PortPmf data_ov060_0211ae9c[];
+extern PortPmf data_ov060_0211b1ac[];
+extern PortPmf data_ov060_0211af74[];
+extern PortPmf data_ov060_0211afb4[];
+
+/* ---- every state body, all matched src (cdecl, `this` by argument) ------- */
+void _ZN7daKpa_c10FreeUpdateEv(char *c);
+void _ZN7daKpa_c10HeldUpdateEv(char *c);
+void _ZN7daKpa_c19ThrownDroppedUpdateEv(char *c);
+
+
+void _ZN11daKpaTail_c19func_ov060_02115d68Ev(char *c);
+void _ZN11daKpaTail_c19func_ov060_02115d50Ev(char *c);
+void _ZN11daKpaTail_c19func_ov060_02115c1cEv(char *c);
+
+void _ZN11daKpaFire_c19func_ov060_0211747cEv(char *c);
+void _ZN11daKpaFire_c19func_ov060_021169f8Ev(char *c);
+void _ZN11daKpaFire_c19func_ov060_02116b68Ev(char *c);
+void _ZN11daKpaFire_c19func_ov060_021167ecEv(char *c);
+void _ZN11daKpaFire_c19func_ov060_021168c4Ev(char *c);
+void _ZN11daKpaFire_c19func_ov060_02116f90Ev(char *c);
+void _ZN11daKpaFire_c19func_ov060_021167c8Ev(char *c);
+void _ZN11daKpaFire_c19func_ov060_02116b18Ev(char *c);
+void _ZN11daKpaFire_c19func_ov060_02116c68Ev(char *c);
+/* run linkw wave 9, lane w9-harvest: 0x02116d78 joined this list. It used to
+   be HOST COPY 8 in this same file; src/func_ov060_02116d78.c has been a
+   byte-match on main since PR #1150 (817be2263, 2026-08-07) and the host copy
+   outlived it only because this branch cannot see main's src/. */
+void _ZN11daKpaFire_c19func_ov060_02116d78Ev(char *c);
+void _ZN11daKpaFire_c19func_ov060_021169b0Ev(char *c);
+void _ZN11daKpaFire_c19func_ov060_02116f74Ev(char *c);
+void _ZN11daKpaFire_c19func_ov060_0211722cEv(char *c);
+void _ZN11daKpaFire_c19func_ov060_021171e8Ev(char *c);
+
+
+void _ZN10daKpa3Bg_c10StateStartEv(char *c);
+void _ZN10daKpa3Bg_c10StateCheckEv(char *c);
+void _ZN10daKpa3Bg_c9StateFallEv(char *c);
+
+/* what the five host copies below called; all five are retired, and the
+   declarations stay as the record of the pack's call surface, as HOST COPY 7's
+   block below says of its own */
+int Vec3_HorzDist(const void *a, const void *b);
+short Vec3_HorzAngle(const void *a, const void *b);
+int _ZN8dActor_c14GetSubtractionEss(void *self, short a, short b);
+char *_ZN8dActor_c10FindWithIDEj(unsigned id);
+void _ZN5dCc_c5ClearEv(void *cc);
+void _ZN5dCc_c6UpdateEv(void *cc);
+void _ZN10dBgActor_c21UpdateModelPosAndRotYEv(void *p);
+void _ZN10dBgActor_c19UpdateClsnPosAndRotEv(void *p);
+int _ZN17dExtShadowModel_c12InitCylinderEv(void *self);
+void _ZN7dCcAc_c4InitEP8dActor_ciijj(
+    void *self, void *actor, int a, int b, unsigned c, unsigned d);
+void _ZN10dBgCh_Actr4InitEP8dActor_ciiP10Vector3_16S3_(
+    void *self, void *actor, int a, int b, void *v, int c);
+void _ZN9dBgCh_GndC1Ev(void *self);
+void _ZN9dBgCh_Gnd12SetObjAndPosERK7Vector3P8dActor_c(
+    void *self, const void *v, void *actor);
+int _ZN9dBgCh_Gnd10DetectClsnEv(void *self);
+void _ZN9dBgCh_GndD1Ev(void *self);
+int _ZNK10dBgCh_Actr10IsOnGroundEv(void *c);
+
+}  /* extern "C" */
+
+/* ============ THE TWO FORMERLY-NAMED HOLES ===============================
+ * NO body follows.  Both holes are matched src on slice lines now: 0x02116d78
+ * went to port/slice_w9harvest.txt at wave 9 and 0x021140c0 went to
+ * port/slice_l15stale.txt at wave 15, each when the decomp banked the real TU
+ * and the port's banner had not been re-read since.  The span derivations are
+ * kept below because they are what the two retired host copies were checked
+ * against and they still pin the byte counts the slice TUs have to fill.
+ *
+ * ---- SPANS, RE-DERIVED (the old header's 0x1f4 / 0x1fc were CARRIED) ------
+ * Bytes read from extracted/overlays/overlay_0060.bin at base 0x02111900
+ * (extracted/dsd/arm9_overlays/overlays.yaml, ov060: base_address 34674944 =
+ * 0x02111900, bss_size 1632).  Each span is confirmed TWICE and the two
+ * derivations agree:
+ *
+ *   func_ov060_021140c0  0x021140c0..0x021142b3 = 0x1f4 bytes = 125 words
+ *     116 instructions, push {r4-r8,lr} @0x021140c0 .. bx lr @0x0211428c
+ *     +  9 literal words 0x02114290..0x021142b0, the last one (0x00000423)
+ *        reached by this function's own ldr [pc, #0x68] @0x02114240
+ *     next symbol func_ov060_021142b4; 0x021142b4 - 0x021140c0 = 0x1f4
+ *
+ *   _ZN11daKpaFire_c19func_ov060_02116d78Ev  0x02116d78..0x02116f73 = 0x1fc bytes = 127 words
+ *     121 instructions, push {r4,r5,r6,lr} @0x02116d78 .. bx lr @0x02116f58
+ *     +  6 literal words 0x02116f5c..0x02116f70, the last one (0x00000011)
+ *        reached by this function's own ldr [pc, #0x78] @0x02116ef0
+ *     next symbol _ZN11daKpaFire_c19func_ov060_02116f74Ev; 0x02116f74 - 0x02116d78 = 0x1fc
+ *
+ * ---- HOW THEY WERE VERIFIED, AND WHAT THAT DOES NOT COVER -----------------
+ * The decomp oracle (mwccarm -> byte compare) is NOT AVAILABLE on this
+ * machine: tools/mwccarm/2004/b56/mwccarm.exe does not exist in either the
+ * repo or the worktree (tools/permuter/mwccarm_compile.sh names that path),
+ * and tangos match reports "no compiler at 2004/b56" on a KNOWN-matched
+ * control (src/func_ov060_02113fcc.c).  So neither body claims a compiler
+ * diff.  What each body DOES claim, and what the reviewer can re-run:
+ *
+ *   1. TOTAL ACCOUNTING.  Every one of the 125 + 127 words is classified as
+ *      instruction or literal, and every instruction is mapped to a statement
+ *      below.  Nothing in either span is unexplained.
+ *   2. EVERY CALL TARGET AND EVERY RELOCATED LOAD is confirmed against
+ *      config/arm9/overlays/ov060/relocs.txt, independently of the
+ *      disassembly.  For 0x021140c0 that table lists exactly 7 arm_call rows
+ *      and 3 load rows; for 0x02116d78 exactly 6 arm_call rows (0x02043824
+ *      TWICE -- the body really does call MarkForDestruction on two paths)
+ *      and 2 load rows.  The counts and targets match the transcription
+ *      one for one, and the literals the reloc table does NOT list are
+ *      therefore plain numeric constants, not addresses -- which is what
+ *      proves 0x92492493 / 0xcccccccd / 0xaaaaaaab / 0xf0f0f0f1 are division
+ *      magics and not pointers.
+ *   3. NO CHANGED CONSTANT, OFFSET OR BRANCH TARGET.  Every immediate, every
+ *      structure offset and every branch is listed in the per-body banner.
+ *      The divisors are re-derived from the magics, not guessed:
+ *        0xcccccccd, umull + lsr #3          -> unsigned / 10
+ *        0xaaaaaaab, umull + lsr #1          -> unsigned / 3
+ *        0xf0f0f0f1, umull + lsr #4          -> unsigned / 17
+ *        0x92492493, smull + add n + asr #9  -> signed  / 896
+ *          (2^41 / 896 = 2454267026.28, ceil = 2454267027 = 0x92492493, the
+ *           exact round-up magic; the trailing "+ (n >>> 31)" is C's
+ *           round-toward-zero correction, i.e. plain `/ 896`)
+ *   4. THE TRANSCRIPTION IDIOMS are the ones the MATCHED siblings in this
+ *      same pack already use, so the shapes are not invented here:
+ *        ((u32)RandomIntInternal(&data_0209e650) >> 0x10) % 10
+ *            -- src/func_ov060_021150d0.cpp, src/func_ov060_021151d4.c
+ *        FX_SinCosTable_[(*(u16 *)p >> 4) * 2] / [... * 2 + 1]
+ *            -- src/func_ov060_021128c0.cpp, src/func_0203cc28.c
+ *            (table re-read from arm9_dec.bin: entry[2i]=sin, [2i+1]=cos,
+ *             scale 0x1000, 4096 entries -- checked at i=0/512/1024)
+ *        *(u16 *)((c + 0x300) + 0xfc)  for the +0x3fc / +0x374 counters
+ *            -- src/func_ov060_02113d8c.cpp, src/func_ov060_021128c0.cpp
+ *
+ * What this standard does NOT establish is that mwccarm would emit these
+ * exact 116 / 121 instructions from this exact C.  It establishes that the
+ * SEMANTICS are the ROM's, word for word, with no constant, offset or call
+ * target altered.  That is the strongest claim this machine can support and
+ * the report says so.
+ */
+
+extern "C" {
+/* what HOST COPY 7 below calls, beyond the block above. Several of these were
+   HOST COPY 8's callees too and are now referenced only by
+   src/func_ov060_02116d78.c, which declares them for itself -- the
+   declarations stay because they document the ov060/arm9 call surface this
+   file's seat depends on. */
+int _ZN7daPly_c9GetHealthEv(void *self);        /* ov002 0x020bf548, thiscall
+                                                  receiver in r0 -- a REAL
+                                                  receiver, not the zero-arg
+                                                  reader shape the
+                                                  closestplayer guard hunts */
+int _ZNK15dExtFrameCtrl_c12WillHitFrameEi(void *anim, int frame);   /* 0x02015a98 */
+void _ZN8dActor_c13SpawnFireballERK7Vector3PK10Vector3_16iij(
+    void *self, const void *pos, const void *rot, int horzSpeed, int unk35c,
+    unsigned param1);                                        /* 0x020102b0 */
+extern "C++" void func_02012694(unsigned int id, const struct Vector3 *v);                       /* 0x02012694 */
+bool _ZN7daKpa_c24Bowser_IsAnimAtLastFrameEv(void *c);        /* ov060 0x02115a30 -- the
+                                                  matched TU returns bool, so
+                                                  this decl says bool: an int
+                                                  decl would read the undefined
+                                                  high 24 bits of MSVC's al */
+void _ZN7daKpa_c13InitAnimationEii(char *c, int idx, int fix);   /* ov060 0x02111cc0 --
+                                                  THREE arguments: the ROM
+                                                  callee reads r0/r1/r2 and the
+                                                  matched TU spends r2 on its
+                                                  SetAnim frame argument, so a
+                                                  one-argument decl would hand
+                                                  it a garbage animation id */
+void _ZN11daKpaFire_c19func_ov060_02116518Ejii(char *self, unsigned kind, int a2, int a3);
+                                                        /* ov060 0x02116518 */
+void *_ZN8dActor_c5SpawnEjjRK7Vector3PK10Vector3_16as(
+    unsigned actorID, unsigned param1, const void *pos, const void *rot,
+    int areaID, int deathTableID);                           /* 0x02010e2c */
+void _ZN7fBase_c18MarkForDestructionEv(void *self);        /* 0x02043824 */
+int RandomIntInternal(int *seed);                            /* 0x0203b990 */
+extern int data_0209e650;             /* the shared LCG seed both bodies draw */
+extern short FX_SinCosTable_[];         /* arm9 sin/cos table, {sin,cos} pairs */
+extern int data_ov060_0211abe0[2];    /* the 0x36c SharedFilePtr; [1] is the
+                                         BCA_File* the sinit's Construct
+                                         resolves -- 8 bytes wide, next ov060
+                                         symbol is data_ov060_0211abe8 */
+}
+
+namespace {
+/* the two locals func_ov060_021140c0 hands Actor::SpawnFireball; the ROM
+   builds them in its own 0x20-byte frame at sp+0x10 (Vector3) and sp+8
+   (Vector3_16) and passes their addresses */
+struct Ov60Vec3 { int x, y, z; };
+struct Ov60Vec3_16 { unsigned short x, y, z; };
+}
+static_assert(sizeof(Ov60Vec3) == 12, "SpawnFireball's Vector3 is 3 words");
+static_assert(sizeof(Ov60Vec3_16) == 6, "SpawnFireball's Vector3_16 is 3 halfwords");
+static_assert(sizeof(short) == 2, "FX_SinCosTable_ is indexed as s16[]");
+static_assert(sizeof(PortPmf) == 8, "the ROM's dispatch record is 8 bytes");
+
+/* ---- lane w7a's proof-of-life trace IS GONE --------------------------------
+ * SM64DS_OV060_TRACE printed state changes from inside the host copies of this
+ * file, and its frame counter was Bowser::Behavior's own tick. Every host copy
+ * that called it has been retired for its matched TU (the last, HOST COPY 6,
+ * in run linkfull wave 24), and a matched TU is not the place to put a trace
+ * back, so the helpers went with their last caller. The fight's state
+ * sequence is observable without it: a debugger breakpoint on the flat
+ * _ZN6Bowser8BehaviorEv reads the receiver's +0x40c / +0x410 state words on
+ * every tick (lane FACEFLIP1, run linkfull). */
+
+/* ============ HOST COPY 7 IS RETIRED =====================================
+ * run link100 wave 15, lane SEAT15A -- the stale-banner harvest, round 2.
+ *
+ * The 0x1f4-byte transcription that stood here carried the banner
+ * "PORT_HOST_ABI: none -- this is a plain cdecl body; it is a host copy only
+ * because no matched TU of this name exists", and this file's header said the
+ * hole was "Still genuinely unmatched: main has no TU of this name either
+ * (checked against origin/main at bc93fa767)".  Both were true when written.
+ * src/func_ov060_021140c0.c landed later, in 83691debd ("Match
+ * func_ov060_021140c0 (ov060, 0x021140c0, 500 bytes)", 2026-09-13): plain
+ * matched C, ten externs, no NONMATCHING banner, no asm hatch, no
+ * ROM-address literal.  It is on port/slice_l15stale.txt now, which carries
+ * the whole derivation. (The seat row "aed4[9]" that took its address is
+ * retired with the rest of 0x0211aed4: main's d_a_kpa.cpp builds that table.)
+ *
+ * Same shape, same file, one wave later than HOST COPY 8
+ * (_ZN11daKpaFire_c19func_ov060_02116d78Ev, run linkw wave 9's w9-harvest lane).
+ *
+ * ALL TEN EXTERNS were checked in this tree's own build/port/walk_window.map
+ * before the retirement and every one is present.  The ov60_ran("BOWSER state
+ * 9") trace call leaves with the host copy: the ROM's body carries no trace.
+ */
+
+/* ============ HOST COPY 1 IS RETIRED =====================================
+ * run linkfull lane SEATS3. func_ov060_02112434, BOWSER's per-frame target /
+ * flag pass (Bowser::Behavior calls it every frame of every fight), compiles
+ * from src/func_ov060_02112434.cpp now, on port/slice_w5e.txt. The copy that
+ * stood here was line for line with that source but for one statement, the
+ * dispatch, which it respelled as a cdecl call of the record's code word with
+ * `thiz + (adj >> 1)` because MSVC's pointer-to-member was not the ROM's eight
+ * bytes when it was written (see WHY FIVE DISPATCHERS above). Under the global
+ * /vmg /vmm pair the matched `(((C*)thiz)->*data_ov060_0211aeb4[i].pmf)()` IS
+ * the ROM's read: code word at the cell's +0, adjust at +4 added to the
+ * receiver in ECX, nothing pushed. So the four cells of data_ov060_0211aeb4
+ * hold __fastcall faces in THE SEAT below instead of the plain cdecl bodies
+ * this copy called, the same move lane PMFB5 made for the tail, the sky
+ * platform and the fire. All four source records read adj == 0, so the
+ * copy's `>> 1` and MSVC's raw adjust agree on every one.
+ */
+
+/* ============ HOST COPIES 2, 3 AND 4 ARE GONE ============================
+ * Run link100 lane PMFB5. func_ov060_02115b84 (BOWSER TAIL),
+ * _ZN17BowserSkyPlatform8BehaviorEv (SKY PLATFORM) and _ZN10BowserFire13InitResourcesEv
+ * compile from src now and dispatch their own tables. What made that possible
+ * is the seat below: the fourteen rows that feed data_ov060_0211ae9c,
+ * _0211af74 and _0211b1ac hold __fastcall FACES instead of plain cdecl bodies,
+ * because a matched TU emits `mov ecx, tab[i*8+4] / add ecx, this / call eax`
+ * and pushes nothing, where these host copies called the code word cdecl with
+ * `c + (adj >> 1)`.
+ *
+ * HOST COPY 5 IS GONE TOO, run link100 lane FWD, and the paragraph that used
+ * to stand here said it had to stay. What it got right is the diagnosis:
+ * src/_ZN10BowserFire8BehaviorEv.cpp defines a REAL C++ MEMBER -- `int
+ * BowserFire::Behavior()`, which MSVC decorates ?Behavior@BowserFire@@QAEHXZ
+ * and calls __thiscall -- while hal/actor_classes_ov060.cpp's bfire_behavior
+ * face calls the FLAT C name, so retiring the copy on its own left that name
+ * undefined and the link said so:
+ *   actor_classes_ov060.cpp.obj : error LNK2019: unresolved external symbol
+ *   __ZN10BowserFire8BehaviorEv referenced in function
+ *   "int __fastcall bfire_behavior(void *,void *)"
+ * What it got wrong is that this needs BowserFire's exact class SHAPE. It does
+ * not: MSVC's decoration of a member function carries the method name, the
+ * class name, the access specifier, the convention and the signature, and
+ * nothing about the class's members or its size. port/hal/fwd_forwarders.cpp
+ * declares the class the way include/BowserFire.h does and forwards the
+ * receiver, and the nine decorations it emits were checked against the nine
+ * matched objects with dumpbin before the link rather than assumed. Its table
+ * data_ov060_0211afb4 measured clean all along -- eight whole-pair {code,0}
+ * sources, a 64-byte span, ROM `add r3,r1,r0,lsl #3` at 021176e4 against
+ * emitted [eax*8], /Zp4 a no-op -- so its eight seat rows are faces now like
+ * the other three tables'. The sibling
+ * _ZN10BowserFire13InitResourcesEv is taken because its src defines the FLAT
+ * `extern "C" int _ZN10BowserFire13InitResourcesEv(char*)`, so the two halves
+ * of one class split for a reason that is about the definition form and not
+ * about the class.
+ *
+ * THE STRIDE, BOTH SIDES, per row, read at each body's OWN address out of
+ * extracted/overlays/overlay_0060.bin (lane PMFB5, run link100)
+ * and off each matched TU's own /FAsc listing (emit_gate3_out.txt):
+ *   02115b84  ROM add r3,r1,r4,lsl #3 at 02115ba0, pool 02115c18 = 0211ae9c
+ *             emitted ?data_ov060_0211ae9c@@3PAP8C@@AEXXZA[ebx*8]
+ *   02117790  ROM add r3,r1,r0,lsl #3 at 021178e8, pool 02117934 = 0211af74
+ *             emitted ?data_ov060_0211af74@@3PAP8Actor@@AEXXZA[eax*8]
+ *   02118254  ROM add r3,r1,r0,lsl #3 at 02118264, pool 021182ac = 0211b1ac
+ *             emitted ?data_ov060_0211b1ac@@3PAUEntry@@A[eax*8]
+ * ROM 8 == emitted 8 on all three, and /Zp4 is a measured no-op on all three
+ * (zero diff lines outside the TITLE line naming the .obj).
+ *
+ * THE ARITY IS ZERO ON ALL THREE and it is read off each listing: nothing is
+ * pushed between the index load and `call eax`, and no `add esp, N` follows.
+ * The `add esp, 4` before 02115b84's sequence is the cleanup of the PREVIOUS
+ * cdecl call, not part of the dispatch.
+ *
+ * THE FOURTEEN SOURCE PAIRS all read {code, 0} in the overlay image at the
+ * addresses their constructors copy them from, all whole-pair copies. ONE OF
+ * THE THREE CONSTRUCTORS USES A SPELLING lane PMFB4's reader called a
+ * FIELD-FORM FILL: src/__sinit_ov060_021195dc.c writes
+ * `data_ov060_0211ae9c[0].lo = SRC;`, and `struct P4 { struct P2 lo, hi; }`
+ * over `struct P2 { int a, b; }` makes `.lo` a whole eight-byte pair whose
+ * ordinal is the slot, not one word of a pair. The flat slot is N * 2 +
+ * ordinal, which is why 0211ae9c's three cells come from [0].lo, [0].hi and
+ * [1].lo. src/__sinit_ov060_0211a000.c uses another one PMFB4's reader did not
+ * know, `TAB[N] = SRC[0]`.
+ *
+ * EVERY ONE OF THE THREE TABLES IS FULLY COVERED, which matters more here than
+ * anywhere else in this lane: an unfilled cell used to be read by a host copy
+ * and handed to a switch, and after a seat it would be CALLED. The spans come
+ * from config/arm9/overlays/ov060/symbols.txt -- 0211ae9c 24 bytes (3 cells),
+ * 0211af74 64 (8), 0211b1ac 24 (3) -- and the constructors fill 3, 8 and 3.
+ * The `[2]` bound the ov060 constructor declares for 0211ae9c is the decomp's
+ * own P4 grouping, not the extent.
+ *
+ * THREE /alternatename DIRECTIVES, each read off the object with
+ * dumpbin /symbols. */
+#pragma comment(linker, "/alternatename:?data_ov060_0211ae9c@@3PAP8C@@AEXXZA=_data_ov060_0211ae9c")
+#pragma comment(linker, "/alternatename:?data_ov060_0211af74@@3PAP8Actor@@AEXXZA=_data_ov060_0211af74")
+#pragma comment(linker, "/alternatename:?data_ov060_0211b1ac@@3PAUEntry@@A=_data_ov060_0211b1ac")
+
+/* ============ HOST COPY 5 IS RETIRED =====================================
+ * Run link100 lane FWD. src/_ZN10BowserFire8BehaviorEv.cpp dispatches
+ * data_ov060_0211afb4 now and port/hal/fwd_forwarders.cpp defines the flat C
+ * name the actor-class face calls. The w7a ov60_note("BOWSERFIRE", ...) trace
+ * line went with the body, and the matched TU is not the place to put a trace
+ * back.
+ */
+
+/* ============ HOST COPY 6 IS RETIRED =====================================
+ * run linkfull wave 24, lane FACEFLIP1. The C2761 refusal this body stood in
+ * for is gone from the synced src: src/_ZN6Bowser8BehaviorEv.cpp now spells
+ * the real dActor_c / ModelAnim / dCcAcPos_c members and compiles clean under
+ * the port's own compile line (run linkfull lane HGFRONT1). What kept it out
+ * after that was port/faces_sync.txt's FORWARD row for
+ * ?Behavior@Bowser@@UAEHXZ, which defined the member and called this body.
+ * The row is a REVERSE row now: the generated face defines the flat
+ * _ZN6Bowser8BehaviorEv that hal/actor_classes_ov060.cpp's slot-6 shim calls
+ * and calls the matched member, which is on port/slice_w24_faceflip.txt. Its
+ * one host-copied callee, func_ov060_02112434 (HOST COPY 1 above), stayed a
+ * copy until run linkfull lane SEATS3 retired it too; the matched TU reaches
+ * the matched callee by the same C name. The w7a trace lines this body
+ * carried went with it.
+ */
+
+/* ============ THE SEAT ====================================================
+ * Rewrites each SOURCE static's code word with its host body BEFORE the sinits
+ * copy it into the runtime table (the WaterBomb / LakituBro / Crate reading:
+ * one less mapping to get wrong), each checked against the ROM address the
+ * body was compiled from, so a mount pointing at the wrong bytes says so
+ * instead of calling into the overlay image.  All 50 adj halves are 0. */
+#define OV60_FACE(tag, slot, sym)                                         \
+    static void __fastcall ov60_##tag##_s##slot(void *self, void *dead_edx)\
+    {                                                                     \
+        (void)dead_edx;                                                   \
+        sym((char *)self);                                                \
+    }
+
+/* data_ov060_0211aeb4 -- BOWSER, four. Run linkfull lane SEATS3: HOST COPY 1
+   is gone and src/func_ov060_02112434.cpp dispatches this table itself, a
+   /vmg /vmm pointer-to-member call with the receiver in ECX and nothing
+   pushed, so its four cells take faces like the tables below. ONE FACE PER
+   CELL: cells 2 and 3 carry the SAME code word (0x021125f0). */
+OV60_FACE(aeb4, 0, _ZN7daKpa_c10FreeUpdateEv)
+OV60_FACE(aeb4, 1, _ZN7daKpa_c10HeldUpdateEv)
+OV60_FACE(aeb4, 2, _ZN7daKpa_c19ThrownDroppedUpdateEv)
+OV60_FACE(aeb4, 3, _ZN7daKpa_c19ThrownDroppedUpdateEv)
+
+/* data_ov060_0211ae9c -- BOWSER TAIL, three */
+OV60_FACE(ae9c, 0, _ZN11daKpaTail_c19func_ov060_02115d68Ev)
+OV60_FACE(ae9c, 1, _ZN11daKpaTail_c19func_ov060_02115d50Ev)
+OV60_FACE(ae9c, 2, _ZN11daKpaTail_c19func_ov060_02115c1cEv)
+
+/* data_ov060_0211af74 -- BOWSER FIRE init, eight */
+OV60_FACE(af74, 0, _ZN11daKpaFire_c19func_ov060_021167c8Ev)
+OV60_FACE(af74, 1, _ZN11daKpaFire_c19func_ov060_02116b18Ev)
+OV60_FACE(af74, 2, _ZN11daKpaFire_c19func_ov060_02116c68Ev)
+OV60_FACE(af74, 3, _ZN11daKpaFire_c19func_ov060_021167c8Ev)
+OV60_FACE(af74, 4, _ZN11daKpaFire_c19func_ov060_021169b0Ev)
+OV60_FACE(af74, 5, _ZN11daKpaFire_c19func_ov060_02116f74Ev)
+OV60_FACE(af74, 6, _ZN11daKpaFire_c19func_ov060_0211722cEv)
+OV60_FACE(af74, 7, _ZN11daKpaFire_c19func_ov060_021171e8Ev)
+
+/* data_ov060_0211b1ac -- SKY PLATFORM, three */
+OV60_FACE(b1ac, 0, _ZN10daKpa3Bg_c10StateStartEv)
+OV60_FACE(b1ac, 1, _ZN10daKpa3Bg_c10StateCheckEv)
+OV60_FACE(b1ac, 2, _ZN10daKpa3Bg_c9StateFallEv)
+
+/* data_ov060_0211afb4 -- BOWSER FIRE behaviour, eight. Run link100 lane FWD:
+   HOST COPY 5 is gone and src/_ZN10BowserFire8BehaviorEv.cpp dispatches this
+   table itself, so its eight cells take faces like the other three tables.
+   ONE FACE PER CELL: cells 6 and 7 carry the SAME code word (0x02116f90) and
+   stay distinguishable that way. */
+OV60_FACE(afb4, 0, _ZN11daKpaFire_c19func_ov060_0211747cEv)
+OV60_FACE(afb4, 1, _ZN11daKpaFire_c19func_ov060_021169f8Ev)
+OV60_FACE(afb4, 2, _ZN11daKpaFire_c19func_ov060_02116b68Ev)
+OV60_FACE(afb4, 3, _ZN11daKpaFire_c19func_ov060_021167ecEv)
+OV60_FACE(afb4, 4, _ZN11daKpaFire_c19func_ov060_021168c4Ev)
+OV60_FACE(afb4, 5, _ZN11daKpaFire_c19func_ov060_02116d78Ev)
+OV60_FACE(afb4, 6, _ZN11daKpaFire_c19func_ov060_02116f90Ev)
+OV60_FACE(afb4, 7, _ZN11daKpaFire_c19func_ov060_02116f90Ev)
+
+namespace {
+/* the host column holds the __fastcall faces above, for the tables whose
+   dispatchers make the pointer-to-member call themselves. The two tables that
+   used to take plain cdecl bodies (0211aed4 and 0211b1d8, decoded by hand and
+   dispatched with the receiver pushed) are main's own objects now and are not
+   seated. The column stays a void* and each row casts. */
+struct Seat { PortPmf *slot; unsigned rom; void *host; const char *tab; };
+const Seat g_ov060_states[] = {
+    /* 0x0211aeb4 -- BOWSER, four (faces, run linkfull SEATS3) */
+    {data_ov060_0211a578, 0x021128c0, (void *)ov60_aeb4_s0, "aeb4[0]"},
+    {data_ov060_0211a510, 0x02112724, (void *)ov60_aeb4_s1, "aeb4[1]"},
+    {data_ov060_0211a518, 0x021125f0, (void *)ov60_aeb4_s2, "aeb4[2]"},
+    {data_ov060_0211a520, 0x021125f0, (void *)ov60_aeb4_s3, "aeb4[3]"},
+    /* 0x0211aed4 -- BOWSER, twenty: NOT SEATED. Main's src/game/actors/
+       d_a_kpa.cpp defines data_ov060_0211aed4[20] with daKpa_c member
+       pointers and daKpa_c::FreeUpdate dispatches it natively (receiver in
+       ECX); nothing reads the twenty mounted source records any more. */
+    /* 0x0211ae9c -- BOWSER TAIL, three */
+    {data_ov060_0211a558, 0x02115d68, (void *)ov60_ae9c_s0, "ae9c[0]"},
+    {data_ov060_0211a550, 0x02115d50, (void *)ov60_ae9c_s1, "ae9c[1]"},
+    {data_ov060_0211a548, 0x02115c1c, (void *)ov60_ae9c_s2, "ae9c[2]"},
+    /* 0x0211afb4 -- BOWSER FIRE behaviour, eight (faces, run link100 FWD) */
+    {data_ov060_0211a794, 0x0211747c, (void *)ov60_afb4_s0, "afb4[0]"},
+    {data_ov060_0211a78c, 0x021169f8, (void *)ov60_afb4_s1, "afb4[1]"},
+    {data_ov060_0211a76c, 0x02116b68, (void *)ov60_afb4_s2, "afb4[2]"},
+    {data_ov060_0211a77c, 0x021167ec, (void *)ov60_afb4_s3, "afb4[3]"},
+    {data_ov060_0211a764, 0x021168c4, (void *)ov60_afb4_s4, "afb4[4]"},
+    /* not a HOLE any more -- w9-harvest seated main's byte-matched
+       src/func_ov060_02116d78.c here in place of w7a's host copy. */
+    {data_ov060_0211a774, 0x02116d78, (void *)ov60_afb4_s5, "afb4[5]"},
+    {data_ov060_0211a744, 0x02116f90, (void *)ov60_afb4_s6, "afb4[6]"},
+    {data_ov060_0211a784, 0x02116f90, (void *)ov60_afb4_s7, "afb4[7]"},
+    /* 0x0211af74 -- BOWSER FIRE init, eight */
+    {data_ov060_0211a75c, 0x021167c8, (void *)ov60_af74_s0, "af74[0]"},
+    {data_ov060_0211a754, 0x02116b18, (void *)ov60_af74_s1, "af74[1]"},
+    {data_ov060_0211a73c, 0x02116c68, (void *)ov60_af74_s2, "af74[2]"},
+    {data_ov060_0211a74c, 0x021167c8, (void *)ov60_af74_s3, "af74[3]"},
+    {data_ov060_0211a734, 0x021169b0, (void *)ov60_af74_s4, "af74[4]"},
+    {data_ov060_0211a7ac, 0x02116f74, (void *)ov60_af74_s5, "af74[5]"},
+    {data_ov060_0211a7a4, 0x0211722c, (void *)ov60_af74_s6, "af74[6]"},
+    {data_ov060_0211a79c, 0x021171e8, (void *)ov60_af74_s7, "af74[7]"},
+    /* 0x0211b1d8 -- SPIKE BOMB, four: NOT SEATED. Main's src/game/actors/
+       d_a_kirai.cpp defines data_ov060_0211b1d8[4] with daKirai_c member
+       pointers (its initializer runs through __sinit_ov060_0211a388) and
+       dispatches it natively; the four mounted records are unread. */
+    /* 0x0211b1ac -- SKY PLATFORM, three (sinit copy order) */
+    {data_ov060_0211a938, 0x021181b4, (void *)ov60_b1ac_s0, "b1ac[0]"},
+    {data_ov060_0211a940, 0x021180e0, (void *)ov60_b1ac_s1, "b1ac[1]"},
+    {data_ov060_0211a930, 0x02117db8, (void *)ov60_b1ac_s2, "b1ac[2]"},
+};
+}  /* namespace */
+
+extern "C" void port_ov060_states_seat(void)
+{
+    static int done;
+    if (done)
+        return;
+    done = 1;
+    for (unsigned i = 0; i < sizeof g_ov060_states / sizeof g_ov060_states[0];
+         ++i) {
+        PortPmf *p = g_ov060_states[i].slot;
+        if ((unsigned)(p->fn) < 0x02000000u || (unsigned)(p->fn) >= 0x02400000u) continue;  /* PORTSYNC3: a mount word that is not a DS code address: the class TU owns the live table */
+        if (p->fn != g_ov060_states[i].rom || p->adj != 0) {
+            std::fprintf(stderr, "FATAL: ov060 state %s: the mount holds "
+                         "%08x/%d, the ROM's own record says %08x/0 -- WRONG "
+                         "BYTES\n", g_ov060_states[i].tab, p->fn, p->adj,
+                         g_ov060_states[i].rom);
+            std::abort();
+        }
+        p->fn = PORT_PMF_TC(g_ov060_states[i].host);
+    }
+}

@@ -1,0 +1,18 @@
+diff --git a/include/daObjKi_Ita_c.h b/include/daObjKi_Ita_c.h
+--- a/include/daObjKi_Ita_c.h
++++ b/include/daObjKi_Ita_c.h
+@@ -18,7 +18,14 @@
+ struct daObjKi_Ita_c : daObjFloatBoard_c {
+     int InitResources(); /* slot  0 */
+ 
++    #ifdef _MSC_VER
++    /* host two-arm destructor spelling; ruling in include/ModelBase.h */
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~daObjKi_Ita_c() {}   /* no slot */
++    #else
+     virtual ~daObjKi_Ita_c() {}
++    #endif
+ };
+ 
+ #ifndef SM64DS_PLATFORM_PC

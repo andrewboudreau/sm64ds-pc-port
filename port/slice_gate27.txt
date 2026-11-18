@@ -1,0 +1,73 @@
+# Gate-27 slice: the HUD, actor id 334.
+#
+# The class the census has been printing as "- 334 x1" since the level boot
+# started spawning: hearts, coins, stars, the timer and the camera buttons, all
+# of them sprites emitted through OAM::RenderSub onto the bottom screen. Every
+# method here is matched; what it needed was gate 25's sub-OAM path and a
+# registry row.
+#
+# Its SpawnInfo is ov002 0x0210c210, which config names g_profile_METER, and
+# its factory is the CONSTRUCTOR at 0x020fe154 -- the ROM stores the ctor itself
+# in the record's +0 word for this class rather than a separate Spawn veneer.
+#
+# NOT ON THIS LIST: src/_ZN3HUD13InitResourcesEv.cpp. It IS linked, through
+# hostgen (GATE27_GEN in CMakeLists.txt, lane HUD-INITRES): --extern-data
+# because its file-scope globals are definitions to MSVC's C++ front end and
+# seven collide with storage the port owns (the save block, which
+# hal/level_boot.cpp holds as a grouped-section run, among them), and
+# CALLEE_SEAM because the port's LoadFile decodes on the way out while the
+# body decodes its result itself -- hal/hud_load.cpp is the raw-loader seam.
+# port/unmatched/HUD_InitResources.cpp, the hand copy that carried both by
+# hand, is retired. See lane HUDINITRES's status.
+
+src/ui/hud/d_meter.cpp
+# RETIRED at SLICE1: body now in src/_ZN3HUDD1Ev.cpp. MSVC folds the ROM destructor variants into one symbol, so only one of a class two per-function destructor TUs can be compiled.
+#src/_ZN3HUDD0Ev.cpp
+# FOLDED into src/ui/hud/d_meter.cpp (row 23): src/_ZN3HUDD1Ev.cpp
+# FOLDED into src/ui/hud/d_meter.cpp (row 23): src/_ZN3HUD16CleanupResourcesEv.cpp
+# FOLDED into src/ui/hud/d_meter.cpp (row 23): src/_ZN3HUD16OnPendingDestroyEv.cpp
+# FOLDED into src/ui/hud/d_meter.cpp (row 23): src/_ZN3HUD8BehaviorEv.cpp
+# FOLDED into src/ui/hud/d_meter.cpp (row 23): src/_ZN3HUD6RenderEv.cpp
+
+# the render leaves
+# FOLDED into src/ui/hud/d_meter.cpp (row 23): src/_ZN3HUD15CalculateDigitsEt.cpp
+# FOLDED into src/ui/hud/d_meter.cpp (row 23): src/_ZN3HUD15RenderCoinCountEv.cpp
+# FOLDED into src/ui/hud/d_meter.cpp (row 23): src/_ZN3HUD15RenderLifeCountEv.cpp
+# FOLDED into src/ui/hud/d_meter.cpp (row 23): src/_ZN3HUD15RenderStarCountEv.cpp
+# FOLDED into src/ui/hud/d_meter.cpp (row 23): src/_ZN3HUD15RenderTimeTimerEv.cpp
+# FOLDED into src/ui/hud/d_meter.cpp (row 23): src/_ZN3HUD17RenderHealthMeterEv.cpp
+# FOLDED into src/ui/hud/d_meter.cpp (row 23): src/_ZN3HUD17RenderSilverStarsEv.cpp
+# FOLDED into src/ui/hud/d_meter.cpp (row 23): src/_ZN3HUD14RenderRedCoinsEv.cpp
+# FOLDED into src/ui/hud/d_meter.cpp (row 23): src/_ZN3HUD19RenderCameraButtonsEv.cpp
+# FOLDED into src/ui/hud/d_meter.cpp (row 23): src/_ZN3HUD13RenderVsTimerEv.cpp
+# FOLDED into src/ui/hud/d_meter.cpp (row 23): src/_ZN3HUD13UpdateVsTimerEv.cpp
+# FOLDED into src/ui/hud/d_meter.cpp (row 23): src/_ZN3HUD17UpdateHealthMeterEv.cpp
+
+# Stage::RenderVsModeCountdown -- the VS start-of-round READY? / red 3-2-1 /
+# START draw. Not a HUD leaf, but it rides here because it emits through the
+# same OAM::Render overloads and reads the same ov002 sprite templates and
+# GetOwnerLanguage that RenderVsTimer above already pulls into this slice. Its
+# banner/START templates (0x0210d008..0x0210d420) are mounted in ov002_syms.txt.
+# Hosted for a host-side pre-round countdown (hal/star_flow.cpp).
+src/game/stages/d_s_stage_methods.cpp
+
+# the two OAM entry points the leaves emit through that gate 25 did not need
+src/engine/oam/OAM.cpp
+# FOLDED into src/engine/oam/OAM.cpp (row 55): src/_ZN3OAM6RenderEbP7OamAttriiii5Fix12IiEi.c
+
+# the arm9 leaf HUD::InitResources ends on: clears the pad-repeat latch
+src/engine/link/unit0203d7b8.cpp
+
+# the leaves' own callees
+src/engine/gx/GXS.cpp
+# FOLDED into src/engine/gx/GXS.cpp (row 62): src/_ZN3GXS11LoadOBJPlttEPKvjj.cpp
+src/Timer.cpp
+src/game/player/d_a_ply_methods.cpp
+
+# NOT HERE: src/_ZN5Stage20RenderBouncingArrowsEv.cpp. It draws its sprite from
+# an OamAttr template at ov001 0x020abd88 that config does not name, and unlike
+# OAM::NUMBERS' pointer targets nothing in emitted DATA points at it -- it is
+# reached from code, so ovdata's pointer pass cannot pull it in either. Naming
+# it is a config change, not a port change. HUD::Render only calls it when
+# gShowTouchScreenArrows is set, which is zeroed bss on this boot, so hal/sub_actors.cpp
+# stubs it and says so if it is ever reached.

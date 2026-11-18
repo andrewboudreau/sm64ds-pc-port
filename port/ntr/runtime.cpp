@@ -1,0 +1,616 @@
+// Host implementations of the decomp's ARM assembly primitives.
+//
+// build/host-src/asm-shims.txt lists all 115 of them; this file covers the ones
+// reached so far. They are matched, correct ARM -- and unusable off-hardware, so
+// each needs a host equivalent with the *same name and linkage* as the decomp
+// file it stands in for.
+//
+// Linkage matters and is not uniform in the decomp:
+//   src/SVC_WaitVBlankIntr.c        `asm void SVC_WaitVBlankIntr(void)`      -> C++ linkage
+//   src/IRQ3.cpp                `extern "C" asm unsigned int ...`    -> C linkage
+// The decomp's filenames are already Itanium mangled names, so a .c file built as
+// C++ gets mangled a second time. Match whichever form the original used, or the
+// link fails in a way that looks like a missing symbol rather than a mismatch.
+
+#include "ntr/rt.h"
+
+#include "ntr/gx.h"
+
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include "hal/dsstate_seg.h"
+
+// ---------------------------------------------------------------------------
+// Interrupt control. The ARM originals set/clear the CPSR I bit and return the
+// previous masked state (0x80 = was disabled).
+// ---------------------------------------------------------------------------
+
+// PORT_HOST_ABI: hand-asm primitive (src/ carries the banner): mrs/msr on
+//   the CPSR I bit. See the Interrupt control block above.
+//   TARGET names the three (src/IRQ3.cpp): OS_DisableInterrupts 0x02059d1c,
+//   OS_EnableInterrupts 0x02059d08, OS_RestoreInterrupts 0x02059d30.
+extern "C" unsigned int OS_DisableInterrupts(void) { return ntr::rt_irq_disable(); }
+// PORT_HOST_ABI: hand-asm primitive (src/ carries the banner): mrs/msr on
+//   the CPSR I bit. See the Interrupt control block above.
+//   TAG ADDED, run link100 wave 14, lane SHADOWS3. The ruling is its
+//   neighbours' and always was; what was missing is the tag ITSELF, because
+//   linkage.py binds a reason to the FIRST code line under it and the line
+//   above took this one's. src/_ZN3IRQ6EnableEv.cpp is four ARM instructions
+//   (mrs r0,cpsr / bic r1,r0,#0x80 / msr cpsr_c,r1 / and r0,r0,#0x80) inside
+//   an `asm` block, and no x86 front end assembles them, so there is no seat
+//   to take here at any point in the future -- it is a permanent exception,
+//   not owed work. The line above this file at 340..347 already NAMED this row
+//   as the same omission ("the sibling on line 30 ... is the same shape and the
+//   same omission, but it is in neither closure, so this lane names it rather
+//   than taking it"); this lane takes it.
+extern "C" unsigned int OS_EnableInterrupts(void) { return ntr::rt_irq_enable(); }
+// PORT_HOST_ABI: hand-asm primitive (src/ carries the banner): mrs/msr on
+//   the CPSR I bit. See the Interrupt control block above.
+extern "C" unsigned int OS_RestoreInterrupts(unsigned int prev) {
+    return ntr::rt_irq_restore(prev);
+}
+
+// ---------------------------------------------------------------------------
+// BIOS SWI wrappers. These are .c files in the decomp, so C++ linkage.
+// ---------------------------------------------------------------------------
+
+void SVC_WaitVBlankIntr(void) { ntr::rt_vblank_wait(); }
+
+// swi 0x04. The game only ever waits on VBlank in practice.
+void SVC_WaitIntr(void) { ntr::rt_vblank_wait(); }
+
+// swi 0x06 -- halt until an interrupt. Same thing here.
+void Halt(void) { ntr::rt_vblank_wait(); }
+
+// swi 0x03 -- burn `count` loop iterations. Nothing to wait for on a host.
+void SVC_WaitByLoop(void) {}
+
+// swi 0x0B/0x0C. The DS BIOS copies in 4- or 32-byte units, with an optional
+// fixed-source fill mode; bit 24 selects fill, bit 26 selects 32-bit units.
+extern "C" void SVC_CpuSet(const void *src, void *dst, unsigned int ctrl) {
+    const unsigned int count = ctrl & 0x1FFFFF;
+    const bool fill = (ctrl >> 24) & 1;
+    const bool word = (ctrl >> 26) & 1;
+    if (word) {
+        const uint32_t *s = static_cast<const uint32_t *>(src);
+        uint32_t *d = static_cast<uint32_t *>(dst);
+        for (unsigned int i = 0; i < count; ++i) d[i] = fill ? *s : s[i];
+    } else {
+        const uint16_t *s = static_cast<const uint16_t *>(src);
+        uint16_t *d = static_cast<uint16_t *>(dst);
+        for (unsigned int i = 0; i < count; ++i) d[i] = fill ? *s : s[i];
+    }
+}
+
+extern "C" void SVC_CpuSetFast(const void *src, void *dst, unsigned int ctrl) {
+    const unsigned int count = ctrl & 0x1FFFFF;
+    const bool fill = (ctrl >> 24) & 1;
+    const uint32_t *s = static_cast<const uint32_t *>(src);
+    uint32_t *d = static_cast<uint32_t *>(dst);
+    for (unsigned int i = 0; i < count; ++i) d[i] = fill ? *s : s[i];
+}
+
+// ---------------------------------------------------------------------------
+// Block copies. These matter more than they look: the geometry FIFO is fed by
+// handing 0x4000400 to a copy routine --
+//
+//     *(volatile u32 *)0x4000400 = 0x1a;   MI_Copy36B(m, (int *)0x4000400);
+//
+// -- so the FIFO address never appears as a dereference the transform can see.
+// docs/mmio-inventory.md calls that the `address-passed` class, and this is where
+// it resolves: the copy routines are themselves ARM asm primitives, so they need
+// host shims anyway, and the shim is the natural place to notice the destination.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+constexpr uint32_t GXFIFO = 0x04000400u;
+
+void copy_words(const uint32_t *src, uint32_t *dst, int n) {
+    if (reinterpret_cast<uintptr_t>(dst) == GXFIFO) {
+        /* run interp1: the display list's own address keys its draw group */
+        ntr::gx_dma_source(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(src)));
+        ntr::gx_write_fifo_block(src, n);
+        ntr::gx_dma_source(0);
+    } else {
+        for (int i = 0; i < n; ++i) dst[i] = src[i];
+    }
+}
+
+}  // namespace
+
+// C linkage: in this port the decomp's .c files compile as C TUs (hostgen
+// wraps its transformed copies in extern "C"), so the copy primitives must
+// carry C names.
+// PORT_HOST_ABI: ARM asm primitive (ldmia/stmia) AND the GXFIFO-address seam
+//                (0x04000400 routes to gx_write_fifo, not a memory store).
+extern "C" void MI_Copy36B(int *src, int *dst) {
+    copy_words(reinterpret_cast<const uint32_t *>(src), reinterpret_cast<uint32_t *>(dst), 9);
+}
+
+// stmia WITHOUT writeback: twelve words through the same port address. Only
+// ever used against the FIFO; for a memory destination the DS semantics would
+// overwrite the same three words four times, so a memory dst is a bug here.
+// PORT_HOST_ABI: ARM asm primitive AND the GXFIFO-address seam (0x04000400).
+extern "C" void GX_SendFifo48B(int *src, int *dst) {
+    if (reinterpret_cast<uintptr_t>(dst) == 0x04000400u) {
+        for (int i = 0; i < 12; ++i) ntr::gx_write_fifo(static_cast<uint32_t>(src[i]));
+    } else {
+        for (int i = 0; i < 12; ++i) dst[i] = src[i];
+    }
+}
+
+// The FIFO flush primitive: 32 no-writeback stmia of four zeroed registers,
+// 128 NOP command words that push any partially-packed command through.
+// PORT_HOST_ABI: hand-asm primitive (banner-marked in src/), a raw stmia
+// loop into the GXFIFO port; the ntr layer models the flush, not the
+// instruction stream. Tag added at the wave-3 close after a Scene seat gave
+// it its first caller and the untagged body surfaced as the queue's only
+// regression.
+extern "C" void GXi_NopClearFifo128_(unsigned addr) {
+    if (addr == 0x04000400u)
+        for (int i = 0; i < 128; ++i) ntr::gx_write_fifo(0);
+}
+
+// ---------------------------------------------------------------------------
+// IRQ handler registry + synthetic delivery. The display-list pump
+// (MI_SendGXCommandAsync/MIi_FIFOCallback) is interrupt-driven on hardware: GXFIFO-timed
+// DMA chunks re-arm on the FIFO-half-empty IRQ (IE bit 21, mask 0x200000) and
+// the final chunk raises the DMA-channel IRQ, whose OS dispatcher calls the
+// callback registered through OSi_EnterDmaCallback. On host the copies are
+// synchronous and the FIFO is always empty, so MIi_DmaSetParams delivers
+// those interrupts inline right after the copy; the recursion terminates
+// because the pump's re-entry finds no bytes remaining.
+// ---------------------------------------------------------------------------
+
+extern "C" {
+// storage for the game's DMA bookkeeping (BSS on the DS). These two are the
+// only DS globals this host library owns, and they are real save state rather
+// than host bookkeeping: the callback table holds the handlers the game itself
+// registered through OSi_EnterDmaCallback. Everything else in this file (the window,
+// frame pacing, the IE stand-in below) deliberately stays out of the capture.
+// See hal/dsstate_seg.h.
+DSSTATE_BEGIN
+int MIi_GXDmaParams[8];                                   /* GX-DMA state */
+DSSTATE_END
+
+/* THE CALLBACK TABLE IS A BAND OF TWO DS SYMBOLS (run hunt2, lane HUD2).
+ *
+ * On the DS the eight {handler, enabled, arg} entries start at 0x020a60c4:
+ * DMA 0..3 then timer 0..3, the order OSi_IrqCallbackInfoIndex lists (8, 9, 10, 11,
+ * 3, 4, 5, 6). config/arm9/symbols.txt names the fifth entry separately,
+ * data_020a60f4 = 0x020a60c4 + 0x30, and src/func_02056e4c.c (the timer arm:
+ * `data_020a60f4[idx] = {handler, 1, arg}; EnableIRQs(1 << (idx + 3))`)
+ * writes through that name while IRQ::SetIRQHandler and IRQ::DmaTimHandler
+ * write and read the same words as OSi_IrqCallbackInfo[4 + idx]. The port hosted the
+ * two names as two objects (this 8-entry table here, and an unrelated int[4]
+ * in hal/player_bridges.cpp), so the timer arm wrote words nothing read, and
+ * OSi_SetTimer's timer-1 arm wrote 8 bytes past the end of that int[4].
+ *
+ * It mattered the moment timer 0 was modelled: the tick's overflow handler
+ * OSi_CountUpTick re-arms itself through OSi_EnterTimerCallback(0, ...) after every
+ * overflow, and DmaTimHandler clears the handler word before the call, so with
+ * the two objects apart the tick advanced ONCE and then stopped for good.
+ *
+ * The fix is the GX bank band's mechanism (hal/cxx_aliases.cpp, GXBANK):
+ * two grouped sections that sort adjacent inside .dsstate, 0x30 bytes each, so
+ * data_020a60f4 IS OSi_IrqCallbackInfo + 0x30 again. port_irqcb_band_ok() reads the
+ * layout back and the timer model refuses to run on a band that came apart. */
+struct PortIrqCbEnt { unsigned handler, active, arg; };
+__pragma(section(".dsstate$irqcb00", read, write))
+__pragma(section(".dsstate$irqcb01", read, write))
+__declspec(allocate(".dsstate$irqcb00")) __declspec(align(4))
+PortIrqCbEnt OSi_IrqCallbackInfo[4] = {};          /* DMA 0..3 callbacks          */
+__declspec(allocate(".dsstate$irqcb01")) __declspec(align(4))
+PortIrqCbEnt data_020a60f4[4] = {};          /* timer 0..3 callbacks        */
+}
+
+extern "C" int port_irqcb_band_ok(void)
+{
+    return reinterpret_cast<const char *>(data_020a60f4) -
+               reinterpret_cast<const char *>(OSi_IrqCallbackInfo) == 0x30;
+}
+
+// ---------------------------------------------------------------------------
+// THE ROM'S OWN VECTOR TABLE (run linkfull, lane IRQTAB1). Built into the two
+// game libraries only (ntr_wide_rt, ntr_hires: NTR_ROM_IRQ_TABLE, set by the
+// "W23-5 IRQ TABLE" block of port/CMakeLists.txt).
+//
+// src/_ZN3IRQ13SetIRQHandlerEjPFvvE.cpp and src/_ZN3IRQ13GetIRQHandlerEj.cpp
+// are the game's own registry and they run as written: the IRQ bit number
+// indexes OS_IRQTable, the ROM's 22-word vector table, except bits 3..6
+// (timers) and 8..11 (DMA), which they divert into OSi_IrqCallbackInfo above. The
+// table is ordinary RAM on the DS and ordinary host memory here:
+// hal/arm9_tables_link100.cpp hosts it at its ROM span inside .dsstate and
+// fills it before main with the cartridge's .data words (EmptyHandler, the
+// four timer and four DMA forwarders).
+//
+// So THIS FILE NO LONGER STORES A HANDLER. Its dispatchers read the slot the
+// ROM's own reader would: HBlank delivers OS_IRQTable[1] (ntr/rt.cpp's
+// scanline sweep), the geometry FIFO OS_IRQTable[21] (MIi_DmaSetParams
+// below), and the VBlank edge is looked up through the matched
+// IRQ::GetIRQHandler(1) (hal/boot2_thread.cpp step 2, hal/os_thread.cpp),
+// which reads OS_IRQTable[0]. Before this, the old host registry kept three
+// file statics and DROPPED every other mask; the ROM table keeps them all
+// (0x40000 IPC, 0x100000 card, the timer and DMA rows), which the cartridge
+// does too. Nothing here dispatches those masks, so storing them changes no
+// delivery.
+//
+// THE ONE VISIBLE DIFFERENCE IS THE ROM'S DEFAULT. An unregistered slot holds
+// IRQ::EmptyHandler (a bare `bx lr`, and a real body here) where the host
+// registry held null, so GetIRQHandler answers EmptyHandler for a mask nobody
+// armed, exactly as the cartridge's does. The HBlank gate below therefore
+// reads "a handler is present" for as long as the slot holds EmptyHandler; the
+// edge still needs IE bit 1, IME, the CPSR I bit and DISPSTAT bit 4, which is
+// what the DS gates on, and the ROM's disarm (func_0202fb30,
+// dScMgLuigi_c::IrisStop / AfterCleanupResources) stores null, which closes it
+// the old way too. hal/arm9_tables_link100.cpp's section 1 note names exactly
+// this hazard and says the honest version is a change to the gate: it is.
+//
+// The flat Itanium names are what the ROM's C callers and this layer's own
+// host callers use (MI_SendGXCommandAsync, _Z13func_0201a4e4v, hal/boot2_thread.cpp,
+// ntr/rt.cpp); the matched TUs define the C++ names. One alias per function
+// joins the two, flat onto matched, and hal/faces4_rows.cpp's /
+// unmatched/MgLuigi_Faces.cpp's older C++-onto-flat rows now resolve through
+// it to the same body (a chained /alternatename, which link.exe follows).
+//
+// THE IE WORD IS THE ROM'S TOO (the second step). src/_ZN3IRQ10EnableIRQsEj.cpp
+// and src/_ZN3IRQ11DisableIRQsEj.cpp run as written, through hostgen's MMIO
+// rewrite (the "W23-5 IRQ TABLE" block), so their `IME = 0; old = IE;
+// IE = old | mask; IME = saved` lands in IE (0x04000210) and IME (0x04000208),
+// two plain read/write latches of the mapped I/O window (ntr/mmio.h
+// mechanism 1): no side effect to model, nothing for io_write to trigger. The
+// host stand-in word g_ie is gone on these libraries and the two dispatchers
+// here read the latch instead: HBlank's IE gate bit 1, the geometry FIFO's bit
+// 21. ntr/rt.cpp's rt_irq_boot_state already seated bit 0 in that same latch
+// (the VBlank enable src/func_0201a054.c makes, EnableIRQs(1)), so the latch
+// now holds what the cartridge's does at the same point rather than the host
+// word's subset of it. IRQ::ClearInterrupts runs as the ROM's too on these
+// libraries (run linkfull wave 27, lane SMALLS1): src/_ZN3IRQ15ClearInterruptsEj.cpp
+// builds from its hostgen copy (port/CMakeLists.txt's "W27 SMALLS1" block), and
+// its acknowledge store reaches ntr/io.cpp's io_write, which clears IF bits
+// write-one-to-clear the way the DS does; the smoke probes keep the no-op below.
+// ---------------------------------------------------------------------------
+// SINCE FOLD_1 the registry, the IE pair and the IF acknowledge are one TU,
+// src/engine/os/OS_Interrupt.cpp, under TARGET's names (OS_GetIrqFunction,
+// OS_SetIrqFunction, OS_EnableIrqMask, OS_DisableIrqMask,
+// OS_ResetRequestIrqMask). Its patch compiles those bodies where
+// PORT_ROM_IRQ_TABLE is defined (the two game targets), so these libraries
+// need no alias onto the retired per-function spellings any more.
+#if defined(NTR_ROM_IRQ_TABLE)
+extern "C" void *OS_IRQTable[22];   // hal/arm9_tables_link100.cpp
+#endif
+
+namespace {
+typedef void (*IrqHandler)(void);
+#if defined(NTR_ROM_IRQ_TABLE)
+constexpr unsigned IRQ_BIT_HBLANK = 1;    // IE/IF bit 1, mask 2
+constexpr unsigned IRQ_BIT_GXFIFO = 21;   // IE/IF bit 21, mask 0x200000
+constexpr uintptr_t REG_IE = 0x04000210u;
+IrqHandler hblank_handler() {
+    return reinterpret_cast<IrqHandler>(OS_IRQTable[IRQ_BIT_HBLANK]);
+}
+IrqHandler gxfifo_handler() {
+    return reinterpret_cast<IrqHandler>(OS_IRQTable[IRQ_BIT_GXFIFO]);
+}
+unsigned ie_word() { return *reinterpret_cast<volatile uint32_t *>(REG_IE); }
+#else
+// The smoke probes' registry (the plain ntr library): they link no ROM vector
+// table and no matched IRQ TUs, so the host copies below stand in for both.
+unsigned g_ie;                      // IE word stand-in
+IrqHandler g_gxfifo_handler;        // handler for mask 0x200000
+IrqHandler g_hblank_handler;        // handler for mask 0x2, the HBlank edge
+IrqHandler g_vblank_handler;        // handler for mask 0x1, the VBlank edge
+IrqHandler hblank_handler() { return g_hblank_handler; }
+IrqHandler gxfifo_handler() { return g_gxfifo_handler; }
+unsigned ie_word() { return g_ie; }
+#endif
+
+// The two DS registers the HBlank gate reads. Both are ordinary latches in the
+// mapped I/O window (ntr/mmio.h mechanism 1), written by the ROM's own arming
+// code: IME by _ZN7dWipe_c14SetForwardTimeEjj's save/restore bracket, DISPSTAT bit 4 by
+// GX_HBlankIntr.
+constexpr uintptr_t REG_IME = 0x04000208u;
+constexpr uintptr_t REG_DISPSTAT = 0x04000004u;
+constexpr unsigned DISPSTAT_HBLANK_IRQ_ENABLE = 0x10u;
+
+// THE DELIVERY CENSUS (run linkfull, lane IRQTAB1). SM64DS_IRQ_CENSUS=1 prints,
+// at exit, how many times MIi_DmaSetParams below delivered each interrupt it
+// synthesises: the geometry-FIFO handler (mask 0x200000, the display-list
+// pump's MIi_FIFOCallback) and the DMA-completion callbacks out of OSi_IrqCallbackInfo
+// (the pump's last chunk, MIi_DMACallback). ntr/rt.cpp's "[det4] hblank" line
+// already counts the HBlank deliveries and hal/boot2_thread.cpp's EXIT-STATS
+// line (SM64DS_THREAD_PROOF=1) the VBlank ones, so together the three lines
+// are every handler this layer dispatches. It exists so a change to WHERE
+// those handlers are looked up can be held to the same number of deliveries
+// on the same run, which is the before/after a dispatch change needs and no
+// picture gives. Counting only: nothing here changes what runs.
+unsigned long long g_census_gxfifo;
+unsigned long long g_census_dmadone;
+
+void irq_census_report() {
+    std::fprintf(stderr, "[irqtab] census: gxfifo=%llu dmadone=%llu\n",
+                 g_census_gxfifo, g_census_dmadone);
+    std::fflush(stderr);
+}
+
+struct IrqCensusReg {
+    IrqCensusReg() {
+        if (std::getenv("SM64DS_IRQ_CENSUS")) std::atexit(irq_census_report);
+    }
+} g_irq_census_reg;
+}  // namespace
+
+#if !defined(NTR_ROM_IRQ_TABLE)
+// THE SMOKE PROBES' COPIES of the two registry calls. The game libraries do not
+// compile these: they link the ROM's OS_GetIrqFunction and OS_SetIrqFunction
+// from src/engine/os/OS_Interrupt.cpp (port/slice_w23_irq.txt) and read the
+// ROM's table above. What follows is the registry as it stood before that, kept
+// for the probes that link the plain ntr library and no ROM table.
+// PORT_HOST_ABI: src walks the DS IRQ vector tables (OS_IRQTable,
+//   OSi_IrqCallbackInfo); the host models the handlers it dispatches.
+extern "C" void *OS_GetIrqFunction(unsigned mask) {
+    if (mask == 0x200000u) return reinterpret_cast<void *>(g_gxfifo_handler);
+    if (mask == ntr::IRQ_HBLANK) return reinterpret_cast<void *>(g_hblank_handler);
+    if (mask == ntr::IRQ_VBLANK) return reinterpret_cast<void *>(g_vblank_handler);
+    return nullptr;
+}
+// PORT_HOST_ABI: src walks the DS IRQ vector tables (OS_IRQTable,
+//   OSi_IrqCallbackInfo); the host models the handlers it dispatches.
+//
+// THREE MASKS ARE MODELLED. Mask 0x200000 is the geometry FIFO, delivered
+// synthetically from MIi_DmaSetParams below. Mask 2 is HBlank: the dWipe_c
+// setters install _Z18Wipe_HBlankHandlerv on it and the scanline sweep in rt.cpp
+// delivers it. Every other mask is still dropped on the floor, deliberately --
+// a handler this layer never raises is better stored nowhere than stored and
+// silently never run.
+//
+// MASK 1 IS THE THIRD, AND IT IS RUN link100 BOOT-PLAN RUNG D1 (lane R3D).
+// src/func_0201a4e4.c:14 -- which hal/boot_os.cpp:627 already calls at boot --
+// registers src/_ZN3IRQ13VBlankHandlerEv.cpp on mask 1, and until this line that
+// registration went on the floor: the handler was LINKED (walk_window.map
+// 0001:00280570) and dispatched by nobody, so the ROM's own end-of-frame wake
+//     if (data_0209d514 >= data_0208ee44 && data_0209d4f0 != 0)
+//         OS_WakeupThread(&data_0209d500);
+// could not fire even after rung R3b (lane R3B) started raising that flag.
+// hal/boot2_thread.cpp's CP15::WaitForInterrupt step 2 is the LOOKUP; this is
+// the STORE. Together they make the VBlank edge real, which is the half of the
+// handover (rung D5) that has to be true before _Z13func_020197b8v can sleep at its
+// own phase 7 and be woken by its own interrupt.
+//
+// IT IS ZERO GAIN AND, ON TODAY'S BINARY, ZERO CHANGE: lane R3B measured
+// halts=0 over a 300-frame level run, so nothing enters the wait on the level
+// path and nothing looks the mask up. port::pump_vblank (hal/os_thread.cpp:66)
+// is the one other reader and no shipped target installs it -- the conductor
+// installs conductor_pump instead. The probe under SM64DS_R3D_WAIT_PROBE in
+// tests/walk_window.cpp is what makes the edge OBSERVABLE rather than assumed.
+extern "C" void OS_SetIrqFunction(unsigned mask, void (*h)(void)) {
+    if (mask == 0x200000u) g_gxfifo_handler = h;
+    else if (mask == ntr::IRQ_HBLANK) g_hblank_handler = h;
+    else if (mask == ntr::IRQ_VBLANK) g_vblank_handler = h;
+}
+#endif  // !NTR_ROM_IRQ_TABLE
+
+namespace ntr {
+
+// The five gates the DS applies before an HBlank IRQ reaches the handler,
+// reported one bit each so a closed gate can be NAMED rather than guessed at.
+// All five have a ROM writer on this path, which is what makes the disarm
+// work: func_0202fb30 clears IE bit 1, clears DISPSTAT bit 4 and nulls the
+// handler, and any one of the three closes this. The handler gate is a host
+// safety net rather than a DS gate (the DS calls whatever the slot holds): on
+// the game libraries it reads the ROM table's slot 1, see THE ROM'S OWN VECTOR
+// TABLE above for what that slot holds before anything arms it.
+unsigned rt_hblank_gates() {
+    unsigned g = 0;
+    if (hblank_handler()) g |= HBLANK_GATE_HANDLER;
+    if (ie_word() & IRQ_HBLANK) g |= HBLANK_GATE_IE;
+    if (!rt_irq_masked()) g |= HBLANK_GATE_CPSR;
+    if (*reinterpret_cast<volatile uint16_t *>(REG_IME) & 1u) g |= HBLANK_GATE_IME;
+    if (*reinterpret_cast<volatile uint16_t *>(REG_DISPSTAT) &
+        DISPSTAT_HBLANK_IRQ_ENABLE)
+        g |= HBLANK_GATE_DISPSTAT;
+    return g;
+}
+
+bool rt_hblank_armed() { return rt_hblank_gates() == HBLANK_GATE_ALL; }
+
+void rt_hblank_dispatch() { hblank_handler()(); }
+
+// TIMER 0'S OVERFLOW INTERRUPT, the vector half (run hunt2, lane HUD2). The
+// count itself is ntr/rt.cpp's rt_timer0_advance; this is what it delivers to.
+// The DS dispatcher reads the vector table at the IRQ bit number, bit 3 for
+// timer 0, and on the game libraries that slot holds the ROM's own
+// IRQ::Tim0OverflowHandler (hal/arm9_tables_link100.cpp), which forwards to
+// IRQ::DmaTimHandler(4) and so to whatever the game registered in the
+// callback table above: OSi_CountUpTick, the OS tick's high word. The smoke
+// probes link no vector table and get no delivery.
+bool rt_timer0_irq_gates_open() {
+    return (ie_word() & 0x8u) && !rt_irq_masked() &&
+           (*reinterpret_cast<volatile uint16_t *>(REG_IME) & 1u);
+}
+
+void rt_timer0_dispatch() {
+#if defined(NTR_ROM_IRQ_TABLE)
+    if (void *v = OS_IRQTable[3]) reinterpret_cast<IrqHandler>(v)();
+#endif
+}
+
+}  // namespace ntr
+#if !defined(NTR_ROM_IRQ_TABLE)
+// THE SMOKE PROBES' COPIES of the IE pair. The game libraries link
+// src/_ZN3IRQ10EnableIRQsEj.cpp and src/_ZN3IRQ11DisableIRQsEj.cpp instead
+// (hostgen'd, over the IE latch; see THE IE WORD IS THE ROM'S TOO above).
+// PORT_HOST_ABI: src pokes the DS interrupt registers (IME 0x4000208, IE
+//   0x4000210); the host keeps the IE word stand-in above.
+extern "C" unsigned OS_EnableIrqMask(unsigned mask) {
+    const unsigned prev = g_ie;
+    g_ie |= mask;
+    return prev;
+}
+// PORT_HOST_ABI: src pokes the DS interrupt registers (IME 0x4000208, IE
+//   0x4000210); the host keeps the IE word stand-in above.
+extern "C" unsigned OS_DisableIrqMask(unsigned mask) {
+    const unsigned prev = g_ie;
+    g_ie &= ~mask;
+    return prev;
+}
+#endif  // !NTR_ROM_IRQ_TABLE
+#if !defined(NTR_ROM_IRQ_TABLE)
+// THE SMOKE PROBES' COPY of IRQ::ClearInterrupts. The game libraries link the
+// matched src/_ZN3IRQ15ClearInterruptsEj.cpp instead (the alias above), whose
+// store now reaches ntr/io.cpp's write-one-to-clear IF (run linkfull, lane
+// SMALLS1; IRQTAB1 measured why it had to wait for that).
+// PORT_HOST_ABI: src acknowledges IF (0x4000214) by storing the mask; the
+//   smoke probes link no matched IRQ TUs and route nothing to IF. The one
+//   linked caller is the display-list pump (src/func_0205a290.c, mask
+//   0x200000, after each geometry-FIFO chunk), and this port never raises IF
+//   bit 21 (the pump is re-entered straight from MIi_DmaSetParams below), so
+//   on the cartridge's own semantics the acknowledge is a no-op here -- which
+//   is what this body is.
+extern "C" unsigned OS_ResetRequestIrqMask(unsigned) { return 0; }
+#endif  // !NTR_ROM_IRQ_TABLE
+
+// DMA to the FIFO is the display-list path (MIi_FIFOCallback). ctrl bit 30 is
+// IRQ-on-complete (the final chunk); a GXFIFO-destined chunk without it relies
+// on the half-empty IRQ to pump the next chunk.
+// PORT_HOST_ABI: src pokes DS DMA registers (REG_DMA_BASE); the host models the
+//                FIFO seam and synthesises the completion IRQ instead.
+extern "C" void MIi_DmaSetParams(int ch, int src, int dst, int ctrl) {
+    const int words = ctrl & 0x1FFFFF;
+    /* CONTROL BIT 24 IS DMA_CONTROL_SRC_FIXED: the source address does NOT
+       advance, so the transfer REPEATS one word. That is what a FILL is, and
+       it is what MI_DmaFill32 asks for.
+       Ignoring it made every fill a memcpy FROM THE SOURCE ADDRESS ONWARDS,
+       and on this hardware model the source it is handed is the mapped MMIO
+       window at 0x040000EC -- so a fill walked the live I/O registers into
+       its destination instead of clearing it.
+       On the title that destination is the two OAM shadow buffers, every
+       frame, and the 3D geometry-port latches landed in entries 64..127. All
+       three of the owner's visual complaints are that one memcpy:
+         * the bottom-screen star correct on half the frames and MASSIVE and
+           rotated 90 degrees on the others -- garbage attr0 rotation/scale
+           and double-size bits, alternating with the buffer swap;
+         * identical corruption top-left of BOTH screens -- same source
+           address feeding both engines;
+         * random glitched LETTERS there on the attract's Yoshi switch --
+           garbage attr2 tile index pointing into the swapped character sheet.
+       Four other live callers (GX_Init, G3X_InitTable, WM_Init
+       and the title's own path) were doing the same MMIO memcpy; honouring
+       the bit heals all of them, because it is the primitive that was wrong
+       rather than any one caller. */
+    if (ctrl & 0x01000000) {
+        const uint32_t v =
+            *reinterpret_cast<const uint32_t *>(static_cast<uintptr_t>(src));
+        uint32_t *d = reinterpret_cast<uint32_t *>(static_cast<uintptr_t>(dst));
+        if (static_cast<uintptr_t>(dst) == GXFIFO) {
+            for (int i = 0; i < words; ++i) ntr::gx_write_fifo(v);
+        } else {
+            for (int i = 0; i < words; ++i) d[i] = v;
+        }
+    } else {
+    copy_words(reinterpret_cast<const uint32_t *>(static_cast<uintptr_t>(src)),
+               reinterpret_cast<uint32_t *>(static_cast<uintptr_t>(dst)), words);
+    }
+    if (static_cast<uintptr_t>(dst) == 0x04000400u) {
+        if (ctrl & 0x40000000) {
+            /* DMA channels are 0..3; entries 4..7 are the timers', hosted
+               as data_020a60f4 (the band above) */
+            const unsigned h = OSi_IrqCallbackInfo[ch & 3].handler;
+            if (h) {
+                ++g_census_dmadone;
+                reinterpret_cast<void (*)(unsigned)>(h)(OSi_IrqCallbackInfo[ch & 3].arg);
+            }
+        } else if (ie_word() & 0x200000u) {
+            if (const IrqHandler h = gxfifo_handler()) {
+                ++g_census_gxfifo;
+                h();
+            }
+        }
+    }
+}
+
+// The waiting form MI_DmaCopy32 and its siblings use (src/engine/mi/MI_Dma.cpp,
+// ITCM 0x01ffde00). The host DMA above is synchronous, so the wait is already
+// over when it returns.
+// PORT_HOST_ABI: DS DMA register poke (0x040000b0 + 2-cycle barrier reads),
+//                the ntr layer models the FIFO seam, not raw DMA registers.
+// GXi_DmaId (0x02099fd0): the GX upload DMA channel, -1 for the CPU copy
+// path the host always takes. G3X.cpp and GX.cpp read it; it sits here, beside
+// the DMA bodies, so every target linking the ntr library has it (smoke_gx
+// compiles G3X.cpp without hal/model_host.cpp, where it used to live).
+extern "C" int GXi_DmaId = -1;
+
+extern "C" void MIi_DmaSetParams_wait(unsigned int ch, unsigned int src, unsigned int dst, unsigned int ctrl) {
+    MIi_DmaSetParams((int)ch, (int)src, (int)dst, (int)ctrl);
+}
+
+// ---------------------------------------------------------------------------
+// CP15 cache maintenance. The host has coherent memory, so these are no-ops --
+// but they must still exist, because the decomp calls them around every DMA.
+//
+// EVERY ONE OF THESE HAS A MATCHED src TU AND ONLY THE LINKED ONES ARE QUEUE
+// ROWS, which is why the tags below look scattered rather than uniform.
+// port/tools/linkage.py only sees a definition once /OPT:REF keeps it, so an
+// untagged sibling here is dormant and not forgiven: the day a slice reaches
+// it, it surfaces as an UNDOCUMENTED SHADOW and wants the same one-line ruling
+// the tagged ones carry. Run link60 lane PC2 hit exactly that. Its new arm9
+// chain (_Z19func_ov007_020b2bd4ii -> _Z13func_02044efcP8BMD_File / _ZN15ModelComponents10SetAmbientEj) linked
+// DC_StoreAll for the first time, the queue went 557 to 558 and
+// SHADOWS 43 to 44, and the answer was the tag and not a code change: the
+// matched TU is an `asm` block of mcr p15 instructions, which is DS hardware
+// the ntr layer does not model, so the host definition IS the faithful
+// stand-in.
+// ---------------------------------------------------------------------------
+
+// PORT_HOST_ABI: hand-asm primitive (src/ carries the banner): mcr p15
+//   cache maintenance, a cache-flush primitive the host runtime necessarily
+//   owns. See the CP15 block above -- host memory is coherent.
+extern "C" void DC_StoreAll(void) {}
+// PORT_HOST_ABI: hand-asm primitive (src/ carries the banner): mcr p15
+//   cache maintenance. See the CP15 block above -- host memory is coherent.
+extern "C" void DC_StoreRange(unsigned int, unsigned int) {}
+// PORT_HOST_ABI: hand-asm primitive (src/ carries the banner): the whole ROM
+//   body is `mov r0, #0; mcr p15, 0, r0, c7, c10, 4; bx lr` -- drain the write
+//   buffer. See the CP15 block above -- host memory is coherent, and a 32-bit
+//   x86 MSVC cannot assemble an ARM coprocessor move in any case.
+//   The tag was simply missing: both its neighbours in this block carry one and
+//   this line did not, so linkage.py counted it an UNDOCUMENTED SHADOW -- work
+//   owed -- when it is the same permanent exception they are. Found by the
+//   func_0203df40 / func_0203ea5c census (run link100, lane DF40); it is the
+//   one row of that census whose disposition was a missing ruling rather than a
+//   missing body. The sibling on line 30, OS_EnableInterrupts, is the same shape
+//   and the same omission, but it is in neither closure, so this lane names it
+//   rather than taking it.
+extern "C" void DC_WaitWriteBufferEmpty(void) {}
+// PORT_HOST_ABI: hand-asm primitive (src/ carries the banner): mcr p15
+//   cache maintenance. See the CP15 block above -- host memory is coherent.
+extern "C" void DC_InvalidateRange(unsigned int, unsigned int) {}
+// PORT_HOST_ABI: hand-asm primitive (src/ carries the banner): mcr p15
+//   cache maintenance. See the CP15 block above -- host memory is coherent.
+//   TAG ADDED, run link100 wave 14, lane SHADOWS3, for the reason the
+//   DrainWriteBuffer note above gives about its own missing tag: the reason on
+//   the line above binds to InvalidateDataCache and stops there, so this row
+//   read as an UNDOCUMENTED SHADOW when it is the same permanent exception its
+//   two neighbours are. src/_ZN4CP1526InvalidateInstructionCacheEjj.cpp is a
+//   five-instruction `mcr p15, 0, r0, c7, c5, 1` loop; no x86 front end
+//   assembles a coprocessor access, so no seat exists to be owed.
+extern "C" void IC_InvalidateRange(unsigned int, unsigned int) {}
+extern "C" void DC_FlushAll(void) {}
+// PORT_HOST_ABI: hand-asm primitive (src/ carries the banner): mcr p15
+//   cache maintenance. See the CP15 block above -- host memory is coherent.
+extern "C" void DC_FlushRange(unsigned int, unsigned int) {}
+
+// The protection unit and DTCM switches (src/engine/cp15/CP15_ProtectionUnit.cpp,
+// OS_SetProtectionRegion1.cpp, CP15_TCM.cpp: hand asm, mcr/mrc p15). A Win32
+// process has no MPU and no TCM, so there is nothing to switch. They live here
+// beside the cache no-ops so every target that links the ntr library has them.
+// PORT_HOST_ABI: CP15 c1 write (protection unit on), no host MPU.
+extern "C" void OS_EnableProtectionUnit(void) {}
+// PORT_HOST_ABI: CP15 c1 write (protection unit off), no host MPU.
+extern "C" void OS_DisableProtectionUnit(void) {}
+// PORT_HOST_ABI: CP15 c6,c1 write (region 1), no host MPU.
+extern "C" void OS_SetProtectionRegion1(unsigned int) {}
+// PORT_HOST_ABI: CP15 c1 write (DTCM enable bit), no host TCM.
+extern "C" void OS_EnableDTCM(void) {}

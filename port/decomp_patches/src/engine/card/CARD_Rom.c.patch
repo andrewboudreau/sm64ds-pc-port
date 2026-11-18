@@ -1,0 +1,66 @@
+diff --git a/src/engine/card/CARD_Rom.c b/src/engine/card/CARD_Rom.c
+--- a/src/engine/card/CARD_Rom.c
++++ b/src/engine/card/CARD_Rom.c
+@@ -32,6 +32,13 @@
+ #define REG_CARDCNT (HW_REG_BASE + 0x1a4)
+ #define REG_CARD_CMD (HW_REG_BASE + 0x1a8)
+ #define REG_CARD_DATA (HW_REG_BASE + 0x100010)
++
++/* Host: every register access below is spelled with its literal address, so
++   port/tools/hostgen.py's MMIO pass routes it through NTR_MMIO into
++   port/ntr/io.cpp, where port/ntr/card.cpp's ROMCTRL, command-latch and
++   data-port hooks answer it (the pin's CARDi_SetRomOp and its siblings were
++   spelled that way and were routed; the macro spelling above is invisible to
++   a textual pass and would store into the plain latch window instead). */
+ 
+ #define CARDMST_SEL_ROM 0x00
+ #define CARDMST_IF_ENABLE 0x40
+@@ -133,12 +140,12 @@
+ 
+ // @symbol CARDi_SetRomOp
+ static void CARDi_SetRomOp(u32 cmd1, u32 cmd2) {
+-    while ((*(vu32 *)REG_CARDCNT & CARD_START) != 0)
++    while ((*(vu32 *)0x040001a4 & CARD_START) != 0)
+         ;
+ 
+-    *(vu8 *)REG_CARD_MASTER_CNT = CARDMST_SEL_ROM | CARDMST_ENABLE | CARDMST_IF_ENABLE;
++    *(vu8 *)0x040001a1 = CARDMST_SEL_ROM | CARDMST_ENABLE | CARDMST_IF_ENABLE;
+     {
+-        vu8 *const p_cmd = REG_CARD_CMD;
++        vu8 *const p_cmd = (vu8 *)0x040001a8;
+         p_cmd[0] = (cmd1 >> (8 * 3));
+         p_cmd[1] = (cmd1 >> (8 * 2));
+         p_cmd[2] = (cmd1 >> (8 * 1));
+@@ -175,7 +182,7 @@
+     ch->ctrl = 0xaf000001;
+ 
+     CARDi_SetRomOpReadPage1(c->src);
+-    *(vu32 *)REG_CARDCNT = p->ctrl;
++    *(vu32 *)0x040001a4 = p->ctrl;
+ }
+ 
+ // @symbol CARDi_OnReadCard
+@@ -241,7 +248,7 @@
+ 
+         if ((src != c->src) || ((c->dst & 3) != 0) || (c->len < len)) {
+             dst = (u32)p->cache_buf;
+-            p->cache_page = (void *)src;
++            p->cache_page = (u8 *)src;
+         } else {
+             dst = c->dst;
+         }
+@@ -249,11 +256,11 @@
+         CARDi_SetRomOpReadPage1(src);
+         {
+             u32 pos = 0;
+-            *(vu32 *)REG_CARDCNT = p->ctrl;
++            *(vu32 *)0x040001a4 = p->ctrl;
+             for (;;) {
+-                const u32 ctrl = *(vu32 *)REG_CARDCNT;
++                const u32 ctrl = *(vu32 *)0x040001a4;
+                 if ((ctrl & CARD_DATA_READY) != 0) {
+-                    u32 data = *(vu32 *)REG_CARD_DATA;
++                    u32 data = *(vu32 *)0x04100010;
+                     if (pos < len)
+                         ((u32 *)dst)[pos++] = data;
+                 }

@@ -1,0 +1,1171 @@
+// The hosted ARM7: command-queue consumer.
+//
+// THE PROTOCOL (all ARM9 halves are matched src/ in slice_gate10):
+//   PushCommand_impl   takes a node off the free list at data_020a6484 and
+//                     appends it to the pending list data_020a648c/6490.
+//   SND_FlushCommand     moves the whole pending list into ring slot
+//                     data_020a64a8[data_020a649c], bumps the in-flight
+//                     count data_020a64a0 and the batch tick data_020a64a4,
+//                     and pokes the ARM7 with PXI_SendWordByFifo(7, head, 0).
+//   SND_RecvCommandReply     when the ARM7's progress word has moved past
+//                     data_020a6488, pops ring slot data_020a6498 and
+//                     splices that batch back onto the free list.
+//   SNDi_GetFinishedCommandTag     reads the ARM7's progress word (data_020a7fc0[0]).
+//   SND_GetPlayerStatus     reads the ARM7's PLAYER BITMASK (data_020a7fc0[1]).
+//                     That word is how the ARM9 learns a sound has FINISHED,
+//                     and it is the only way it can: see publish_player_status
+//                     and sdat_host_tick below.
+//
+// THE DEADLOCK, AND HOW IT IS CLOSED. SND_AllocCommand ends with
+//     do { SND_RecvCommandReply(1); p = AllocCommand(); } while (p == 0);
+// and SND_RecvCommandReply(1) is
+//     while (SNDi_GetFinishedCommandTag() == data_020a6488) {}
+// -- a spin on a counter only the consumer advances. On hardware a second
+// CPU advances it. Here there is no second CPU, so if the free list ever
+// empties inside game code the spin is forever.
+//
+// The fix is not a bigger pool or a per-frame drain (game code can exhaust
+// 256 nodes between two frames and never return). It is to host the seam
+// where it actually is: SNDi_GetFinishedCommandTag is "read the other core's progress",
+// and on a single-threaded host, reading the other core's progress has to
+// MAKE the other core run. So this file owns SNDi_GetFinishedCommandTag (removed from
+// the slice) and pumps the consumer before returning the counter.
+//
+// That makes termination provable. If the spin is entered, the free list is
+// empty, so all 256 nodes are on the pending list or in the ring. Whichever
+// they are, SND_AllocCommand has already called SND_FlushCommand (directly, or via
+// the SND_RecvCommandReply(0) drain) before the spin, so at least one batch is in
+// the ring and data_020a64a4-1 > consumed. The pump therefore consumes at
+// least one batch and advances the progress word, the comparison in
+// SND_RecvCommandReply fails, the spin exits, the batch is reclaimed and the free
+// list is non-empty. One iteration, always.
+//
+// The same hook makes the whole subsystem self-starting: seeding runs from
+// the first SNDi_GetFinishedCommandTag, so even a sound call that arrives before the
+// frame loop's tick finds a seeded pool instead of a null free list.
+#include "sdat.h"
+
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+// ---- the ARM9-side globals, as the matched code sees them ---------------
+extern "C" {
+extern void *data_020a6484;         // free list head
+extern void *data_020a6494;         // free list tail NODE
+extern void *data_020a648c;         // pending list head
+extern void *data_020a6490;         // pending list tail
+extern int   data_020a6488;         // batches reclaimed
+extern int   data_020a6498;         // ring read index
+extern int   data_020a649c;         // ring write index
+extern int   data_020a64a0;         // batches in flight
+extern int   data_020a64a4;         // next batch tick (starts at 1)
+extern void *data_020a64a8[];       // 9-slot ring of batch heads
+extern unsigned int *data_020a7fc0; // -> the ARM7 status block
+
+int SND_FlushCommand(int blocking);
+
+/* The game's own sound init, and it is the ROM's own bodies now (run link100,
+ * lane SND1, rung R1; port/slice_snd1.txt).
+ *
+ *   func_0204f070   the once-only guard and its four calls. The first,
+ *                   SND_Init, is SND_Init: the 256-node command pool, the
+ *                   0x280 status block, the channel-7 registration. The other
+ *                   three are the counter resets and the voice/player records
+ *                   sd_sound_init_host used to call by hand.
+ *   SND_CommandInit   SND_Init on its own, for the save-state restore path in
+ *                   sd_consumer_reset: the guard above it has already fired by
+ *                   then, so func_0204f070 would no-op.
+ *
+ * What made these runnable is hal/snd_globals.cpp, which hosts the pool, the
+ * callback table and the status block in the ROM's own layout. See the header
+ * on sd_consumer_reset for what that retired. */
+void func_0204f070(void);
+void SND_CommandInit(void);
+
+/* RUNG R2 (run link100, lane SND2; port/slice_snd2.txt): the 1 MB sound heap,
+ * _Z13func_020133bcv's SECOND statement and the storage every later statement of
+ * that body allocates out of.
+ *
+ *     sSndHeap = func_0205130c(Memory::Allocate(0x100000), 0x100000);
+ *
+ * func_0205130c word-aligns the span, refuses one with under 0x10 bytes of
+ * payload, lays a SolidHeapAllocator over [base+0x10, end) and runs
+ * func_02051024 over the 0x10 header (the allocator pointer at +0, a
+ * NestedHeapIterator with link offset 0xc at +4, the slot id func_02050fd4
+ * hands out at +0xc). That header IS the handle: sSndHeap.
+ *
+ * WHERE THE MEGABYTE COMES FROM. Memory::Allocate(size) is
+ * Memory::Allocate(size, 4, 0), and src/_ZN6Memory8AllocateEjiPN5mHeap6Heap_tE.c
+ * substitutes the DEFAULT heap for a null heap argument. At this line the
+ * default heap is the ROOT heap and not the game heap:
+ * Heap::InitializeGameHeap carved 0x3b000 out of the root a few lines
+ * earlier and left data_020a0ea0 pointing at the root (the pair is read back
+ * in hal/lk4_solidheap_seat.cpp), and Stage::InitResources is the only thing
+ * that ever swaps it. So the megabyte comes out of hal/os_arena.cpp's 8 MB
+ * arena in the DS's own order, and the GAME heap's layout is untouched. What
+ * does move is every later ROOT-heap allocation; the before/after
+ * measurement is in the lane's report.
+ */
+void *func_0205130c(unsigned int addr, unsigned int size);
+void *_ZN6Memory8AllocateEj(unsigned int size);
+extern int sSndHeap;      /* the sound heap handle func_02050f34 and
+                                  _Z13func_020134d8PvP7SndHeap allocate out of */
+
+/* RUNG R3 (run link100, lane SND2): the player/group table, and it is the
+ * first statement of _Z13func_020133bcv that CHANGES WHAT THE PORT SOUNDS LIKE.
+ *
+ *     func_02052008(func_0203d974() == 0 ? sSndHeap : 0);
+ *
+ * func_02052008 walks all 32 sequence players, asks the SDAT's own INFO
+ * block for each one's PLAYER record through func_02050ae8, and hands the
+ * record's first byte to Sound::Player::SetPlayableSeqCount -- 'how many
+ * sequences may this player run at once'. func_0204fc40, inside rung R1's
+ * func_0204f070, has already given every player the ROM's compiled-in
+ * default of 1, and until this line the port never replaced it. In this
+ * cartridge's archive nine players ask for more (2 for players 2, 21 and
+ * 29; 3 for 10 and 13; 4 for 14 and 20; 5 for 17; 6 for 9) and seven have no
+ * record at all, which func_02050ae8 answers with 0 and the loop skips. So
+ * the change can only RAISE a limit, never lower one: nothing that sounds
+ * today stops sounding, and a player the ROM allows two sequences on can
+ * now run two.
+ *
+ * THE ARGUMENT IS THE ROM'S OWN EXPRESSION, face and all. func_0203d974 is
+ * hosted in hal/star_flow.cpp and answers 1, so the argument is 0 and the
+ * per-player sub-heap loop at the bottom of func_02052008 is skipped -- the
+ * same branch a DSi or a download-played console takes. Only two players in
+ * this archive ask for a sub-heap at all (0x2c00 for player 0, 0x1000 for
+ * player 1); the rest ask for zero and are skipped by the ROM's own test.
+ * When that face retires the expression starts passing the rung-R2 heap and
+ * those two allocations happen, which is why the call is written the ROM's
+ * way rather than as a constant.
+ *
+ * NO NULL CHECK, AND THAT IS FAITHFUL. func_02050ae8 dereferences
+ * data_020a5bb8 + 0x84 without testing either, so an archive that failed to
+ * open faults here -- on the DS as much as on the host, because
+ * func_02050f34 discards func_02050d54's failure in exactly the same way.
+ * hal/sdat/sdat.cpp's 'cannot open ... sound stays silent' path is the host
+ * standing in for that failure, and it now ends the same way the cartridge
+ * would.
+ */
+void func_02052008(int arg);
+int func_0203d974(void);
+
+/* RUNG R4 (run link100, lane SND2): the SDAT archive opened OFF THE CARD,
+ * by the cartridge's own loader, into the rung-R2 heap.
+ *
+ *     anim = data_0208e498;                  the path, /data/sound_data.sdat
+ *     func_0201a9fc(data_0209d574);          the boot's own tick
+ *     func_02050f34(&sSndArc, anim, sSndHeap, 0);
+ *     func_0201a9fc(data_0209d574);
+ *
+ * func_02050f34 resolves the path through the ROM's own open-by-name file
+ * system (FS_ConvertPathToFileID -> FSi_FindPath -> FSi_FindPathCommand walks Nintendo's
+ * directory table; hal/fs_names.cpp is the seat that made that work and
+ * hal/nitrofs_boot.cpp's read face serves the bytes), opens the file,
+ * reads its 0x30 header into the root object, and then func_02050d54
+ * allocates the INFO and FAT blocks out of the sound heap and reads those
+ * in too. The last thing it does is data_020a5bb8 = self, which is why
+ * hal/sdat/sdat.cpp no longer seats that global: the cartridge does.
+ *
+ * THE FOURTH ARGUMENT IS 0 AND THAT MATTERS. func_02050d54 only allocates
+ * and reads the SYMB block when the flag is non-zero, so the port gets the
+ * two blocks the ROM's accessors read (INFO at root+0x84, FAT at root+0x7c)
+ * and not the name table, exactly as the DS does.
+ *
+ * WHAT IT DOES NOT DO IS LOAD WAVE DATA. The FAT the ROM just read has an
+ * empty runtime-address slot in every record, so every residency test would
+ * fail and every sound would go down the on-demand load path. The port
+ * answers that the way it always has -- the whole archive IS in memory --
+ * but into the ROM's own table now: sdat_seat_rom_residency(), the
+ * pre-seat that used to run inside sdat_init. See its header in
+ * hal/sdat/sdat.cpp for what that is and what it is not.
+ */
+void func_02050f34(void *self, int path, int heap, int flag);
+void func_0201a9fc(void *tick);
+void sdat_seat_rom_residency(void);
+extern unsigned char data_0208e498[];   /* "/data/sound_data.sdat" */
+extern unsigned char data_0209d574[];   /* the boot's own tick record */
+
+/* The rest of the init, still called by hand. See sd_sound_init_host. */
+void func_0204f94c(void *p);         /* clear one player's voice pointer */
+extern "C++" void func_02011a28(char *table);  /* PlayLong's 0x40-slot handle table; C++ at TARGET (Sound.cpp) */
+void func_02048f34(void *owner);     /* 3D voice pools */
+extern int sMusicHandle[], sSubHandle[], data_0209b4a4[];
+extern int data_0209b53c[];
+/* Main's src/engine/sound/Sound.cpp owns PlayLong's handle table as a C++
+   SndRegTable; the flat C storage the port kept is gone (ACT4b), so the C
+   spelling here (and star_flow.cpp's) binds straight to main's object. */
+#pragma comment(linker, "/alternatename:_data_0209b53c=?data_0209b53c@@3USndRegTable@@A")
+extern unsigned char sSndArc[];
+extern unsigned char gSoundInitialized;  /* the master "sound effects on" flag */
+
+/* The ARM9's own voice bookkeeping, for the census the trace prints.
+ * data_020a4d54 is the FREE voice list and data_020a4d60 the ACTIVE one;
+ * both are 0xc-byte NestedHeapIterators whose element count is the u16 at
+ * +8 (see NestedHeapIterator::AddLast / ::Remove, which are the only two
+ * functions that move it). data_020a4bf8 and data_020a4c18 are the 3D
+ * positional slot tables func_02048720 hands out, 8 bytes per slot, and a
+ * slot is free exactly when its first word is null. */
+extern unsigned char data_020a4d54[];
+extern unsigned char data_020a4d60[];
+extern int data_020a4bf8[];
+extern int data_020a4c18[];
+extern int data_02099fb0;            /* the type-9 pool's live count */
+
+/* THE ROM'S OWN SOUND FRAME (run link100, lane SND1, rungs R8/R9/R10).
+ * func_020132d8 is phase 9 of the game's main loop -- the last thing in the
+ * frame after the VBlank wait -- and sdat_host_tick calls it at the point two
+ * hand-written transcriptions used to stand. See the block above
+ * sd_sound_init_host for what those were and why all five of their SKIPs are
+ * spent. Everything they used to call by hand (_Z13func_02012d64v, func_0204fafc,
+ * SND_RecvCommandReply, _Z13func_020119c8Pv, the jingle ramp) is inside it. */
+void func_020132d8(void);
+extern "C++" void func_02011974(void *table);  /* the level-change looping-handle reaper; C++ at TARGET */
+
+/* The music/jingle crossfade used to be written out here as
+ * sd_sound_fade_host, with eight declarations behind it (_Z13func_02012d64v,
+ * _Z13func_02013524P12NNSSndHandleii, func_0204fa2c, ApproachLinear, gSubSoundID, sSubVolumeTarget,
+ * sVolumeRampStep, gSubVolume). It is the first half of func_020132d8 and
+ * comes from the cartridge now, so the declarations went with the copy. */
+}
+
+// The ARM9 half of the voice trace. The switch and the printer live in
+// mixer.cpp, which is the one file every sound harness links; this census
+// reads the game's own voice records, so it belongs where they are.
+void sd_vtrace_arm9_census(const char *when)
+{
+    if (!g_voice_trace) return;
+
+    int freeN   = *(unsigned short *)(data_020a4d54 + 8);
+    int activeN = *(unsigned short *)(data_020a4d60 + 8);
+
+    int p2 = 0, p9 = 0;
+    for (int i = 0; i < 2; i++) if (data_020a4bf8[i * 2]) p2++;
+    int n9 = data_02099fb0;
+    if (n9 < 0 || n9 > 6) n9 = 6;
+    for (int i = 0; i < n9; i++) if (data_020a4c18[i * 2]) p9++;
+
+    static int lastFree = -1, lastActive = -1, lastP2 = -1, lastP9 = -1;
+    if (freeN == lastFree && activeN == lastActive && p2 == lastP2 &&
+        p9 == lastP9)
+        return;
+    lastFree = freeN; lastActive = activeN; lastP2 = p2; lastP9 = p9;
+
+    sd_vtrace("arm9 voices free %2d active %2d | 3d slots type2 %d/2 "
+              "type9 %d/%d  (%s)%s\n", freeN, activeN, p2, p9, n9, when,
+              freeN == 0 ? "  <- FREE LIST EMPTY" : "");
+
+    // On a new low water mark, name the voices that are sitting on the pool,
+    // so "the pool is draining" can be told from "the pool is busy". The
+    // active list is a NestedHeapIterator with link offset 0x14 (its ctor
+    // argument in func_0204fc40), so the next pointer is at node+0x18.
+    static int low = 99;
+    if (freeN >= low) return;
+    low = freeN;
+    for (unsigned char *n = *(unsigned char **)data_020a4d60; n;
+         n = *(unsigned char **)(n + 0x18)) {
+        int id = n[0x3c];
+        sd_vtrace("  held by voice %2d: state %d, started %d, priority %3d, "
+                  "player %s\n", id, n[0x2c], n[0x2d], n[0x3d],
+                  sd_seq_active(id) ? "STILL SOUNDING" : "quiet");
+    }
+}
+
+// The other pool in the sound stack, one level up from the voices, and the
+// one the voice census cannot see.
+//
+// data_0209b53c is func_0201226c's "start this looping sound, or refresh the
+// one I started last frame" table: an 8-byte header (a birth counter at +0
+// that becomes the handle, a round-robin allocation cursor at +4) followed by
+// 0x40 entries of 0x14 bytes. An entry is LIVE exactly when its first word --
+// the handle its caller is holding -- is non-zero, and +6 is the
+// refreshed-this-frame flag that _Z13func_020119c8Pv clears and then acts on.
+//
+// It gets its own line because a handle can be live here while the voice
+// underneath it is long gone, and because a live count that only ever climbs
+// is the signature of nothing reaping.
+void sd_vtrace_loop_census(const char *when)
+{
+    if (!g_voice_trace) return;
+
+    unsigned char *t = (unsigned char *)data_0209b53c;
+    int live = 0, fresh = 0;
+    for (int i = 0; i < 0x40; i++) {
+        unsigned char *e = t + 8 + i * 0x14;
+        if (*(int *)e == 0) continue;
+        live++;
+        if (e[6]) fresh++;
+    }
+
+    // How many sequencer players are actually running is what "louder"
+    // means: each leaked handle leaves one more player sounding the same
+    // sequence, and they sum.
+    unsigned mask = sd_seq_player_mask();
+    int players = 0;
+    for (unsigned m = mask; m; m &= m - 1) players++;
+
+    static int lastLive = -1, lastFresh = -1, lastPlayers = -1;
+    if (live == lastLive && fresh == lastFresh && players == lastPlayers)
+        return;
+    lastLive = live; lastFresh = fresh; lastPlayers = players;
+
+    sd_vtrace("3d loop handles live %2d/64 refreshed %2d, births %d, "
+              "seq players sounding %2d  (%s)%s\n",
+              live, fresh, *(int *)t, players, when,
+              live == 0x40 ? "  <- HANDLE TABLE FULL" : "");
+}
+
+namespace {
+
+// A queue node: next, then the five words PushCommand_impl writes.
+struct Node {
+    Node *next;
+    int op, a, b, c, d;
+};
+
+enum { NODES = 256, RING = 9 };
+
+// THE STATUS BLOCK, AND WHO NAMES IT. This used to be a host array beside the
+// queue, published into unconditionally, with a note saying the 0x19 handshake
+// "is a no-op rather than a fake" because the consumer owned the block. Rung R1
+// inverts that: src/func_0205b358.c runs, and its last act is to send command
+// 0x19 carrying the address of the block IT allocated (data_020a64e0, hosted at
+// its ROM span in hal/snd_globals.cpp). This pointer is what that command hands
+// over, and it stays null until the command is executed -- which is the DS's
+// own state of affairs, since on hardware the ARM7 does not know where
+// SNDSharedWork is until the ARM9 tells it either.
+unsigned int *g_block;
+int g_seeded;
+int g_pumping;                          // reentrancy guard for the hook
+unsigned g_consumed;                    // batches this consumer has executed
+int g_readIdx;                          // our own cursor into the ring
+int g_trace;                            // SM64DS_SND_TRACE=1
+sd_u8 g_sawOp[256];
+unsigned g_strm[4];                     // 0x11, 0x15, 0x16, 0x17: seen, not sounded
+
+const char *op_name(int op)
+{
+    switch (op) {
+    case 0x00: return "START_SEQ";
+    case 0x01: return "STOP_SEQ";
+    case 0x02: return "PAUSE_SEQ";
+    case 0x03: return "PLAYER_PARAM";
+    case 0x04: return "TRACK_PARAM";
+    case 0x05: return "MUTE_TRACKS";
+    case 0x09: return "SETUP_CAPTURE";
+    case 0x0a: return "START_CHANNEL";
+    case 0x0b: return "CHANNEL_SETUP";
+    case 0x0e: return "CHANNEL_FLAGS";
+    case 0x0f: return "CALLBACK_REG";
+    case 0x11: return "SHARED_WORK";
+    case 0x13: return "STOP_UNUSED";
+    case 0x15: return "STRM_SETUP";
+    case 0x16: return "STRM_PARAM";
+    case 0x17: return "STRM_PARAM2";
+    case 0x19: return "SET_STATUS_BLOCK";
+    case 0x1b: return "LOAD_SEQ";
+    case 0x1c: return "LOAD_BANK";
+    case 0x1d: return "LOAD_WAVEARC";
+    default:   return "?";
+    }
+}
+
+// An opcode this consumer handles can still carry a PARAMETER it does not.
+// Those would otherwise vanish without a word, which is the one thing the
+// port is not allowed to do quietly.
+void note_param(int op, int param)
+{
+    static sd_u8 seen[2][256];
+    int row = (op == 3) ? 0 : 1;
+    if (param < 0 || param > 255 || seen[row][param]) return;
+    seen[row][param] = 1;
+    fprintf(stderr, "[snd] command 0x%02x parameter 0x%02x not implemented "
+            "-- ignored\n", op, param);
+}
+
+void exec(const Node *n)
+{
+    int op = n->op;
+    if (g_trace)
+        fprintf(stderr, "[snd] op %02x %-16s a=%08x b=%08x c=%08x d=%08x\n",
+                op, op_name(op), (unsigned)n->a, (unsigned)n->b,
+                (unsigned)n->c, (unsigned)n->d);
+
+    switch (op) {
+    case 0x00: {                        // START_SEQ
+        // a = voice id (the byte at voice+0x3c), b = sequence data base,
+        // c = offset of this entry within it, d = resident SBNK.
+        //
+        // b and c are the SEQARC case: func_02051a98 passes the SSAR's DATA
+        // base in b and the entry's own offset in c, so a sound effect is
+        // one entry inside a packed archive. Music passes c = 0, so the same
+        // pair covers both.
+        //
+        // They go to sd_seq_start SEPARATELY, and adding them here was a bug
+        // rather than a shortcut: b is the base every branch target in the
+        // stream is measured from, so an entry folded into the base sends
+        // its own first jump 0xc off into the neighbouring entry. See the
+        // header on sd_seq_start.
+        int slot = n->a & 31;
+        const sd_u8 *base = (const sd_u8 *)(size_t)(unsigned)n->b;
+        sd_u32 off = (sd_u32)n->c;
+        const sd_u8 *bnk = (const sd_u8 *)(size_t)(unsigned)n->d;
+        if (!base || !bnk) break;
+        if (g_voice_trace) {
+            const sd_u8 *seq = base + off;
+            long rel = (seq >= g_sdat.base && seq < g_sdat.base + g_sdat.size)
+                       ? (long)(seq - g_sdat.base) : -1;
+            sd_vtrace("cmd  START player %2d seq sdat+0x%lx%s\n", slot, rel,
+                      sd_seq_active(slot) ? "  (over a player still sounding)"
+                                          : "");
+        }
+        // SND_AssignWaveArc has normally already patched the bank's wave-link
+        // slots by now; this fills any that are still empty and is a no-op
+        // otherwise.
+        sdat_link_bank_waves((sd_u8 *)bnk);
+        sd_seq_start(slot, base, off, bnk);
+        break;
+    }
+    case 0x01:                          // STOP_SEQ
+        SD_VT("cmd  STOP  player %2d%s\n", n->a & 31,
+              sd_seq_active(n->a & 31) ? "  (CUTS a player still sounding)"
+                                       : "");
+        sd_seq_stop(n->a & 31);
+        break;
+    case 0x02:                          // PAUSE_SEQ: a = player, b = flag
+        // SND_PauseSeq's command (Sound::PauseMusic / UnpauseMusic reach it
+        // through func_0204f558). The ARM7's handler is on sd_seq_pause.
+        SD_VT("cmd  PAUSE player %2d flag %d\n", n->a & 31, n->b);
+        sd_seq_pause(n->a & 31, n->b);
+        break;
+    case 0x03: {                        // PLAYER_PARAM: b = param, c = value
+        // Param 4 is SND_SetPlayerChannelPriority's, sent once at start (see below).
+        // Param 6 is SND_SetPlayerVolume's, and it is a different animal: a SIGNED
+        // attenuation in tenths of a dB out of the ROM's own table, sent
+        // every frame by func_0204fafc for every voice that is sounding. It
+        // is the game's 3D distance volume and its fade ramps both.
+        //
+        // PARAM 4 IS THE PLAYER'S CHANNEL PRIORITY, NOT A VOLUME, and this
+        // used to hand it to sd_seq_set_volume. The params are byte offsets
+        // into the ARM7's player record, and SM64DS's PlayerInit
+        // (0x037FD9BC) puts the priority at +4 (0x40), the 0..127 volume at
+        // +5 (0x7f) and this s16 fader at +6; the note-on reads the
+        // allocator priority out of +4 (0x037FD4E4). Its one sender,
+        // SND_SetPlayerChannelPriority via NNS_SndPlayerSetChannelPriority, is fed the SEQ / SEQARC record's
+        // cpr byte (src/func_02051a98.c:72, src/func_02051bd0.c:80), which
+        // is 64, 96, 106 or 127 -- so every sound the game started had its
+        // priority applied to it a second time as a volume, a cut of 0 to
+        // 6 dB that depended on nothing but its steal order. The record's
+        // own volume byte goes to the ARM9 voice (+0x40, NNS_SndPlayerSetInitialVolume) and
+        // reaches the ARM7 inside param 6.
+        int slot = n->a & 31;
+        if (n->b == 4) sd_seq_set_priority(slot, n->c);
+        else if (n->b == 6) sd_seq_set_volume_db10(slot, n->c);
+        else note_param(3, n->b);
+        break;
+    }
+    case 0x04: {                        // TRACK_PARAM
+        // a = voice id | (size << 24), b = track mask, c = param, d = value.
+        //
+        // The top byte of a is the WIDTH of the field, not a mode: every one
+        // of the five matched emitters pins it (SND_SetTrackPan sends 1 with
+        // the byte-wide pan, SND_SetTrackVolume and SND_SetTrackPitch send 2 with the
+        // two halfword params below). It selects the store the ARM7 makes,
+        // and the host does not need it -- each param is handled in its own
+        // domain here -- so it is read out of the slot and otherwise unused.
+        //
+        // Param 9 is PAN, and the value is SIGNED: func_02048d80 derives it
+        // from the listener-relative X as (dx >> 12) / 2 clamped to
+        // -0x40..0x3f and hands it straight to NNS_SndPlayerSetTrackPan, so 0 means
+        // centre. Reading it as an absolute 0..127 put every centred sound
+        // hard left.
+        //
+        // Params 0x0a and 0x0c are the per-track attenuation (tenths of a dB
+        // out of data_02086384) and the per-track pitch (1/64 semitone). They
+        // are the reason a rolling or moving sound effect changes as it moves
+        // -- func_02048af4 and _Z13func_02012860P12NNSSndHandleiiii re-send both every frame beside
+        // the pan -- and both used to reach note_param and be dropped. The
+        // full derivation is on the definitions in sseq.cpp.
+        //
+        // 0x0a IS A MUSIC PATH AS OF RUNG R10, and this comment used to say
+        // the opposite -- "no matched TU sends either one for a BGM layer".
+        // That was true when it was written, and the underwater filter is what
+        // makes it false: _Z13func_020490b0P12NNSSndHandle pushes the filter's ramp at the MAIN
+        // MUSIC player through NNS_SndPlayerSetTrackVolume -> SND_SetTrackVolume, which is
+        // exactly command 0x04 parameter 0x0a on sMusicHandle's own tracks.
+        // 0x0c is still not a music path, and the sequence a layer plays is
+        // still started by op 0x00 and nothing else.
+        int slot = (n->a & 0xffffff) & 31;
+        unsigned mask = (unsigned)n->b;
+        if (n->c == 9) sd_seq_set_pan(slot, 64 + (int)(signed char)n->d);
+        else if (n->c == 0x0a) sd_seq_set_track_volume_db10(slot, mask, n->d);
+        else if (n->c == 0x0c) sd_seq_set_track_pitch(slot, mask, n->d);
+        // 0x19 / 0x1a: the track's modulation speed and depth (track +0x19 /
+        // +0x1a in the ARM7), from SND_SetTrackModSpeed / SND_SetTrackModDepth.
+        else if (n->c == 0x19 || n->c == 0x1a)
+            sd_seq_set_track_mod(slot, mask, n->c, n->d);
+        else note_param(4, n->c);
+        break;
+    }
+    case 0x19:
+        // SET_STATUS_BLOCK, and it is the ONE command in this switch the ARM9
+        // sends before it sends anything else. src/func_0205b358.c takes a node
+        // off the free list it has just built, writes 0x19 into the opcode word
+        // and data_020a7fc0 -- its own SNDSharedWork -- into the first
+        // argument, and flushes. Everything this consumer publishes goes there
+        // from now on: word 0 is the batch progress counter SNDi_GetFinishedCommandTag
+        // returns, word 1 the player bitmask SND_GetPlayerStatus returns.
+        //
+        // Honouring it rather than owning the block is what makes the two
+        // halves the same object: the ARM9 reads through data_020a7fc0, this
+        // file writes through the pointer the ARM9 sent, and if they ever
+        // disagreed the queue would stall on the first spin instead of quietly
+        // reading a stale host word.
+        g_block = (unsigned int *)(size_t)(unsigned)n->a;
+        if (g_trace)
+            fprintf(stderr, "[snd] status block published at %p by the ROM's "
+                    "own SND_Init\n", (void *)g_block);
+        break;
+    case 0x11: case 0x15: case 0x16: case 0x17:
+        // THE STREAM COMMANDS: RECORDED, NAMED, AND NOT SOUNDED (run link100,
+        // lane SND1, rung R8).
+        //
+        // 0x15/0x16/0x17 stand a STRM player up and re-parameterise it, and
+        // 0x11 is the shared-work write SND_SetChannelVolume makes for one. This
+        // consumer has nothing honest to do with them: hal/sdat/mixer.cpp
+        // plays SEQUENCED voices out of an SBNK's wave archives, and a stream
+        // is a different source entirely -- a file the other core reads in
+        // blocks while it plays -- and there is no such reader here.
+        // Answering them with sequencer calls would be fabricating audio, so
+        // they are counted and said out loud instead.
+        //
+        // NOTHING SENDS THEM TODAY, and that is measured rather than assumed:
+        // both objects the ROM's stream frame walks are zero (data_020a5634's
+        // head word, and the +0xf0 flag in each of data_020a5bd4's four
+        // records), because standing a stream up needs the 1MB sound heap, the
+        // SDAT opened off the card and the ARM9 sound thread -- rungs R2, R4
+        // and R5, all held. The counter is here so that the day one of those
+        // lands, the first stream announces itself instead of going quietly
+        // missing.
+        g_strm[op == 0x11 ? 0 : op - 0x14]++;
+        if (!g_sawOp[op & 0xff]) {
+            g_sawOp[op & 0xff] = 1;
+            fprintf(stderr, "[snd] STRM command 0x%02x %s RECORDED, not "
+                    "sounded: this consumer has no streamed-sound player "
+                    "(a=%08x b=%08x c=%08x d=%08x)\n", op, op_name(op),
+                    (unsigned)n->a, (unsigned)n->b, (unsigned)n->c,
+                    (unsigned)n->d);
+        }
+        break;
+    case 0x1b: case 0x1c: case 0x1d:
+        // Load commands. Never expected: sdat_init pre-seats every FAT
+        // residency slot with the resident address, so the game correctly
+        // finds nothing to load. If one appears, the archive is already in
+        // memory and there is nothing for the consumer to do.
+        break;
+    default:
+        if (!g_sawOp[op & 0xff]) {
+            g_sawOp[op & 0xff] = 1;
+            fprintf(stderr, "[snd] command 0x%02x %s not implemented "
+                    "(a=%08x b=%08x c=%08x d=%08x) -- skipped\n",
+                    op, op_name(op), (unsigned)n->a, (unsigned)n->b,
+                    (unsigned)n->c, (unsigned)n->d);
+        }
+        break;
+    }
+}
+
+// Execute every batch the ARM9 has flushed but the consumer has not run.
+void drain(void)
+{
+    while (g_consumed < (unsigned)(data_020a64a4 - 1)) {
+        Node *head = (Node *)data_020a64a8[g_readIdx];
+        if (++g_readIdx > 8) g_readIdx = 0;
+        for (Node *n = head; n; n = n->next) exec(n);
+        g_consumed++;
+        // The word SNDi_GetFinishedCommandTag reads, in the block the ARM9 named. The very
+        // first batch a boot consumes is the one carrying command 0x19, so
+        // g_block is already set by the time this line runs for it.
+        if (g_block) g_block[0] = g_consumed;
+    }
+}
+
+// THE OTHER HALF OF THE STATUS BLOCK.
+//
+// SNDSharedWork is not one word. Word 0 is the progress counter this file
+// already published; word 1 is the PLAYER BITMASK -- bit p set while ARM7
+// player p is still holding a sequence -- and it is not decoration. It is the
+// answer to "did that sound finish", and it is the only answer the ARM9 has:
+// SND_GetPlayerStatus reads it and func_0204fafc recycles, on that bit alone, every
+// voice record whose player has gone quiet.
+//
+// Left at zero it reads as "no player is playing", which sounds harmless and
+// is not: func_0204fafc is the ONLY caller of func_0204f2d4 that runs on a
+// sound finishing, so with the word unpublished (or the function unrun) a
+// voice is never given back. The 16 records and the 3D positional slots
+// become one-way, and func_0204f364 and func_0204f63c spend the rest of the
+// session in their steal-or-refuse paths.
+void publish_player_status(void)
+{
+    if (g_block) g_block[1] = sd_seq_player_mask();
+}
+
+// THE ROM'S OWN SOUND FRAME RUNS WHOLE NOW, AND THE TWO TRANSCRIPTIONS THAT
+// STOOD HERE ARE GONE (run link100, lane SND1, rungs R8 / R9 / R10).
+//
+// What was here was sd_sound_frame_host and sd_sound_fade_host: between them a
+// hand-written copy of src/func_0204f03c.c and src/func_020132d8.cpp with five
+// calls SKIPped, each skip carrying its own written reason. All five reasons
+// are spent, and two of them were already stale when this lane read them.
+//
+//   func_020508a0, func_020522c4   the streamed-sound frame and its four
+//       players. The reasons given were that they "would be driving a stream
+//       this port does not have" and that "their data_020a5bd4 record array is
+//       defined nowhere in the port". THE SECOND WAS FALSE: hal/stage_globals.cpp
+//       has hosted that array (1200 bytes = 4 x 0x12c) since its own lane
+//       landed. The first is true and is not a reason to skip them: the ROM's
+//       bodies do not need a stream to be safe to run. func_020508a0 returns on
+//       its first line while data_020a5634's head word is zero, and
+//       func_020522c4's four records are each gated on a +0xf0 flag word that
+//       nothing in this build sets. They run, they find no stream, and that is
+//       exactly what they do on hardware with no stream playing. What the port
+//       gains is not behaviour, it is that func_0204f03c can be CALLED instead
+//       of copied with two holes in it. (port/slice_snd8.txt, rung R8.)
+//
+//   _Z13func_02013078v, func_020494cc, _Z13func_020490b0P12NNSSndHandle   THE UNDERWATER MUSIC FILTER,
+//       and this port has never had it. Skipped as a unit, correctly, because
+//       "func_020494cc reads data_02082200, _02082204, _02082208, _0208220c and
+//       _02082210, and not one of those five is defined anywhere in the port,
+//       so it would not link". Five words, four bytes each, arm9 .data, zero
+//       relocations in any of the five spans -- port/tools/romdata.py reads
+//       them out of the cartridge now, so the mechanism links and runs as a
+//       unit the way that note said it had to. (rung R10.)
+//
+// So src/func_020132d8.cpp -- the ROM's phase 9, the last thing in the frame
+// after the VBlank wait -- is called from sdat_host_tick at the point the
+// transcription occupied, and it calls func_0204f03c itself. The order inside
+// is the ROM's, which is the order the transcription was copying: the master
+// SFX gate, the music ramp, the jingle ramp, the filter, the frame, the
+// looping-handle reaper.
+//
+// ONE THING THE HOST STILL DOES ITSELF, AND IT HAS TO HAPPEN FIRST: word 1 of
+// SNDSharedWork. publish_player_status is the ARM7's job, not the ARM9's, and
+// func_0204fafc -- inside func_0204f03c -- reads that word back through
+// SND_GetPlayerStatus to decide which voices have gone quiet. So sdat_host_tick
+// publishes it and then calls the frame, which puts the write at the same
+// instant the DS's ARM7 would last have made it.
+
+// The game's own sound init, minus the three things that are hardware.
+//
+// _Z13func_020133bcv is Sound::Init on the DS. It is not in any slice, and it
+// cannot be called wholesale here, so this runs the matched sub-inits that
+// carry real state and skips the rest deliberately:
+//
+//   RUN  func_0204f070   THE ROM'S OWN ONCE-ONLY SOUND INIT (run link100, lane
+//                        SND1, rung R1). Three transcribed lines used to stand
+//                        here -- func_0204f1e8, func_02050950, func_0204fc40 --
+//                        and they are calls two and three and four of this
+//                        body. Call ONE is SND_Init, which is the command
+//                        pool: it was skipped because src/func_0205b358.c
+//                        needs three DS symbols to be one object, and
+//                        hal/snd_globals.cpp now makes them one. So the guard,
+//                        the pool, the status block, the channel-7
+//                        registration and the three counter/record resets all
+//                        come from the cartridge, in the cartridge's order.
+//                        (func_0204fc40 is the one that builds the 16 voice
+//                        records -- the +0x3c byte it stores is the voice id
+//                        every command carries -- and the 32 player records
+//                        with their default playable-sequence limit of 1.)
+//   RUN  func_0204f94c x3               clears the music, sub-music and SFX
+//                                       player objects
+//   RUN  _Z13func_02011a28Pc                  Sound::PlayLong's handle table
+//   RUN  func_02048f34                  the 3D voice pools
+//   SET  gSoundInitialized = 1              the master SFX flag. Without it
+//                                       _Z22Player_PlaySoundEffectP12NNSSndHandleii returns at its
+//                                       first line and NOTHING makes a sound.
+//
+//   RUN  func_0205130c   THE 1 MB SOUND HEAP (rung R2). This is
+//                        _Z13func_020133bcv's second statement and it is the
+//                        ROM's own now; sSndHeap is a real
+//                        SolidHeapAllocator handle from this line on, where
+//                        it used to stay null for the life of the process.
+//   RUN  func_02052008   THE PLAYER/GROUP TABLE (rung R3). Every player's
+//                        playable-sequence limit now comes from the SDAT's
+//                        own PLAYER records instead of staying at
+//                        func_0204fc40's compiled-in 1. Nine of the 32 ask
+//                        for more than one in this cartridge.
+//
+//   RUN  func_02050f34   THE ARCHIVE OPENED OFF THE CARD (rung R4). The
+//                        cartridge's own loader resolves
+//                        /data/sound_data.sdat through the ROM's own
+//                        open-by-name FS, reads the header into
+//                        sSndArc and the INFO and FAT blocks into the
+//                        rung-R2 heap, and seats data_020a5bb8 itself.
+//                        hal/sdat/sdat.cpp's root seat and residency
+//                        pre-seat inverted for it; the pre-seat now fills
+//                        the table the ROM read.
+//   SKIP _Z13func_020134d8PvP7SndHeap   loads group 1 into that heap. Reached only on the
+//                        func_0203d974()==0 branch, and hal/star_flow.cpp's
+//                        hosted func_0203d974 answers 1 -- a face whose
+//                        written reason is that sSndHeap was null.
+//                        Rung R2 removes that reason but not the face: the
+//                        file is not this lane's to edit, and the branch
+//                        also needs func_02050f34. Named in the report.
+//   SKIP func_020506fc   starts the ARM9 sound THREAD that would drain the
+//                        queue. This consumer is that drain.
+//
+// If a sound plays that this init did not prepare for, the failure is a
+// missing voice or a skipped command, both of which print -- not silence
+// that pretends to be working.
+void sd_sound_init_host(void)
+{
+    func_0204f070();
+    /* rung R2, at _Z13func_020133bcv's own second line. The ROM tests nothing
+       here and neither does this: a null handle is the ROM's own state of
+       affairs after a refused carve, and the first statement that would use
+       it is the one that reports. The value is printed below, so a run says
+       which of the two it got. */
+    sSndHeap = (int)func_0205130c(
+        (unsigned int)(size_t)_ZN6Memory8AllocateEj(0x100000), 0x100000);
+    /* rung R4: _Z13func_020133bcv's next three statements, in its order. */
+    func_0201a9fc(data_0209d574);
+    func_02050f34(sSndArc, (int)(size_t)data_0208e498,
+                  sSndHeap, 0);
+    func_0201a9fc(data_0209d574);
+    /* and the host's half of that statement, at the line after it: the FAT
+       the cartridge just read has no residency in it. */
+    sdat_seat_rom_residency();
+    /* rung R3, at its own line: */
+    func_02052008(func_0203d974() == 0 ? sSndHeap : 0);
+    func_0204f94c(&sMusicHandle);
+    func_0204f94c(&sSubHandle);
+    func_0204f94c(&data_0209b4a4);
+    func_02011a28((char *)data_0209b53c);
+    func_02048f34(sSndArc);
+    gSoundInitialized = 1;
+    fprintf(stderr, "[snd] sound init: 16 voices, 32 players, SFX enabled; "
+                    "sound heap %p (1 MB out of the root heap, rung R2)\n",
+            (void *)(size_t)sSndHeap);
+}
+
+}  // namespace
+
+
+extern "C" void sd_sound_level_reap(void)
+{
+    func_02011974(data_0209b53c);
+}
+
+
+void sd_consumer_init(void)
+{
+    if (g_seeded) return;
+    g_seeded = 1;
+
+    g_trace = getenv("SM64DS_SND_TRACE") != 0;
+    /* the same switch arms Sound::Play's two cull reports (sound_abi.cpp) */
+    g_snd_trace_play = g_trace;
+
+    // THE POOL IS SEEDED BY THE ROM NOW, from inside sd_sound_init_host below
+    // (func_0204f070 -> SND_Init -> SND_CommandInit). What used to stand
+    // here was a call to sd_consumer_reset, whose body was SND_CommandInit's data
+    // effect written out by hand because the three DS symbols it needs to be
+    // adjacent were three separate host objects. hal/snd_globals.cpp makes them
+    // one 0x1800 run with the three names at their ROM offsets, so the
+    // cartridge's own SND_Init runs: it chains the 256 nodes, seats the free
+    // list, clears the 0x280 status block through SNDi_InitSharedWork, points
+    // data_020a7fc0 at it and sends command 0x19 to say where it is.
+    //
+    // ORDER. The sequencer, the mixer and the SDAT root come up FIRST, because
+    // SND_Init's 0x19 command goes into the ring and is not executed until the
+    // first drain -- but nothing guarantees which tick that is, and a command
+    // must never reach exec() before the subsystems it drives exist.
+    sdat_init();
+    sd_mix_reset();
+    sd_seq_reset();
+    sd_sound_init_host();
+
+    const char *wav = getenv("SM64DS_WAV_DUMP");
+    if (wav) sd_wav_open(wav);
+
+    // g_block is still null here on purpose: it is set when the 0x19 command is
+    // EXECUTED, which is the first drain, not when it is queued. The address
+    // printed is the ARM9's own -- what it wrote into data_020a7fc0 -- and the
+    // drain confirming the same one is what makes the two halves one object.
+    fprintf(stderr, "[snd] hosted ARM7: %d-node command pool seeded by the "
+            "ROM's own SND_Init, status block at %p\n",
+            NODES, (void *)data_020a7fc0);
+}
+
+void sd_consumer_tick(void)
+{
+    sd_consumer_init();
+    // The ARM9 half: publish whatever is pending. Non-blocking (0) -- with
+    // 0 this cannot re-enter SND_RecvCommandReply, so it cannot re-enter the pump.
+    SND_FlushCommand(0);
+    drain();
+    sd_vtrace_arm9_census("after drain");
+    sd_vtrace_loop_census("after drain");
+}
+
+// The seam. See the header comment for why this, and not a bigger pool.
+// PORT_HOST_ABI: src reads the ARM7's cross-core progress word (data_020a7fc0);
+//                the host has no second core, so this file pumps it instead.
+//
+// IT RETURNS THE ROM'S OWN WORD (run link100, lane SND1, rung R1). It used to
+// return g_status[0], a host array this file owned; src/func_0205b5d4.c returns
+// data_020a7fc0[0], and after rung R1 that pointer is seated by the cartridge's
+// own SND_Init and points at data_020a64e0. So the only difference between this
+// body and the matched one is the pump, which is the ruling.
+extern "C" unsigned int SNDi_GetFinishedCommandTag(void)
+{
+    sd_consumer_init();
+    if (!g_pumping) {
+        g_pumping = 1;
+        drain();
+        g_pumping = 0;
+    }
+    return data_020a7fc0 ? data_020a7fc0[0] : 0;
+}
+
+extern "C" void _ZN5Sound22LoadAndSetMusic_Layer1Ei(int seqId);
+extern "C" void SNDi_SetSurroundDecay(void *c);   /* PushCommand_impl(0x13, c, 0,0,0) */
+
+/* ---- SM64DS_SND_COINPROBE=<period>: THE COIN, ON DEMAND -------------------
+ *
+ * "Coins do not play in the VS arenas" is a claim about ONE request, and the
+ * only honest way to compare an arena against a normal level is to make the
+ * two runs issue THE SAME request from the same place and read the two
+ * verdicts. Collecting a real coin cannot be scripted identically in both, so
+ * this fires the ROM's own coin call instead, unchanged:
+ *
+ *     Actor::GivePlayerCoins  ->  Sound::PlayBank3(0x11, actor + 0x74)
+ *     (src/_ZN8dActor_c15GivePlayerCoinsER6Playerhj.cpp:44-48, and the three ov002
+ *      collect paths func_ov002_020af684 / 020b16c4 / 020b1884 make the same
+ *      two calls with the same two ids)
+ *
+ * at the PLAYER's own +0x74 -- the camera-space position Actor::BeforeBehavior
+ * computes -- which is what a coin standing next to him would carry. Nothing
+ * about the request is invented: same entry point, same kind, same id, same
+ * kind of vector. 0x12 is the id the ROM uses when the player has the +0x706
+ * byte set, so both are probed and the pair is what a real pickup would pick
+ * between. Everything after the call is the game's.
+ *
+ * It rides sdat_host_tick because that is the one per-frame hook this file
+ * already owns; the harness needs no change to arm it. */
+extern "C" {
+extern void *gPlayers[];             /* per-player Actor* */
+extern unsigned char gLocalPlayerId;       /* local player index */
+extern void _ZN5Sound9PlayBank3EjRK7Vector3(unsigned int id, void *camSpacePos);
+}
+
+static void snd_coin_probe(void)
+{
+    static int period = -1;
+    static int frame;
+    if (period < 0) {
+        const char *e = getenv("SM64DS_SND_COINPROBE");
+        period = e ? atoi(e) : 0;
+        if (period > 0)
+            fprintf(stderr, "[coinprobe] armed: the ROM's own "
+                    "Sound::PlayBank3(0x11/0x12, player+0x74) every %d "
+                    "frames\n", period);
+    }
+    if (period <= 0) return;
+    if (++frame % period) return;
+
+    void *player = gPlayers[gLocalPlayerId];
+    if (!player) {
+        fprintf(stderr, "[coinprobe] frame %d: no local player yet\n", frame);
+        return;
+    }
+    void *cam = (char *)player + 0x74;
+    const int *c = (const int *)cam;
+    fprintf(stderr, "[coinprobe] frame %d: player camera-space (%d,%d,%d)\n",
+            frame, c[0] >> 12, c[1] >> 12, c[2] >> 12);
+    _ZN5Sound9PlayBank3EjRK7Vector3(0x11, cam);
+    _ZN5Sound9PlayBank3EjRK7Vector3(0x12, cam);
+}
+
+/* ---- SM64DS_SND_BREAKPROBE=<frame>: THE STAR CONTAINER, ON DEMAND ---------
+ *
+ * "Breaking the star container is silent" is a claim about one request that a
+ * walking harness never issues: the container has to be hit, and a hit cannot
+ * be scripted the same way twice. So this runs the ROM's own break, unchanged,
+ * on a real container off the behaviour list:
+ *
+ *     StarMarker::Behavior          -- src/_ZN10StarMarker8BehaviorEv.cpp:78-84
+ *       -> _ZN10StarMarker7CollectEv      -- the break: Sound::Play(3, 0x53) through
+ *          _Z13func_02012694jPK7Vector3(0x53, actor + 0x74), the cylinder cleared, and the
+ *          three Particle::NewSimple bursts 0x12c/0x12d/0x12e
+ *
+ * 0x53 is NCS_SE_SCT_GLASS_BROKEN in the SDAT's own symbol block, and the
+ * marker it fires from is the container: StarMarker::InitResources gives every
+ * mState != 0 marker the second model (data_ov002_0211092c) and a
+ * MovingCylinderClsnWithPos, where mState == 0 gets the plain glow. Both
+ * functions are in the port's link (port/slice_gate79.txt:11 and :21).
+ *
+ * THE SECOND CALL IS NOT A SECOND SOUND, IT IS THE SAME ONE IN RANGE. The four
+ * containers on arena map 0 stand thousands of units from where the player
+ * enters, and Sound::Play's own 3D cull (func_02048720, `if (dist > lim)` with
+ * lim = data_02099fac = 550) refuses anything past its limit -- which is the
+ * DS's answer too, and tells us nothing about whether the sound would sound.
+ * So the ROM's own break call is issued a second time at the PLAYER's own
+ * +0x74, the camera-space position the coin probe already uses for the same
+ * reason. Same entry point, same kind, same id. Nothing after either call is
+ * the probe's.
+ *
+ * PICK AN EARLY FRAME, AND PROVE IT AGAINST A ONE-LINE-DIFFERENT BINARY.
+ * Both halves of that sentence are load-bearing and the first one cost a
+ * review round.
+ *
+ * A LATE frame is vacuous in an arena. Once the VS countdown has ended and the
+ * arena's own music is running (hal/star_flow.cpp's countdown tick,
+ * from about frame 60), three looping music tracks hold voices, and at frame
+ * 300 the break is refused at the ARM9 voice pool in BOTH builds. Two refusals
+ * that agree prove nothing about the thing under test: the voice budget, not
+ * the program number, is what answered. Frame 30 -- before the countdown ends
+ * -- is where the two builds actually differ, and where the answer is a drop on
+ * one side and a 965 ms note start on the other.
+ *
+ * And the comparison has to be against a binary that differs by the ONE line.
+ * Diffing an arena run against a build that also lacks the arena music changes
+ * the voice budget as well as the program number, so the voice-start counts
+ * are not a measurement of anything. The isolating build is a mask-only
+ * revert: put `& 0x7f` back in hal/sdat/sseq.cpp's case 0x81 and change
+ * nothing else. That is the third binary the review used, and it is what the
+ * numbers in that comment rest on.
+ *
+ * ONE MORE TRAP IN READING THE CONTROL RUN. Firing this probe on an adventure
+ * level is a good control -- it shows the glass break was silent there too, so
+ * the arena's bank was never the variable -- but the level has note drops of
+ * its OWN, and they are not the same sound. On Bob-omb Battlefield the level's
+ * own pre-fix drop is program 45 (173 masked), a different sound with the same
+ * failure shape; the program-72 drop in that log is the break this probe
+ * fired, and it exists only because the probe fired it. An earlier draft of
+ * this record called them "the same drop" and that was wrong. Read the player
+ * number: the break's drop is on whichever player the sequence at sdat+0x4b8ee
+ * was started on, printed by the [sseq] line immediately above it. */
+extern "C" {
+extern int data_020a4b78[];               /* the behaviour list head */
+extern void _ZN12daStarBase_c7CollectEv(char *c); /* StarMarker's own break */
+struct Vector3;
+extern "C++" void func_02012694(unsigned int id, const Vector3 *camSpacePos);  /* C++ at TARGET (Sound.cpp) */
+}
+
+static void snd_break_probe(void)
+{
+    static int at = -1;
+    static int frame, fired;
+    if (at < 0) {
+        const char *e = getenv("SM64DS_SND_BREAKPROBE");
+        at = e ? atoi(e) : 0;
+        if (at > 0)
+            fprintf(stderr, "[breakprobe] armed for frame %d: the ROM's own "
+                    "_ZN12daStarBase_c7CollectEv on a live STAR_MARKER container\n",
+                    at);
+    }
+    if (at <= 0) return;
+    if (++frame != at || fired) return;
+    fired = 1;
+
+    char *hit = 0;
+    for (int *node = (int *)(size_t)data_020a4b78[0]; node;
+         node = (int *)(size_t)node[1]) {
+        char *o = (char *)(size_t)node[2];
+        if (!o || *(unsigned short *)(o + 0xc) != 180) continue;
+        if (*(unsigned char *)(o + 0x1d8) == 0) continue;   /* not a container */
+        hit = o;
+        break;
+    }
+    if (hit) {
+        const int *p = (const int *)(hit + 0x5c);
+        const int *c = (const int *)(hit + 0x74);
+        fprintf(stderr, "[breakprobe] frame %d: STAR_MARKER %p state %d at "
+                "(%d,%d,%d), camera-space (%d,%d,%d) -- running the break\n",
+                frame, (void *)hit, (int)*(unsigned char *)(hit + 0x1d8),
+                p[0] >> 12, p[1] >> 12, p[2] >> 12,
+                c[0] >> 12, c[1] >> 12, c[2] >> 12);
+        _ZN12daStarBase_c7CollectEv(hit);
+    } else {
+        fprintf(stderr, "[breakprobe] frame %d: no STAR_MARKER with "
+                "mState != 0 on the behaviour list\n", frame);
+    }
+
+    void *player = gPlayers[gLocalPlayerId];
+    if (player) {
+        fprintf(stderr, "[breakprobe] frame %d: and the same break call, "
+                "_Z13func_02012694jPK7Vector3(0x53), at the player's own +0x74 so the 3D cull "
+                "cannot be the answer\n", frame);
+        func_02012694(0x53, (const Vector3 *)((char *)player + 0x74));
+    }
+}
+
+/* ---- SM64DS_SND_SYSPROBE=<frame>:<id>[,<frame>:<id>...]: A SYSTEM SOUND, ON
+ * DEMAND ---------------------------------------------------------------------
+ *
+ * Calls the ROM's own func_02012790(id) at the given hosted sound frame: the
+ * 2D system-sound entry the red coin uses for its numbered jingle
+ * (src/func_ov002_020b16c4.c: func_02012790(_Z11NumRedCoinsv() + 0x2f)), the game
+ * over screen for 0x9a / 0x9b, the minigames for their chimes. id is the
+ * SEQARC 2 entry. It exists because the jingle only plays for a red coin
+ * placed by the level with its own index, so a scripted run cannot collect
+ * one on demand; this issues the same call the coin would and everything
+ * after it is the game's. Off unless set. */
+extern "C" unsigned int func_02012790(unsigned int id);
+
+static void snd_sys_probe(void)
+{
+    static int n = -1, frame;
+    static int at[16], id[16];
+    if (n < 0) {
+        n = 0;
+        const char *e = getenv("SM64DS_SND_SYSPROBE");
+        while (e && *e && n < 16) {
+            char *end;
+            long f = strtol(e, &end, 0);
+            if (end == e || *end != ':') break;
+            long v = strtol(end + 1, &end, 0);
+            at[n] = (int)f; id[n] = (int)v; n++;
+            e = end;
+            while (*e == ',' || *e == ' ') ++e;
+        }
+        if (n) fprintf(stderr, "[sysprobe] armed: %d call(s) of the ROM's own "
+                       "func_02012790\n", n);
+    }
+    if (!n) return;
+    ++frame;
+    for (int i = 0; i < n; i++)
+        if (at[i] == frame) {
+            fprintf(stderr, "[sysprobe] frame %d: func_02012790(0x%x)\n",
+                    frame, (unsigned)id[i]);
+            func_02012790((unsigned int)id[i]);
+        }
+}
+
+/* ---- SM64DS_SND_VOICEPROBE=<frame>:<char>:<id>[,...]: A CHARACTER VOICE, ON
+ * DEMAND ----------------------------------------------------------------------
+ *
+ * Calls the ROM's own Sound::PlayCharVoice(char, id, pos), the call the player
+ * actor makes for every voice line (src/game/player/Player.cpp), at the given hosted
+ * sound frame, at the local player's camera-space position (+0x74) when there is
+ * a player, else at the origin. char is the character index the player actor
+ * keeps at +0x6d9. It exists so a voice that plays only deep in a level (the
+ * Mario line at the Bowser throw is voice id 0x32) can be captured without
+ * reaching it. Test builds only: off unless the variable is set. */
+extern "C" unsigned int _ZN5Sound13PlayCharVoiceEjjRK7Vector3(unsigned int ch, unsigned int id, const void *pos);
+
+static void snd_voice_probe(void)
+{
+    static int n = -1, frame;
+    static int at[16], who[16], id[16];
+    if (n < 0) {
+        n = 0;
+        const char *e = getenv("SM64DS_SND_VOICEPROBE");
+        while (e && *e && n < 16) {
+            char *end;
+            long f = strtol(e, &end, 0);
+            if (end == e || *end != ':') break;
+            long c = strtol(end + 1, &end, 0);
+            if (*end != ':') break;
+            long v = strtol(end + 1, &end, 0);
+            at[n] = (int)f; who[n] = (int)c; id[n] = (int)v; n++;
+            e = end;
+            while (*e == ',' || *e == ' ') ++e;
+        }
+        if (n) fprintf(stderr, "[voiceprobe] armed: %d call(s) of the ROM's own "
+                       "Sound::PlayCharVoice\n", n);
+    }
+    if (!n) return;
+    ++frame;
+    for (int i = 0; i < n; i++)
+        if (at[i] == frame) {
+            static const int zero[3] = { 0, 0, 0 };
+            void *player = gPlayers[gLocalPlayerId];
+            const void *pos = player ? (const void *)((char *)player + 0x74) : (const void *)zero;
+            fprintf(stderr, "[voiceprobe] frame %d: PlayCharVoice(char %d, id 0x%x)%s\n",
+                    frame, who[i], (unsigned)id[i], player ? "" : " (no player: origin)");
+            _ZN5Sound13PlayCharVoiceEjjRK7Vector3((unsigned)who[i], (unsigned)id[i], pos);
+        }
+}
+
+
+/* hal/sdat/out_win.cpp's device-less clock renders one vblank of sound per
+   tick times the ROM's frame divider, read through this pointer. */
+extern "C" int data_0208ee44;
+extern "C" const volatile int *sd_out_frame_divider_word;
+
+extern "C" void sdat_host_tick(void)
+{
+    sd_out_frame_divider_word = &data_0208ee44;
+    sd_consumer_init();
+    snd_coin_probe();
+    snd_break_probe();
+    snd_sys_probe();
+    snd_voice_probe();
+    // The ARM9's sound frame first, then the ARM7's: that is the order on
+    // hardware (func_020132d8 -> func_0204f03c runs in the game's update, the
+    // other core consumes after), and it matters here because the recycle and
+    // the volume ramps func_0204fafc queues have to reach the same drain as
+    // everything else the frame sent.
+    // SM64DS_SND_SLOW_MS=<n>: name any drain over n ms by its three parts
+    // (the ARM9 sound frame, the queue drain, the output push), for the
+    // port's frame-budget checks. Off unless set.
+    static double slow_ms = -1;
+    if (slow_ms < 0) { const char *e = getenv("SM64DS_SND_SLOW_MS"); slow_ms = e ? atof(e) : 0; }
+    const clock_t q0 = slow_ms > 0 ? clock() : 0;
+    // Word 1 of SNDSharedWork before the ROM's frame reads it back through
+    // SND_GetPlayerStatus: see the block above sd_sound_init_host. Then phase 9.
+    publish_player_status();
+    func_020132d8();
+    const clock_t q1 = slow_ms > 0 ? clock() : 0;
+    sd_consumer_tick();
+    const clock_t q2 = slow_ms > 0 ? clock() : 0;
+
+    // SM64DS_SND_MUSIC=<seq id> starts a BGM through the game's OWN front
+    // door on the first tick. The walking harness never reaches the level
+    // boot's music call, so without this there is no way to exercise
+    // LoadAndSetMusic_Layer1 -> _Z13func_02011dccP12NNSSndHandlei -> func_02051fb4 ->
+    // func_02051bd0 -> START in the live binary. 58 is NCS_BGM_CHIJOU, the
+    // castle grounds theme.
+    static int musicDone;
+    if (!musicDone) {
+        musicDone = 1;
+
+        // SM64DS_SND_QUEUE_STRESS=N pushes N commands in one burst, with no
+        // tick in between, which is exactly the state that used to deadlock:
+        // past 256 the free list is empty, SND_AllocCommand falls into
+        //     do { SND_RecvCommandReply(1); p = AllocCommand(); } while (!p);
+        // and SND_RecvCommandReply(1) spins on a counter only the consumer moves.
+        // If this returns for N > 256, the spin terminates. It hangs forever
+        // if the SNDi_GetFinishedCommandTag hook is ever removed.
+        const char *stress = getenv("SM64DS_SND_QUEUE_STRESS");
+        if (stress) {
+            int n = atoi(stress);
+            fprintf(stderr, "[snd] queue stress: pushing %d commands with no "
+                            "consumer tick...\n", n);
+            for (int i = 0; i < n; i++) SNDi_SetSurroundDecay((void *)(size_t)i);
+            fprintf(stderr, "[snd] queue stress: all %d pushed, no deadlock "
+                            "(pool is %d nodes)\n", n, NODES);
+        }
+        const char *m = getenv("SM64DS_SND_MUSIC");
+        if (m) {
+            fprintf(stderr, "[snd] SM64DS_SND_MUSIC=%s: "
+                    "Sound::LoadAndSetMusic_Layer1(%d)\n", m, atoi(m));
+            _ZN5Sound22LoadAndSetMusic_Layer1Ei(atoi(m));
+            sd_consumer_tick();
+        }
+    }
+
+    sd_out_push();
+    if (slow_ms > 0) {
+        const double k = 1000.0 / CLOCKS_PER_SEC;
+        const double a = (clock() - q0) * k;
+        if (a >= slow_ms)
+            fprintf(stderr, "[snd-slow] drain %.1f ms: sound_frame %.1f consumer %.1f "
+                    "out_push %.1f\n", a, (q1 - q0) * k, (q2 - q1) * k, a - (q2 - q0) * k);
+    }
+}

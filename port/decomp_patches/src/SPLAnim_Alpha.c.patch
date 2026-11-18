@@ -1,0 +1,43 @@
+diff --git a/src/SPLAnim_Alpha.c b/src/SPLAnim_Alpha.c
+--- a/src/SPLAnim_Alpha.c
++++ b/src/SPLAnim_Alpha.c
+@@ -1,5 +1,21 @@
+ #include "types.h"
+ #include "private/spl_particle_views.h"
++#ifdef _MSC_VER
++/* host: mwccarm compiles `/` and `%` on ints to the ROM helper _s32_div_f
++   (0x01ffabe4), which answers x / 0 = x and x % 0 = 0 where x86 idiv faults
++   (c0000094). hal/cstd_div.c's ds_idiv / ds_imod are that helper's answers. */
++#ifdef __cplusplus
++extern "C" {
++#endif
++int ds_idiv(int, int);
++int ds_imod(int, int);
++#ifdef __cplusplus
++}
++#endif
++#define SPL_DIV(a, b) ds_idiv((a), (b))
++#else
++#define SPL_DIV(a, b) ((a) / (b))
++#endif
+ extern u32 data_020a4d30;
+ 
+ /* The particle's 0x40 halfword (SPL's visibility): the base alpha in bits 0-4,
+@@ -42,7 +58,7 @@
+         int start = anim->alpha.start;
+         int mid = anim->alpha.mid;
+         int diff = mid - start;
+-        int step = lifeRate * diff / in;
++        int step = SPL_DIV(lifeRate * diff, in);
+         value = step + start;
+     } else if (lifeRate < out) {
+         value = anim->alpha.mid;
+@@ -50,7 +66,7 @@
+         int mid = anim->alpha.mid;
+         int end = anim->alpha.end;
+         int diff = end - mid;
+-        int step = (lifeRate - 0xff) * diff / (0xff - out);
++        int step = SPL_DIV((lifeRate - 0xff) * diff, 0xff - out);
+         value = step + end;
+     }
+     u16 *visibility = &ptcl->visibility;

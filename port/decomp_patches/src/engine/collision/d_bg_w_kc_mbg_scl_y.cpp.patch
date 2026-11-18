@@ -1,0 +1,23 @@
+diff --git a/src/engine/collision/d_bg_w_kc_mbg_scl_y.cpp b/src/engine/collision/d_bg_w_kc_mbg_scl_y.cpp
+--- a/src/engine/collision/d_bg_w_kc_mbg_scl_y.cpp
++++ b/src/engine/collision/d_bg_w_kc_mbg_scl_y.cpp
+@@ -28,9 +28,19 @@
+ 
+ /* local extern: no header in include/ declares these three. */
+ extern dBgCh_Lin data_020a0d0c; /* the scratch line, in collider space */
++#ifndef _MSC_VER
+ extern Vector3 data_020a0d60;   /* == data_020a0d0c.lineEnd  (+0x54) */
+ extern dBgPi data_020a0d1c;     /* == data_020a0d0c's dBgPi   (+0x10) */
++#endif
+ }
++#ifdef _MSC_VER
++/* PC port: on the ROM these two names are addresses inside data_020a0d0c
++   (its dBgPi base at +0x10, its lineEnd at +0x54), so DetectClsn's result
++   is read back through them. The host links separate objects under those
++   names, which DetectClsn never writes, so read the subobjects directly. */
++#define data_020a0d60 (data_020a0d0c.lineEnd)
++#define data_020a0d1c ((dBgPi &)data_020a0d0c)
++#endif
+ 
+ dBgW_KcMbgSclY::dBgW_KcMbgSclY() {}
+ 

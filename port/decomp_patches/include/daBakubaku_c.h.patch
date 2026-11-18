@@ -1,0 +1,18 @@
+diff --git a/include/daBakubaku_c.h b/include/daBakubaku_c.h
+--- a/include/daBakubaku_c.h
++++ b/include/daBakubaku_c.h
+@@ -60,7 +60,14 @@
+        `return new daBakubaku_c()`. */
+ 
+     /* Inline empty dtor: mwccarm emits D1 then D0, no D2. */
++    #ifdef _MSC_VER
++    /* host two-arm destructor spelling; ruling in include/ModelBase.h */
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~daBakubaku_c() {}   /* no slot */
++    #else
+     virtual ~daBakubaku_c() {}
++    #endif
+ 
+     int SetState(void *state);
+ 

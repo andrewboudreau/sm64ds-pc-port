@@ -1,0 +1,15 @@
+diff --git a/src/minigames/d_mg3d_esp_anim_set.cpp b/src/minigames/d_mg3d_esp_anim_set.cpp
+--- a/src/minigames/d_mg3d_esp_anim_set.cpp
++++ b/src/minigames/d_mg3d_esp_anim_set.cpp
+@@ -116,9 +116,11 @@
+ void func_02046208(void *a, unsigned int b, int c);
+ 
+ int func_020179b4(SharedFilePtr *r0, dExtModel_c *r1, int r2);
++#ifndef _MSC_VER /* host: MSVC rejects a C-linkage redeclaration of a function an earlier line declares C++; the ROM names are C++ (_Z...), so the host drops the extern "C" */
+ extern "C" {
+ void Mg_SetNextBanner(int);
+ }
++#endif
+ 
+ extern "C" void InitialiseVramGlobals(void);
+ 

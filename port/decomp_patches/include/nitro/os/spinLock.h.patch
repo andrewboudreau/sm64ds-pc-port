@@ -1,0 +1,25 @@
+diff --git a/include/nitro/os/spinLock.h b/include/nitro/os/spinLock.h
+--- a/include/nitro/os/spinLock.h
++++ b/include/nitro/os/spinLock.h
+@@ -18,11 +18,21 @@
+ #include "types.h"
+ #include "nitro/hw/mmap_shared.h" /* HW_LOCK_ID_FLAG_MAIN, HW_*_LOCK_BUF */
+ 
++#ifdef _MSC_VER
++/* MSVC C++ rejects a typedef that gives the struct's own tag a volatile
++   type (C2373); the host keeps the layout and drops the qualifier. */
++typedef struct OSLockWord {
++    u32 lockFlag;
++    u16 ownerID;
++    u16 extension;
++} OSLockWord;
++#else
+ typedef volatile struct OSLockWord {
+     u32 lockFlag;
+     u16 ownerID;
+     u16 extension;
+ } OSLockWord;
++#endif
+ 
+ /* Set in a lock word's ownerID while the ARM9 holds it. */
+ #define OS_MAINP_LOCKED_FLAG 0x40

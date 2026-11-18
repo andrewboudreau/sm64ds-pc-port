@@ -1,0 +1,1481 @@
+// The actor registry: which classes the port can build, and the gate that
+// turns the rest away.
+//
+// ---- what the ROM reads ----------------------------------------------------
+//
+// _ZN7fBase_c10fBase_makeEiPvji is the spawn spine and it consults exactly two globals.
+// data_020a4bb8[actorID] is a SpawnInfo*: a factory function pointer at +0
+// that the spine CALLS, and two halfwords at +4/+6 that the ActorBase
+// constructor reads back out of the same record and drops into the two
+// processing-list nodes it just built. A null slot is a call through zero, so
+// the table cannot be left empty for an id the level names.
+//
+// data_020a4b58 is the pre-spawn hook. _Z13func_02043060i calls it with the actor
+// id BEFORE the table is touched and 3 means "abort, cleanly" -- an exercised
+// ROM path, since LoadEntranceObjects already stores a possibly-null result.
+// So the gate is: registered ids proceed, everything else is named once and
+// skipped. A level's unhosted classes come out as a list rather than a crash.
+//
+// ---- the SpawnInfo records are Nintendo's ----------------------------------
+//
+// Every record here is the ROM's own, mounted through port/tools/ovdata.py,
+// with ONLY the factory word repointed at the host. The two priority
+// halfwords are what the ActorBase constructor re-reads, and inventing them
+// would put the actor in the wrong place in both processing lists. The ROM
+// also happens to store the actor's own id in the +4 halfword, which makes a
+// free cross-check: if the record's id and the table's id disagree, the
+// registry is pointing at the wrong bytes and says so.
+//
+// ---- the per-frame processing lists ---------------------------------------
+//
+// _Z13func_02044120v is the ROM's whole actor frame and it is five list walks:
+//
+//     phase 4  data_020a4ba8 -> _ZN7fBase_c10deletePackEv   cleanup Process   (slots 3/4/5)
+//     phase 2  data_020a4b88 -> _ZN7fBase_c10createPackEv   init Process      (slots 0/1/2)
+//     phase 3  data_020a4b78 -> _ZN7fBase_c11executePackEv   behaviour Process (slots 6/7/8)
+//     phase 5  data_020a4b98 -> _ZN7fBase_c8drawPackEv   render Process    (slots 9/10/11)
+//     phase 1  data_020a4b6c -> _ZN7fBase_c11connectProcEv   scene-tree housekeeping
+//
+// read straight out of the five PMF pairs __sinit_fListNode.cpp copies into the
+// list heads (arm9 0x02099f48/50/60/68/70; each is {function, 0}, a plain
+// nonvirtual pointer-to-member). The records are hosted beside their five
+// __fastcall faces (unmatched/func_02043fdc_hostcopy.cpp, each face carrying
+// the per-actor quarantine), the ROM's sinit copies them at Entry, and the
+// lists are walked by the matched src/func_02043fdc.cpp and
+// src/func_020441cc.cpp through /vmg /vmm member pointers, which are the ROM's
+// eight-byte pairs (the hostcopy file's header).
+//
+// THE FRAME IS THE ROM'S NOW (run linkfull, lane K1LOOP): both host loops
+// call src/func_02044120.c itself at phase 4 (port_actor_frame below), all
+// five walks in the ROM's order. It used to be SPLIT -- 4/2/3 as a "tick",
+// 5 inside the host's render frame, 1 after the level draw -- because the
+// render walk has to land in an open geometry buffer with this frame's view.
+// That is the DS's own arrangement read the other way round: the list-5 walk
+// submits geometry at phase 4 and the engine rasterises it after the swap, so
+// the loops open the host geometry buffer before phase 4 (where the DS's is
+// empty, after the previous swap) and rasterise it later, and the Camera
+// renders at the head of list 5 (render priority 0) with the host rig riding
+// its face (hal/camera_bridges.cpp). The split functions below stay for the
+// frames that are not the ROM's (the host's own frozen or replayed frames, the
+// teardown convergence loops in hal/level_change.cpp, the dev arms): a frame
+// runs one shape or the other, never both, and the census counts it.
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+
+/* types main's C++ declarations below name (catchup1 linkage flip) */
+struct dActor_c;
+struct dBgCh_Actr;
+struct dMap_c;
+struct dMeter_c;
+extern "C" {
+
+/* storage: hal/actor_vtables.cpp (actorID -> SpawnInfo*) */
+extern void **data_020a4bb8;
+/* storage: hal/player_bridges.cpp (the pre-spawn hook slot) */
+extern int data_020a4b58[4];
+
+/* the five processing lists. data_020a4b6c is the scene tree (three words:
+   head, callback pair); the other four are {head, tail, callback pair}. */
+extern int data_020a4b6c[8];
+extern int data_020a4b78[8];
+extern int data_020a4b88[8];
+extern int data_020a4b98[8];
+extern int data_020a4ba8[8];
+extern int data_02099f24[4];       /* the current phase */
+
+/* the actor freeze mask. b454 is the persistent freeze-REQUEST word (storage:
+   hal/auto_bss.cpp); b464 is this frame's copy of it and the only word
+   Actor::BeforeBehavior reads (storage: hal/actor_vtables.cpp). Latched at the
+   head of phase 3 below -- see the long note there. */
+extern int gNextActorUpdateMask[8];
+extern unsigned int gActorUpdateMask;
+
+/* the four Process wrappers (host copies in port/unmatched/) and the
+   scene-tree housekeeping pass (matched src) */
+void *_ZN14Absorb02043fdc13func_02043fdcEPNS_21ProcessListDescriptorE(void *list);
+void *_ZN11ProcessTree5Thing13func_020441ccEv(void *list);
+
+}  /* extern "C" */
+
+// ---- the class table -------------------------------------------------------
+//
+// One row per class the port can build. `info` is the mounted ROM SpawnInfo,
+// `factory` the matched <Class>_Spawn compiled for the host, and `fill` the
+// runtime vtable fill (the vtable law: MSVC slot order, host __fastcall
+// thunks, everything else trapped by name).
+struct PortActorClass {
+    unsigned short id;
+    const char *name;
+    unsigned char *info;
+    void *(*factory)(void);
+    void (*fill)(void);
+};
+
+extern "C" {
+extern unsigned char g_profile_PLAYER[];      /* ov002 0x0210a704 */
+extern unsigned char g_profile_CAMERA[];      /* arm9  0x02086d78 */
+void *daPly_c_classInit(void);                   /* ov002 0x020e6c0c */
+}
+/* main's camera factory takes no parameter and keeps C linkage (d_camera.cpp
+   declares it inside its extern "C" block) */
+struct dCamera_c;
+extern "C" dCamera_c *dCamera_c_classInit();  /* arm9  0x0200e444 */
+extern "C" {
+void hal_fill_player_vtable(void);
+void hal_fill_camera_vtable(void);
+}
+
+/* Both ROM factories allocate their own object and ignore the argument
+   register they were entered with, which is why they can be called through a
+   no-argument pointer at all. */
+static void *port_factory_player(void) { return daPly_c_classInit(); }
+static void *port_factory_camera(void) { return dCamera_c_classInit(); }
+/* The bottom screen's classes put the CONSTRUCTOR in the SpawnInfo's +0 word
+   rather than a separate Spawn veneer -- it allocates and returns the object
+   itself, which is all the spine asks of a factory. */
+struct dMeter_c;
+extern "C++" dMeter_c *dMeter_c_classInit();  /* C++ linkage at main (d_meter.cpp) */
+static void *port_factory_hud(void) { return dMeter_c_classInit(); }
+struct dMap_c;
+extern "C++" dMap_c *dMap_c_classInit();  /* C++ linkage at main (d_map.cpp) */
+static void *port_factory_minimap(void) { return dMap_c_classInit(); }
+
+#include "actor_classes.inc"
+#include "dBgCh_Actr.h"
+#include "fBase_c.h"
+
+static const PortActorClass port_actor_classes[] = {
+    {0x0bf, "PLAYER", g_profile_PLAYER, port_factory_player,
+     hal_fill_player_vtable},
+    /* The camera's vtable fill is the gate-13 seam and runs from the same
+       place the layout check does; the registry only needs its factory. */
+    {0x14c, "CAMERA", g_profile_CAMERA, port_factory_camera, 0},
+    PORT_ACTOR_CLASS_ROWS
+    {0, 0, 0, 0, 0},
+};
+
+// ---- the census ------------------------------------------------------------
+//
+// The boot is one pass over the level's own object tables, so what it spawned
+// is a fact worth reading back rather than inferring. Two counters per id,
+// filled by the gate itself.
+enum { PORT_ACTOR_IDS = 512 };
+static unsigned short g_spawned[PORT_ACTOR_IDS];
+static unsigned short g_skipped[PORT_ACTOR_IDS];
+
+/* The counters are per-BOOT, not per-run. A level change tears the previous
+   level's actors down and the next boot spawns its own; carrying the counts
+   across meant a warped-into level's census read the sum of both, which is
+   both harder to compare against a direct boot and wrong as a statement about
+   "what this level spawned". hal/level_change.cpp zeroes them in its teardown,
+   right where it drops the other per-level host state. */
+extern "C" void port_actor_census_reset(void)
+{
+    std::memset(g_spawned, 0, sizeof g_spawned);
+    std::memset(g_skipped, 0, sizeof g_skipped);
+}
+
+/* ---- host-ABI per-level spawn blockers ------------------------------------
+   A class can be hosted, registered and fault-free on one level and hit a host
+   translation limit on another because the level's object table hands it a
+   different tuning param. That is a real blocker, not a missing class, so it is
+   named here rather than left to fault: the gate turns the id away on the
+   listed levels exactly the way it turns away an unregistered class, and the
+   census reports it as skipped so the boot is honest about what did not spawn.
+
+   The PAINTING (daPicGate_c, 307, ov080) is the one case so far. Its
+   InitResources/Behavior/Render dispatch a per-mode state through a
+   pointer-to-member of an INCOMPLETE class; mwccarm makes that PMF 8 bytes and
+   the recovered Disp/Entry stride lands on the ROM's 8-byte {fn,delta} records,
+   but MSVC widens it to the 16-byte generic form, so &data_ov080_02128628[mi]
+   strides wrong and the call shifts `this` into unmapped memory. Level 2's six
+   paintings all carry mode 0 and survived by luck of the layout; level 4
+   (castle_b1) and level 5 (castle_2f) carry mode>0 / high-texture params that
+   fault one call into the state function (measured: a write to this+0x16c with
+   this = 0xfffad16c). Hosting the three dispatchers is the fix, deferred; until
+   then the painting spawns on levels 1..3 and is skipped on 4/5.
+
+   Level 13 (Hazy Maze Cave, cave) carries a PAINTING too, and it faults on the
+   same PMF-stride path: measured, the id-0x133 spawn dispatches one call into
+   the mis-strided state function and writes through a `this` shifted into
+   unmapped memory (the identical func_0203b27c teardown fault at this+0x1b8 the
+   levels 4/5 paintings hit). Same blocker, same fix pending, so it joins the
+   list; the cave boots and is walkable with the painting skipped and named in
+   the census. */
+extern "C" int port_level_id(void);
+static int port_host_abi_blocked(unsigned id)
+{
+    /* The PAINTING's levels-4/5/13 skip came off 2026-08-08: the mis-strided
+       PMF dispatch behind those faults is hosted in
+       port/unmatched/Painting_Dispatch.cpp now (see the long note above),
+       and all three levels boot their paintings through it. */
+
+    /* run linkw wave 7 (lane w7-c): BOWSER_SKY_PLATFORM (167) on LEVEL 40, the
+       Bowser in the Sky arena -- the second case this hook exists for, and it
+       is a HOST BOOT-ORDER limit rather than a class defect. Level 40 is the
+       only level in all fifty-two that places id 167, so the class had never
+       actually spawned until this lane mounted the arena; it is fault-free
+       everywhere it is reachable, which is nowhere else.
+
+       MEASURED, not reasoned. Its InitResources (src/_ZN9SpikeBomb13InitResourcesEv.cpp,
+       daKpa3Bg_c::InitResources) calls CopyTexPalFromLevelModel(this + 0xdc),
+       and src/CopyTexPalFromLevelModel.c opens on
+
+           struct Entry* sbase = data_0209f320->entries;
+
+       -- a load through data_0209f320 + 4. data_0209f320 is the Stage's
+       ModelComponents pointer, and the only src/ writer that SEATS it is
+       Stage::LoadModel (src/_ZN5Stage9LoadModelEv.cpp, last line);
+       Stage::CleanupResources clears it back to 0
+       (src/_ZN5Stage16CleanupResourcesEv.cpp:92). The fault caught under
+       SM64DS_FAULTS_FATAL is exactly that load:
+
+           FAULT code c0000005 at +0x0008e07f accessing 00000004, eax=00000000
+           _CopyTexPalFromLevelModel+0xf
+             <- _func_ov060_021182b0+0x44  <- ?skyplat_init  <- Actor::Spawn
+             <- LoadStandardObjects <- LoadObjects <- Stage::LoadClsnAndObjects
+             <- _port_stage_a_boot+0x211  <- _main+0x797
+
+       THE ROM RUNS THE TWO THE OTHER WAY ROUND. Stage::InitResources
+       (src/_ZN5Stage13InitResourcesEv.cpp) is
+           :361  Stage::LoadModel(thiz);
+           :363  Stage::LoadClsnAndObjects(...);
+       so on the DS data_0209f320 is seated before any actor initialises. The
+       host harness inverts them: port/tests/walk_window.cpp calls
+       port_stage_a_boot (which runs LoadClsnAndObjects) before it calls
+       Stage::LoadModel -- confirmed on this tree by print order, not by
+       reading (level 36's log has [census] ahead of "level model loaded by
+       Stage::LoadModel ... components 3003AF24"). The level-change path has
+       the same inversion. Line numbers are deliberately not cited here: they
+       were :2099/:2265/:4382 when this was written and :2390/:2556/:4735 by
+       the time it merged. Search for port_stage_a_boot and Stage::LoadModel
+       in port/tests/walk_window.cpp; the ORDER is the durable fact.
+
+       AND IT CANNOT BE FIXED FROM port_stage_a_boot. Calling Stage::LoadModel
+       early there would leave the harness's own call as a SECOND one, and a
+       second Stage::LoadModel is not idempotent: LoadAndSetFile -> the port's
+       cached LoadFile(handle) -> _ZN11dExtModel_c13SetLoadedFileEP8BMD_Fileii, which calls
+       dExtSimpleModel_c::UpdateFileOffsets UNCONDITIONALLY, and that function rebases the
+       BMD's file-relative offsets IN PLACE (`file.bones = REBASE(file.bones)`,
+       src/_ZN5Model17UpdateFileOffsetsER8BMD_File.cpp). A duplicate pass adds
+       the base a second time and sends every pointer in the level model out of
+       the file -- on EVERY level, not just this one. So the fix is one line in
+       port/tests/walk_window.cpp (hoist the LoadModel call above the boot, the
+       ROM's own order), and that file is reserved to another owner.
+
+       Until then id 167 is declined ON LEVEL 40 ONLY. The arena boots, exits 0
+       under FAULTS_FATAL, and the census names the ten skipped platforms rather
+       than the port faking them. Nothing else changes: no other level places
+       167, and the class's registry row, vtable fill and ov060 mount are
+       untouched.
+
+       The scope of that "no other level" is worth stating exactly, because a
+       review re-derived it: of the 52 rows, 8 (levels 0, 29, 30, 32, 34, 41,
+       42, 46) point into data-only overlays whose data_02092208 word does not
+       decode as a LVL_Overlay at all, so the sweep covers the 44 that do
+       decode. Across those 44, id 167 appears only on level 40 (x10) and id
+       301 only on level 36 (x16).
+
+       THE DECLINE IS LIFTED (run link60, lane SL0), because the fix it names
+       has landed. Stage::LoadModel now runs inside port_stage_boot_body ahead
+       of Stage::LoadClsnAndObjects, which is the order Stage::InitResources
+       has it in, so data_0209f320 is seated before the object pass reaches
+       CopyTexPalFromLevelModel. Both of port/tests/walk_window.cpp's calls
+       were REMOVED rather than one being added, so the duplicate-rebase the
+       paragraph above worried about cannot happen: there is exactly one
+       Stage::LoadModel per boot and one rebase per loaded buffer.
+
+       One correction to that paragraph while it is being answered. It reads
+       the duplicate-rebase risk onto "the port's cached LoadFile", meaning
+       hal/fs.cpp. That cache is not the hazard: fs_hand_out memcpys pristine
+       bytes into a fresh allocation on every call, so it never hands back a
+       rebased buffer. The sharing was in hal/level_boot.cpp's own
+       LoadFile(handle) handle table, which returned the same filePtr for a
+       repeat handle inside one level. Same conclusion, different file.
+
+       AND THAT SHARING IS GONE, run link60 lane LF1: LoadFile loads a fresh
+       block on every call now, the ROM's own contract, so no repeat request
+       can hand back a buffer another caller has already rebased or freed.
+
+       DEVIATION, DECLARED: hal/actor_registry.cpp is on neither this lane's
+       owned list nor its do-not-touch list. The lane took this one line
+       because it is the line this file asked for by name, and lifting it is
+       what makes the hoist observable. Nothing else here is touched. */
+
+    return 0;
+}
+
+extern "C" const char *port_actor_class_name(unsigned id);
+
+/* THE OVERLAY LOAD THIS HOOK STANDS IN FOR (run hunt1, lane MGMENU1).
+   The ROM's occupant of data_020a4b58 is func_0201a694 (src/func_0201a694.c,
+   seated by src/func_0201a5cc.c). For a scene id it asks GetSceneOverlayID
+   and, for a minigame (0x169..0x186, IsMinigameActorID's range), calls
+   func_0201a798(&overlay_6), which loads ov004 and then ov006
+   (src/func_0201a798.c). The DS overlay load runs each overlay's static-init
+   range, so all 35 ov004/ov006 constructors have run before the factory is
+   reached. One of them, __sinit_ov004_020b948c, constructs
+   dScMgBase_c::graphCallback_c in sMgGraphCallback (its vtable word is
+   data_ov004_020bc03c); every minigame's slot 33 then parks that block in
+   gGraphCallback.
+
+   The port's model of "ov004 + ov006 are loaded" is hal/scene_mg.cpp's
+   port_scene_mg_prepare (the constructors, then the seats that follow them),
+   and until now only the direct SM64DS_SCENE=<minigame> boot ran it. A
+   minigame picked from the minigame menu (scene 5) spawns through this hook
+   with none of it done, and the frame's graphics-block dispatch
+   (_Z13func_02019404v / _Z13func_02019144v) calls through the block's zero vtable word.
+   So the hook does it here, at func_0201a694's point, before the factory.
+   The gate is the ROM's own predicate, inside port_scene_mg_prepare; every
+   other id is untouched. It runs once per process, as on the direct boot:
+   the port never unloads ov006, so there is no FS_EndOverlay to undo it. */
+extern "C" void port_scene_mg_prepare(int id);
+
+extern "C" int port_prespawn_hook(void *idv)
+{
+    unsigned id = (unsigned)(size_t)idv;
+    if (id < PORT_ACTOR_IDS && data_020a4bb8[id] && !port_host_abi_blocked(id)) {
+        port_scene_mg_prepare((int)id);
+        static int trc = -1;
+        if (trc < 0) trc = std::getenv("SM64DS_TRACE_SPAWN") != 0;
+        if (trc) std::fprintf(stderr, "  [spawn+] actor 0x%x %s proceed\n",
+                              id, port_actor_class_name(id));
+        ++g_spawned[id];
+        return 2;                     /* what a null hook returns: proceed */
+    }
+    if (id < PORT_ACTOR_IDS) {
+        if (!g_skipped[id]) {
+            std::printf("  [spawn] actor 0x%x %s, skipped\n", id,
+                        data_020a4bb8[id] ? "host-ABI blocked on this level"
+                                          : "not registered");
+            /* stderr too: playlogs capture stderr, and a silent decline here is
+               how the rabbit-key grant (id 229) went missing without a trace.
+               Keep the decline quiet-but-VISIBLE in every real-play log. */
+            std::fprintf(stderr, "  [spawn-declined] actor 0x%x %s\n", id,
+                         data_020a4bb8[id] ? "host-ABI blocked on this level"
+                                           : "not registered");
+        }
+        ++g_skipped[id];
+    }
+    return 3;
+}
+
+/* Name an actor id for a diagnostic; the trap in actor_classes.cpp is the
+   customer. Never returns null so it can sit inside a printf. */
+extern "C" const char *port_actor_class_name(unsigned id)
+{
+    for (const PortActorClass *k = port_actor_classes; k->name; ++k)
+        if (k->id == id)
+            return k->name;
+    return "?";
+}
+
+extern "C" void port_actor_census(void)
+{
+    int spawned = 0, skipped = 0, kinds = 0, skipkinds = 0;
+    for (int i = 0; i < PORT_ACTOR_IDS; ++i) {
+        spawned += g_spawned[i];
+        skipped += g_skipped[i];
+        kinds += g_spawned[i] != 0;
+        skipkinds += g_skipped[i] != 0;
+    }
+    std::printf("[census] %d spawned (%d classes), %d skipped (%d classes)\n",
+                spawned, kinds, skipped, skipkinds);
+    for (int i = 0; i < PORT_ACTOR_IDS; ++i)
+        if (g_spawned[i]) {
+            const char *nm = "?";
+            for (const PortActorClass *k = port_actor_classes; k->name; ++k)
+                if (k->id == i) nm = k->name;
+            std::printf("         + %3d x%-3u %s\n", i, g_spawned[i], nm);
+        }
+    for (int i = 0; i < PORT_ACTOR_IDS; ++i)
+        if (g_skipped[i])
+            std::printf("         - %3d x%-3u\n", i, g_skipped[i]);
+}
+
+// ---- installation ----------------------------------------------------------
+extern "C" void hal_fill_moving_cylinder_vtables(void);
+
+/* fault_probe.h's rich dump and the quarantine walker resolve actor ids to
+   class names through this weak pointer; wire it to the real table here (the one
+   TU that has both). Null in a bare smoke, where the dump prints "?". */
+typedef const char *(*port_classname_fn)(unsigned id);
+extern "C" port_classname_fn port_classname_resolver;
+
+/* run mods1: the registry's own factory for an id (what a plugin's
+   replace_actor wraps), or 0 when the class is not registered. */
+extern "C" void *port_actor_registry_stock_factory(unsigned actor_id)
+{
+    for (const PortActorClass *k = port_actor_classes; k->name; ++k)
+        if (k->id == actor_id && k->info && k->factory)
+            return (void *)k->factory;
+    return 0;
+}
+
+extern "C" void port_actor_registry_install(void)
+{
+    int n = 0;
+    port_classname_resolver = port_actor_class_name;
+    /* The two actor-attached CYLINDER tables, before any class fills its own.
+       They belong to no single actor -- MovingCylinderClsn and its WithPos
+       child are shared bases that a dozen classes construct -- so they are
+       seated here rather than hung off whichever class happens to register
+       first. CylinderClsn::Process dispatches GetPos and GetOwnerID on every
+       node of _ZN5dCc_c8listHeadE, and an unfilled table there is a call through
+       null on the first frame an actor cylinder is threaded. */
+    hal_fill_moving_cylinder_vtables();
+    /* SM64DS_SKIP_CLASS=NAME[,NAME...] leaves a class unregistered, so the
+       spine's own gate turns it away and the level boots without it. The
+       cheapest way to ask "is this class the one breaking the run" -- it is
+       how the HUD was pinned as the owner of a fault three phases downstream
+       of it. Substring match, so SM64DS_SKIP_CLASS=HUD,BIRD works. */
+    const char *skip = std::getenv("SM64DS_SKIP_CLASS");
+    for (const PortActorClass *k = port_actor_classes; k->name; ++k) {
+        if (skip && std::strstr(skip, k->name)) {
+            std::printf("  [reg] %s skipped by SM64DS_SKIP_CLASS\n", k->name);
+            continue;
+        }
+        if (!k->info || !k->factory) {
+            std::fprintf(stderr, "  [reg] %s has no SpawnInfo or factory\n",
+                         k->name);
+            continue;
+        }
+        /* The ROM stores the actor's own id in the record's +4 halfword. A
+           mismatch means the mount is pointing at the wrong bytes, which
+           would otherwise show up as two silently wrong list priorities. */
+        {
+            unsigned rec = *(unsigned short *)(k->info + 4);
+            if (rec != k->id)
+                std::fprintf(stderr, "  [reg] %s: SpawnInfo at %p says id %u, "
+                             "registry says %u -- WRONG RECORD\n", k->name,
+                             (void *)k->info, rec, k->id);
+        }
+        *(void **)(k->info + 0) = (void *)k->factory;
+        data_020a4bb8[k->id] = k->info;
+        if (k->fill) k->fill();
+        ++n;
+    }
+    data_020a4b58[0] = (int)(size_t)port_prespawn_hook;
+    std::printf("[reg] %d actor classes registered, the gate is armed\n", n);
+}
+
+// ---- the frame -------------------------------------------------------------
+//
+// THE FIVE LIST CALLBACKS ARE THE ROM'S SINIT'S NOW (run linkfull, lane
+// K1LOOP). This function used to write them by hand -- "the way
+// __sinit_fListNode.cpp does" -- because the sinit's five source records were
+// hosted nowhere. They are hosted (unmatched/func_02043fdc_hostcopy.cpp: each
+// record is {the list's __fastcall face, 0}, the pair PMF3 proved), and the
+// ROM's own __sinit_fListNode.cpp runs at Entry from hal/ctor_runner.cpp's table,
+// its last word, zeroing each head and copying the pair in.
+//
+// So the a2 seat (hal/level_boot.cpp, every level and scene boot) CHECKS here
+// instead of writing. One case writes: a target with no Entry seam
+// (smoke_player: hal/ctor_runner.cpp's CMake note says its initialisers are
+// linked and not run) reaches this with the heads still zero, and then the
+// ROM's own sinit runs here, once, before anything is spawned onto a list.
+// A head that holds anything else is a fault this line names.
+typedef int (*PortListFn)(void *);
+extern "C" void (__fastcall *const g_pmf3_list_cells[5])(void *, void *);
+/* The five {fn, adj} source records main's src/fListNode.cpp copies into the
+   heads (ProcessTree::Thing data_020a4b6c(data_02099f60), ProcessList
+   data_020a4b88(data_02099f70) and so on). The scene tree's is the hosted
+   record in unmatched/func_02043fdc_hostcopy.cpp; the four list records are
+   hal/pmf_host_values.cpp's, which bind fBase_c's real createPack /
+   executePack / drawPack / deletePack. Read as raw words: only the pair
+   matters here, not the pointer-to-member type. */
+extern "C" const unsigned data_02099f60[2];
+extern "C" const unsigned port_pmfv_data_02099f70[2];
+extern "C" const unsigned port_pmfv_data_02099f48[2];
+extern "C" const unsigned port_pmfv_data_02099f68[2];
+extern "C" const unsigned port_pmfv_data_02099f50[2];
+
+extern "C" void port_actor_lists_seat(void)
+{
+    if (data_020a4b6c[1] == 0 && data_020a4b88[2] == 0 &&
+        data_020a4b78[2] == 0 && data_020a4b98[2] == 0 &&
+        data_020a4ba8[2] == 0) {
+        /* main's src/fListNode.cpp now constructs the heads with C++ dynamic
+           initializers (mwcc's __sinit_fListNode.cpp, formerly the flat
+           __sinit_02075154), which the host CRT runs before main; there is
+           no flat entry left to call here, so an unseated head is reported */
+        std::fprintf(stderr, "[k1loop] the five list heads are unseated at the "
+                             "a2 seat: src/fListNode.cpp's static initializer "
+                             "did not run on this target\n");
+    }
+    const struct { const int *head; int w; int cell; const unsigned *src; const char *name; } k[] = {
+        {data_020a4b6c, 1, 0, data_02099f60,           "scene tree data_020a4b6c"},
+        {data_020a4b88, 2, 1, port_pmfv_data_02099f70, "init data_020a4b88"},
+        {data_020a4b78, 2, 2, port_pmfv_data_02099f48, "behaviour data_020a4b78"},
+        {data_020a4b98, 2, 3, port_pmfv_data_02099f68, "render data_020a4b98"},
+        {data_020a4ba8, 2, 4, port_pmfv_data_02099f50, "cleanup data_020a4ba8"},
+    };
+    for (const auto &r : k) {
+        /* PORTSYNC3: the head holds what the initializer copied out of its
+           source record (main's fListNode.cpp: for the four lists that is now
+           fBase_c's own member, native thiscall, which the walker's
+           __fastcall call enters the same way), or the hosted face pair the
+           records used to carry. Anything else is a fault. */
+        const unsigned w0 = (unsigned)r.head[r.w], w1 = (unsigned)r.head[r.w + 1];
+        if (w0 == r.src[0] && w1 == r.src[1] && w0 != 0)
+            continue;
+        if (w0 != (unsigned)(size_t)g_pmf3_list_cells[r.cell] || w1 != 0) {
+            std::fprintf(stderr, "FATAL: [k1loop] list head %s holds {%08x, %x}, "
+                                 "not the pair __sinit_fListNode.cpp copies "
+                                 "{%08x, %x} nor the hosted face\n",
+                         r.name, w0, w1, r.src[0], r.src[1]);
+            std::abort();
+        }
+    }
+}
+
+/* Phases 4, 2 and 3 of _Z13func_02044120v: cleanup, the init pass for anything
+   spawned since the last frame, then behaviour. */
+/* SM64DS_TRACE_LISTS=1: name every node on a list before it is walked --
+   actor id, alive state, kill flag, PAUSE FLAGS and vtable. The only window
+   into a frame that is otherwise entirely matched code walking Nintendo's own
+   structures.
+
+   pauseFlags (fBase_c +0x13) is printed because being ON the list is not the
+   same as being ticked, and the two used to look identical here. ActorBase::
+   Process (_ZN7fBase_c11executePackEv) calls slot 7 first and only calls slot 6 when it
+   returns non-zero, and fBase_c::BeforeBehavior returns 0 when shouldBeKilled
+   is set OR pauseFlags & 2; the render pair is the same shape on slots 10/9
+   with pauseFlags & 8. So an actor that is alive, unkilled, on the list and
+   nevertheless frozen is a flag-byte question, and the flag byte was the one
+   field this line did not carry.
+
+   SM64DS_TRACE_LISTS=2 adds the four dispatched vtable words, which separates
+   "the gate said no" from "the slot stopped holding the host thunk" -- what a
+   re-mounted overlay or a write through a vptr looks like, and invisible in
+   every other line this file prints. The {node ... actor ... id ...} prefix is
+   unchanged: port/tools/stage_pause_proof.py rung 2 parses it. */
+static void port_list_trace(const char *name, int *list)
+{
+    static int on = -1;
+    if (on < 0) {
+        const char *e = std::getenv("SM64DS_TRACE_LISTS");
+        on = e ? std::atoi(e) : 0;
+        if (e && on == 0) on = 1;       /* a set but non-numeric value means 1 */
+    }
+    if (!on)
+        return;
+    /* THE CALLBACK WORD IS PART OF THE LIST'S STATE AND IT WAS NOT PRINTED.
+       src/func_02043fdc.cpp opens `if (thiz->callback == 0) return`, so a list
+       whose callback word has been cleared is walked by NOBODY while every
+       node is still on it and every field in the node still reads healthy.
+       Printing the head and the nodes and not this word made those two states
+       -- "the list is live" and "the list is inert" -- literally identical in
+       the log. The two walked shapes differ: the scene tree at data_020a4b6c
+       is {head, callback, 0} and the four processing lists are {head, tail,
+       callback, 0}, so the index is chosen off the name rather than assumed. */
+    const int cb = (name[0] == 't') ? list[1] : list[2];   /* "tree" vs the rest */
+    /* AND THE PASS NUMBER, after the two words and still before the colon, so
+       the node text after the colon keeps its shape. The lines are otherwise
+       indistinguishable frame to frame, so five hundred identical lines cannot
+       be lined up against any other per-frame count in the run -- and "walked
+       N times, dispatched M times" is exactly such a comparison. Counted per
+       list, because the three lists are walked by the same function. */
+    static unsigned pass_beh, pass_other;
+    unsigned *pass = (name[0] == 'b') ? &pass_beh : &pass_other;
+    std::printf("  [list] %s head %08x cb %08x pass %u:", name, list[0], cb,
+                (*pass)++);
+    for (int *n = (int *)(size_t)list[0]; n; n = (int *)(size_t)n[1]) {
+        char *o = (char *)(size_t)n[2];
+        std::printf(" {node %p actor %p id %u alive %u kill %u pause %u vt %p",
+                    (void *)n,
+                    (void *)o, o ? *(unsigned short *)(o + 0xc) : 0u,
+                    o ? *(unsigned char *)(o + 0xe) : 0u,
+                    o ? *(unsigned char *)(o + 0xf) : 0u,
+                    o ? *(unsigned char *)(o + 0x13) : 0u,
+                    o ? *(void **)o : (void *)0);
+        if (on >= 2 && o) {
+            void **vt = *(void ***)o;
+            if (vt)
+                std::printf(" beh %p bbeh %p ren %p bren %p",
+                            vt[6], vt[7], vt[9], vt[10]);
+        }
+        std::printf("}");
+    }
+    std::printf("\n");
+}
+
+/* GATE 33's read-back: with SM64DS_SPAWN_ACTOR set, report every sixty frames
+   how many of each named id are still on the behaviour list and what the coin
+   counter says. The SPAWNING is port-beta-lvl's port_debug_spawn_env, called
+   from the boot; this only follows what it made. A no-op with the variable
+   unset. */
+extern "C" void port_bob_debug_watch(void);
+
+/* ---- SM64DS_POUND_PROBE: the ground-pound dispatch, on demand --------------
+   SM64DS_POUND_PROBE=<classId>[:<frame>] runs ONE real ground-pound hit on the
+   first live actor of that class, through the ROM's own hit path, on the given
+   frame (default 240). Unset, nothing below runs and nothing below is reached.
+
+   The path is _Z19func_ov002_020ef2a4P10dBgCh_ActrP8dActor_c, which daPly_c::St_GroundPound_Main calls with
+   the player's WithMeshClsn and the player: it asks the collider whether the
+   player is on the ground, reads the floor ClsnResult's ClsnID, resolves that
+   id with Actor::FindWithID and dispatches vtable slot 21, OnGroundPounded, on
+   what it finds. Everything except the collider is the live game: the actor is
+   a real spawn with its real vtable, the argument is the real Player, and the
+   dispatch is the ROM function's own `call dword ptr [edx+0x54]`.
+
+   The collider is a zeroed scratch record, not the player's, so the probe can
+   name the target without having to stand on it: set the on-ground bit the
+   accessor reads and write the target's unique id where the floor result keeps
+   its ClsnID. The unique id is found by asking Actor::FindWithID, so no field
+   offset is assumed here. */
+extern "C" {
+int _ZNK10dBgCh_Actr10IsOnGroundEv(void *c);
+void *_ZNK10dBgCh_Actr14GetFloorResultEv(void *c);
+void *_ZN8dActor_c10FindWithIDEj(unsigned id);
+extern "C++" int func_ov002_020ef2a4(dBgCh_Actr * c, dActor_c * arg);
+extern "C++" int func_ov002_020eee3c(char *, char *);
+int _ZNK10dBgCh_Actr8IsOnWallEv(void *c);
+void *_ZNK10dBgCh_Actr13GetWallResultEv(void *c);
+/* the CEILING third of the same family, for SM64DS_POUND_PROBE=<id>:<f>:28.
+   _Z19func_ov002_020eeca8P10dBgCh_ActrP8dActor_c is _Z19func_ov002_020ef2a4P10dBgCh_ActrP8dActor_c with the hit-ceiling accessors in
+   place of the floor pair and slot 28, OnHitFromUnderneath, in place of slot
+   21 (`a->m70(arg)`, vtable+0x70). It is the ROM function the player's ceiling
+   collision runs; the head-bonk raycast (unmatched/Player_HeadBonk.cpp) is the
+   other site and reaches the same slot with the same __thiscall contract.
+   func_02035638 is the hit-ceiling accessor (`c[0x90] & 0x10`) and
+   _ZN10dBgCh_Actr15GetSphereResultEv the ceiling ClsnResult (`c + 0x30`) -- both matched src, so
+   the flag bit and the record offset below are read off the ROM's own
+   accessors rather than assumed. */
+extern "C++" int func_ov002_020eeca8(dBgCh_Actr *, dActor_c *);
+int func_02035638(void *c);
+unsigned _ZNK5dBgPi9GetClsnIDEv(void *r);
+/* the block's own refusal test and the closest-player cache it consults */
+int _ZN18daObjHatenaBlock_c12IsHitBlockedEv(void *self);
+void *_ZN8dActor_c13ClosestPlayerEv(void *self);
+extern signed char gCurrentSublevel;      /* current level */
+extern void *data_0209b458;            /* the closest-player cache itself */
+}
+
+/* Gate 203's read-back. The QuestionBlock/ExclamationBlock keeps its state
+   index at +0x3e8 and the character that hit it at +0x3f2; state 1 is the
+   bounce and state 2 is spent. Printing those two across the hit is what
+   distinguishes "the box opened" from "the frame did not crash". */
+static void pp_qblock_state(const char *when, void *o)
+{
+    if (!o)
+        return;
+    /* +0x9c and +0xa8 are the recoil the slot-28 body writes BEFORE it
+       consults the refusal test, so they separate "the body never ran" from
+       "the body ran and was refused" without guessing which. */
+    std::fprintf(stderr, "[pound]   %-6s block state %d  ch %u  recoil "
+                 "%08x/%08x\n", when,
+                 *(int *)((char *)o + 0x3e8),
+                 *(unsigned char *)((char *)o + 0x3f2),
+                 *(unsigned *)((char *)o + 0x9c),
+                 *(unsigned *)((char *)o + 0xa8));
+    std::fflush(stderr);
+}
+
+/* After the hit, follow the block for a while: entering state 1 only proves
+   the trigger fired, and the payout happens when the bounce runs out and
+   func_ov102_021498e0 spawns the content and parks it in state 2. */
+static void *g_qb_watch;
+static int g_qb_watch_left;
+
+static void pp_qblock_follow(void)
+{
+    static int last = -99;
+    if (!g_qb_watch || g_qb_watch_left <= 0)
+        return;
+    --g_qb_watch_left;
+    int st = *(int *)((char *)g_qb_watch + 0x3e8);
+    if (st != last) {
+        last = st;
+        std::fprintf(stderr, "[pound]   watch  block state -> %d (%d frames "
+                     "left)\n", st, g_qb_watch_left);
+        std::fflush(stderr);
+    }
+    if (g_qb_watch_left == 0) {
+        std::fprintf(stderr, "[pound]   watch  FINAL block state %d\n", st);
+        std::fflush(stderr);
+        g_qb_watch = 0;
+    }
+}
+
+static void *pp_first_of_class(unsigned id)
+{
+    int n = 0;
+    for (int *node = (int *)(size_t)data_020a4b78[0]; node && n++ < 4096;
+         node = (int *)(size_t)node[1]) {
+        char *o = (char *)(size_t)node[2];
+        if (o && *(unsigned short *)(o + 0xc) == (unsigned short)id)
+            return o;
+    }
+    return 0;
+}
+
+/* TEMP repro helper (SM64DS_YOSHI_EGG_REPRO in hal/player_bridges.cpp): the
+   first live actor of a class, so the egg-lay driver targets a real, currently
+   constructed enemy rather than a stale boot-time pointer. Inert otherwise. */
+extern "C" void *port_first_live_actor_of_class(unsigned id)
+{
+    return pp_first_of_class(id);
+}
+
+/* TEMP repro helper: the enemy's unique Actor id, so the egg-lay driver can set
+   the tongue's target (Player+0x338) and let the REAL grab->swallow run. */
+extern "C" unsigned port_unique_id_of_actor(void *actor)
+{
+    for (unsigned u = 0; u < 65536u; ++u)
+        if (_ZN8dActor_c10FindWithIDEj(u) == actor)
+            return u;
+    return 0xffffffffu;
+}
+
+static unsigned pp_unique_id_of(void *actor)
+{
+    for (unsigned u = 0; u < 65536u; ++u)
+        if (_ZN8dActor_c10FindWithIDEj(u) == actor)
+            return u;
+    return 0xffffffffu;
+}
+
+/* Nineteen filler virtuals put the twentieth at vtable+0x4c, so MSVC emits
+   the same `call dword ptr [reg+0x4c]` for it that the ROM's three Yoshi
+   call sites emit for slot 19. Declared, never defined: only the call is
+   wanted, and the object is always a real actor with a real vtable. */
+struct PpEggSlot {
+    virtual void v0(); virtual void v1(); virtual void v2(); virtual void v3();
+    virtual void v4(); virtual void v5(); virtual void v6(); virtual void v7();
+    virtual void v8(); virtual void v9(); virtual void v10(); virtual void v11();
+    virtual void v12(); virtual void v13(); virtual void v14(); virtual void v15();
+    virtual void v16(); virtual void v17(); virtual void v18();
+    virtual int OnTurnIntoEgg(void *player);          /* vtable + 0x4c */
+};
+
+/* SM64DS_VT_AUDIT=<frame> prints, once, the slot-21 entry of every class
+   actually alive on this level, as a module-relative offset. Resolving those
+   offline against walk_window.map and checking each for `ret 4` is a complete
+   audit of what the level can really dispatch, which a scan of vtable-fill
+   code shapes is not: a fill can write a slot through a register the scanner
+   does not model, and only the live table settles it. */
+static void port_vt_audit(void)
+{
+    static int armed = -1, at = 0;
+    static long frame;
+    if (armed < 0) {
+        const char *e = std::getenv("SM64DS_VT_AUDIT");
+        armed = 0;
+        if (e) { at = (int)std::strtol(e, 0, 0); armed = at > 0; }
+    }
+    if (!armed || ++frame != at)
+        return;
+    armed = 0;
+    unsigned char seen[PORT_ACTOR_IDS];
+    std::memset(seen, 0, sizeof seen);
+    char *base = (char *)(size_t)GetModuleHandleA(0);
+    int n = 0;
+
+    /* The set this audit walks has to be the set the CALLER can reach.
+       _ZN7daPly_c19func_ov002_020cef84Ev reaches its target through Actor::FindWithID, not
+       through the behaviour list, and the two are different registries: an
+       actor can be findable without being on the behaviour list. Enumerating
+       by asking FindWithID for every id is exact and assumes nothing about
+       the list's layout. Printed with the same [vt] shape. */
+    for (unsigned u = 0; u < 8192u; ++u) {
+        char *o = (char *)_ZN8dActor_c10FindWithIDEj(u);
+        if (!o) continue;
+        unsigned id = *(unsigned short *)(o + 0xc);
+        char **vt = *(char ***)o;
+        std::printf("[vtfind] uid %5u id %3u %-28s vt %p", u, id,
+                    id < PORT_ACTOR_IDS ? port_actor_class_name(id) : "?",
+                    (void *)vt);
+        if (!vt) { std::printf(" NO VTABLE\n"); continue; }
+        for (int s = 18; s <= 31; ++s)
+            std::printf(" %d:+%08x", s, (unsigned)(size_t)(vt[s] - base));
+        std::printf("\n");
+    }
+
+    for (int *node = (int *)(size_t)data_020a4b78[0]; node && n++ < 4096;
+         node = (int *)(size_t)node[1]) {
+        char *o = (char *)(size_t)node[2];
+        if (!o) continue;
+        unsigned id = *(unsigned short *)(o + 0xc);
+        if (id >= PORT_ACTOR_IDS || seen[id]) continue;
+        seen[id] = 1;
+        char **vt = *(char ***)o;
+        if (!vt) { std::printf("[vt] id %3u %-24s NO VTABLE\n", id,
+                               port_actor_class_name(id)); continue; }
+        std::printf("[vt] id %3u %-28s vt %p", id,
+                    port_actor_class_name(id), (void *)vt);
+        for (int s = 18; s <= 31; ++s)
+            std::printf(" %d:+%08x", s, (unsigned)(size_t)(vt[s] - base));
+        std::printf("\n");
+    }
+    std::fflush(stdout);
+}
+
+static void port_pound_probe(void)
+{
+    static int armed = -1, at = 240, slot = 21;
+    static unsigned want;
+    static long frame;
+    if (armed < 0) {
+        const char *e = std::getenv("SM64DS_POUND_PROBE");
+        armed = 0;
+        if (e) {
+            char *end;
+            want = (unsigned)std::strtoul(e, &end, 0);
+            if (end != e) {
+                armed = 1;
+                if (*end == ':') {
+                    at = (int)std::strtol(end + 1, &end, 0);
+                    if (*end == ':')
+                        slot = (int)std::strtol(end + 1, 0, 0);
+                }
+            }
+        }
+    }
+    if (!armed || ++frame != at)
+        return;
+    armed = 0;
+
+    void *target = pp_first_of_class(want);
+    void *player = pp_first_of_class(191);
+    if (!target || !player) {
+        std::fprintf(stderr, "[pound] frame %ld: class %u %s, player %s -- "
+                     "nothing to hit\n", frame, want, target ? "up" : "ABSENT",
+                     player ? "up" : "ABSENT");
+        std::fflush(stderr);
+        return;
+    }
+    /* SM64DS_POUND_PROBE=<id>:<frame>:19 dispatches slot 19, OnTurnIntoEgg,
+       instead of the pound. Slot 19 has no single ROM entry point the way
+       slot 21 has _Z19func_ov002_020ef2a4P10dBgCh_ActrP8dActor_c -- the three call sites are Yoshi's --
+       so the shadow class below reproduces the call site rather than reusing
+       one: nineteen filler virtuals put the twentieth at vtable+0x4c, and
+       MSVC emits the same `call dword ptr [reg+0x4c]` with the Player in the
+       one pushed slot. Same contract, same instruction. */
+    if (slot == 19) {
+        /* Two readbacks, one per class. POWER_STAR's body stores the argument
+           it was handed at +0x438, so that word says whether the argument
+           survived the veneer; every Actor has shouldBeKilled at +0xf, which
+           is what BabyPenguin's OnTurnIntoEgg exists to set. */
+        int star = (want == 178);
+        unsigned arg0 = star ? *(unsigned *)((char *)target + 0x438) : 0u;
+        unsigned char kill0 = *((unsigned char *)target + 0xf);
+        std::fprintf(stderr, "[pound] frame %ld: class %u %s actor %p, player "
+                     "%p -- dispatching slot 19 (OnTurnIntoEgg)\n", frame, want,
+                     port_actor_class_name(want), target, player);
+        std::fflush(stderr);
+        int r = ((PpEggSlot *)target)->OnTurnIntoEgg(player);
+        unsigned char kill1 = *((unsigned char *)target + 0xf);
+        std::fprintf(stderr, "[pound] RETURNED %d -- frame survived; "
+                     "shouldBeKilled %u -> %u\n", r, kill0, kill1);
+        if (star)
+            std::fprintf(stderr, "[pound] POWER_STAR +0x438 %08x -> %08x "
+                         "(player is %p; a module code address there is the "
+                         "dropped-argument bug)\n", arg0,
+                         *(unsigned *)((char *)target + 0x438), player);
+        std::fflush(stderr);
+        return;
+    }
+
+    unsigned uid = pp_unique_id_of(target);
+    if (uid == 0xffffffffu) {
+        std::fprintf(stderr, "[pound] class %u actor %p has no unique id\n",
+                     want, target);
+        std::fflush(stderr);
+        return;
+    }
+
+    static unsigned char clsn[512];
+    std::memset(clsn, 0, sizeof clsn);
+    int hit;
+    if (slot == 28) {
+        /* The CEILING third: whatever the player's head is under gets
+           OnHitFromUnderneath(player). This is the exclamation/question
+           block's own opening trigger. Flag and record offset both come from
+           the matched accessors, not from a guess: func_02035638 tests
+           c[0x90] & 0x10 and _ZN10dBgCh_Actr15GetSphereResultEv returns c + 0x30. */
+        *(unsigned char *)(clsn + 0x90) |= 0x10u;   /* hit-ceiling */
+        void *res = ((dBgCh_Actr *)(clsn))->dBgCh_Actr::GetSphereResult();
+        if (!res || !func_02035638(clsn)) {
+            std::fprintf(stderr, "[pound] scratch collider will not report a "
+                         "ceiling (res %p, flags %02x)\n", res,
+                         *(unsigned char *)(clsn + 0x90));
+            std::fflush(stderr);
+            return;
+        }
+        *(unsigned *)((char *)res + 0x1c) = uid;
+        if (_ZNK5dBgPi9GetClsnIDEv(res) != uid) {
+            std::fprintf(stderr, "[pound] ceiling ClsnID readback %u != uid "
+                         "%u -- the rig would dispatch on the wrong actor\n",
+                         _ZNK5dBgPi9GetClsnIDEv(res), uid);
+            std::fflush(stderr);
+            return;
+        }
+        std::fprintf(stderr, "[pound] frame %ld: class %u %s actor %p uid %u, "
+                     "player %p -- dispatching slot 28 "
+                     "(OnHitFromUnderneath) through _Z19func_ov002_020eeca8P10dBgCh_ActrP8dActor_c\n",
+                     frame, want, port_actor_class_name(want), target, uid,
+                     player);
+        std::fflush(stderr);
+        pp_qblock_state("before", target);
+        /* The refusal test the five hit slots all consult, read directly so a
+           refusal is distinguishable from a dispatch that never landed. Its
+           own inputs are printed beside it: the level it switches on, the
+           cached closest player, and the +0x706 byte it actually tests. */
+        {
+            void *cp_arg = _ZN8dActor_c13ClosestPlayerEv(target);
+            std::fprintf(stderr, "[pound]   gate   _ZN18daObjHatenaBlock_c12IsHitBlockedEv -> %d "
+                         "| level %d | cache %p | ClosestPlayer(this) %p "
+                         "+0x706 %u | player %p +0x706 %u\n",
+                         _ZN18daObjHatenaBlock_c12IsHitBlockedEv(target), (int)gCurrentSublevel,
+                         (void *)data_0209b458, cp_arg,
+                         cp_arg ? *(unsigned char *)((char *)cp_arg + 0x706) : 0u,
+                         player, *(unsigned char *)((char *)player + 0x706));
+            std::fflush(stderr);
+        }
+        hit = func_ov002_020eeca8((dBgCh_Actr *)clsn, (dActor_c *)player);
+        std::fprintf(stderr, "[pound] RETURNED %d -- the caller's frame "
+                     "survived the dispatch\n", hit);
+        pp_qblock_state("after", target);
+        /* and follow it: state 1 is the bounce, and the block reaches state 2
+           only by running func_ov102_021498e0 to its end, which is where the
+           content is actually spawned. */
+        g_qb_watch = target;
+        g_qb_watch_left = 90;
+        return;
+    }
+    if (slot == 25) {
+        /* The WALL half of the same pair. _Z19func_ov002_020eee3cPcS_ is what
+           _Z19func_ov002_020ef2a4P10dBgCh_ActrP8dActor_c is, with IsOnWall/GetWallResult in place of the
+           floor pair and slot 25, OnPushed, in place of slot 21: whatever the
+           player is pushing against gets OnPushed(player). Walking into a
+           thing, which is why it reaches players far more often than a pound
+           does. */
+        *(unsigned char *)(clsn + 0x90) |= 0x8u;  /* WithMeshClsn::IsOnWall */
+        void *res = _ZNK10dBgCh_Actr13GetWallResultEv(clsn);
+        if (!res || !_ZNK10dBgCh_Actr8IsOnWallEv(clsn)) {
+            std::fprintf(stderr, "[pound] scratch collider will not report a "
+                         "wall (res %p, flags %02x)\n", res,
+                         *(unsigned char *)(clsn + 0x90));
+            std::fflush(stderr);
+            return;
+        }
+        *(unsigned *)((char *)res + 0x1c) = uid;
+        std::fprintf(stderr, "[pound] frame %ld: class %u %s actor %p uid %u, "
+                     "player %p -- dispatching slot 25 through "
+                     "_Z19func_ov002_020eee3cPcS_\n", frame, want,
+                     port_actor_class_name(want), target, uid, player);
+        std::fflush(stderr);
+        hit = func_ov002_020eee3c((char *)clsn, (char *)player);
+    } else {
+        *(unsigned *)(clsn + 0x10) |= 0x10u;      /* WithMeshClsn::IsOnGround */
+        void *res = _ZNK10dBgCh_Actr14GetFloorResultEv(clsn);
+        if (!res || !_ZNK10dBgCh_Actr10IsOnGroundEv(clsn)) {
+            std::fprintf(stderr, "[pound] scratch collider will not report "
+                         "ground (res %p)\n", res);
+            std::fflush(stderr);
+            return;
+        }
+        *(unsigned *)((char *)res + 0x1c) = uid;  /* ClsnResult::GetClsnID */
+        std::fprintf(stderr, "[pound] frame %ld: class %u %s actor %p uid %u, "
+                     "player %p -- dispatching slot 21 through "
+                     "_Z19func_ov002_020ef2a4P10dBgCh_ActrP8dActor_c\n", frame, want,
+                     port_actor_class_name(want), target, uid, player);
+        std::fflush(stderr);
+        hit = func_ov002_020ef2a4((dBgCh_Actr *)clsn, (dActor_c *)player);
+    }
+    std::fprintf(stderr, "[pound] RETURNED %d -- the caller's frame survived "
+                 "the dispatch\n", hit);
+    std::fflush(stderr);
+}
+
+static unsigned g_k1_f_tick, g_k1_f_render, g_k1_f_pass;   /* this frame */
+static unsigned g_k1_n_tick, g_k1_n_render, g_k1_n_pass;   /* whole run */
+
+extern "C" void port_actor_tick(void)
+{
+    ++g_k1_f_tick;
+    ++g_k1_n_tick;
+    port_bob_debug_watch();
+    port_pound_probe();
+    pp_qblock_follow();
+    port_vt_audit();
+    data_02099f24[0] = 4;
+    port_list_trace("cleanup", data_020a4ba8);
+    _ZN14Absorb02043fdc13func_02043fdcEPNS_21ProcessListDescriptorE(data_020a4ba8);
+    data_02099f24[0] = 2;
+    port_list_trace("pending", data_020a4b88);
+    _ZN14Absorb02043fdc13func_02043fdcEPNS_21ProcessListDescriptorE(data_020a4b88);
+    /* THE FREEZE MASK LATCH -- Stage::Behavior's FIRST statement, arm9
+       0x0202bbbc, src/_ZN5Stage8BehaviorEv.cpp:105:
+
+           gActorUpdateMask = gNextActorUpdateMask;
+
+       and it belongs exactly here. gNextActorUpdateMask is the persistent
+       freeze-REQUEST word; gActorUpdateMask is this frame's copy of it, and it is
+       the only word Actor::BeforeBehavior reads
+       (src/_ZN8dActor_c14BeforeBehaviorEv.cpp:74):
+
+           if ((f & 9) != 9 && (gActorUpdateMask == 0 || (f & gActorUpdateMask) != 0))
+               goto do_copy;             // -> return 1, Behavior runs
+           if (data_0209fc68 != 0)
+               goto do_copy;             // cutscene override: think anyway
+           return 0;                     // Behavior is SKIPPED this frame
+
+       Zero means "no freeze, every actor thinks". Nonzero means "only actors
+       whose own mFlags intersect the mask think" -- and slot 7 returning 0
+       means ActorBase::Process (_ZN7fBase_c11executePackEv) never calls slot 6 at all, so
+       the actor's whole state machine stands still for the frame.
+
+       WHAT USES IT. The message system. The Player talk state's Main
+       (src/game/player/Player.cpp:45-52, the state daPly_c::ShowMessage2 puts the
+       player into) sets its OWN mFlags |= 0x800000, CLEARS the talk partner's,
+       ORs 0x800000 into gNextActorUpdateMask, and only then opens the box. So a
+       dialogue freezes every actor in the level except the player reading it,
+       and unfreezes them at :58-59 when data_0209d660 goes back to 0. Same
+       set/clear pair at func_ov002_020c4188.c:43/64/83, func_ov002_020c92fc.c:35,
+       func_ov002_020c91bc.c:12, func_020345b0.c:66. The message code itself is
+       unaffected because it runs from Stage, not from the actor lists.
+
+       WHY IT WAS MISSING. The port already sets gNextActorUpdateMask correctly -- the
+       setters above are all live matched code -- but nothing in port/ ever
+       COPIED it into gActorUpdateMask, because all twenty Stage slots trap
+       (hal/stage_bridges.cpp) and the port hand-hosts only Stage::Behavior's
+       LAST statement (tests/walk_window.cpp). So the mask read 0 forever, the
+       `gActorUpdateMask == 0` arm always passed, and no actor was ever frozen by a
+       dialogue. Measured, castle grounds, glowing rabbit: b454 went 00800000
+       the frame the box opened and b464 stayed 00000000 for all 900 frames
+       while the RabbitKey kept falling.
+
+       WHY AT THE HEAD OF PHASE 3 rather than the head of the whole tick. On the
+       ROM the Stage is IN the behaviour list -- its spawn record at 0x0209213c
+       carries behaviour priority 3 against the hundreds every other class uses
+       -- so Stage::Behavior is the first body phase 3 runs and every actor
+       walked after it sees the value it just latched. Phases 4 and 2 are
+       cleanup and init; neither dispatches slot 7. This line is therefore the
+       same statement, in the same position in the frame, reaching the same
+       word. Stage::VE_Init, Stage::LC_Update and Stage::PS_Update re-latch it
+       at their own points on the ROM; those paths are not hosted here and are
+       named in lane FIXC4's status (run mg16) as an honest gap.
+
+       RETIRED (run link100, lane FRAME), and the paragraph above is its own
+       retirement argument. It says this line is "the same statement, in the
+       same position in the frame" as Stage::Behavior's first one, standing in
+       because every Stage slot trapped. Slot 6 holds the ROM's own
+       Stage::Behavior now, and it runs where that paragraph says it runs: at
+       the head of the behaviour list this function is about to walk, before any
+       other body. The stand-in and the statement would be the same write to the
+       same word twice, one line apart -- harmless (it is a copy of one word,
+       which is why section 12b of port/stage_lifecycle_map.txt classed it
+       IDEMPOTENT and survivable) and untrue, because it would leave the file
+       claiming the Stage does not latch its own mask.
+
+       AND THE GAP IN THE LAST SENTENCE CLOSES WITH IT: Stage::VE_Init,
+       Stage::LC_Update and Stage::PS_Update re-latch gActorUpdateMask at their own
+       points, and all three are in the link now behind slot 6
+       (port/slice_gate220.txt). The honest gap in lane FIXC4's status (run mg16) is a
+       gap no longer.
+
+       IF THE STAGE IS NOT THE FIRST NODE this retirement is wrong, so it is
+       measured rather than argued: port/tools/stage_pause_proof.py rung 2 reads
+       the behaviour list in walk order out of the SM64DS_TRACE_LISTS line
+       printed immediately below and fails unless the Stage heads it. */
+
+    data_02099f24[0] = 3;
+    port_list_trace("behaviour", data_020a4b78);
+    _ZN14Absorb02043fdc13func_02043fdcEPNS_21ProcessListDescriptorE(data_020a4b78);
+    data_02099f24[0] = 0;
+}
+
+/* Phase 5: the render bucket, in render-priority order. Runs inside the
+   host's render frame rather than with the rest of _Z13func_02044120v. Nothing
+   converts units here any more: the whole frame is scene units, which is
+   what an actor's own Render writes. */
+/* GATE 33: the pairwise cylinder pass, arm9 0x02014aa8, BUILT AND WIRED BUT
+   OFF BY DEFAULT -- SM64DS_CYLINDER_PASS=1 turns it on.
+
+   It is the missing half of every cylinder interaction in the port. Each actor
+   calls CylinderClsn::Update to link its own node into _ZN5dCc_c8listHeadE; this
+   walks that list, and for every overlapping pair writes hitFlags and
+   otherOwner at CylinderClsn+0x20/+0x24 and unlinks the node again. Those two
+   words are exactly what func_ov002_020b19dc reads at the coin's +0x198/+0x19c
+   to decide it was collected. With the pass never running they stay zero, and
+   Bob-omb Battlefield measures 60 coins alive with the counter at 0 while
+   Mario stands inside one. The ROM calls it from Stage::Render (arm9
+   0x0202ba14) and the Stage does not run here -- all twenty of its slots trap,
+   hal/stage_bridges.cpp -- so this is where Stage::Render would have made the
+   call: the head of the render phase.
+
+   WHY IT IS OFF: it is the MSVC DESTRUCTOR SLOT SHIFT, in the one shape the
+   dual-fill trick cannot serve. CylinderClsn declares ~CylinderClsn, then
+   GetPos, then GetOwnerID, so the ROM table is {D1, D0, GetPos, GetOwnerID} at
+   slots 0..3 while a header-compiled caller folds the two destructors into one
+   and counts GetPos at 1 and GetOwnerID at 2. CylinderClsn::Process is
+   header-compiled and dispatches both on every node.
+   hal_fill_cylinder_withpos_vtable fills ROM slots 0..3, which is right for
+   the Tree's shadow-TU callers, and _ZTV7dCcAc_c -- what every
+   actor on this gate's roster carries -- is unfilled storage. The two
+   numberings COLLIDE (ROM slot 1 is D0, MSVC slot 1 is GetPos), so one array
+   cannot serve both the way _ZTV17dExtSimpleModel_c's Render does at 4 and 5.
+
+   The fix is the one the MSVC-slot-shift note prescribes: keep the vtable
+   ROM-shaped and host-copy the consumer with explicit slot indices -- a host
+   Process reading slots 2 and 3 directly instead of dispatching. That is a
+   0x49c-byte transcription and a gate of its own. Turning the switch on
+   without it faults on the first frame with a jump to +0xffed0000, which is
+   the null at MSVC slot 1 of an unfilled table.
+
+   THAT TRANSCRIPTION WAS WRITTEN AND THE CYLINDER PASS RUNS. Everything above
+   is still true of THIS SYMBOL and this switch, and reading it as "the port
+   does not do cylinder collision" -- which is what it says on a quick read --
+   is now wrong enough to send the next debugger somewhere else entirely.
+   Corrected in passing by run mg16 lane MP3, which needed the answer and had
+   to go and find it:
+
+     port/unmatched/CylinderClsn_Process.cpp is the ROM-shaped host copy the
+     paragraph above prescribes, port/slice_gate181.txt:22-25 records it, and
+     tests/walk_window.cpp calls port_cylinder_clsn_process() UNCONDITIONALLY
+     once per frame. SM64DS_CYLINDER_PASS gates only the MATCHED symbol below,
+     which stays off for the dispatch reason given.
+
+   So actor-vs-actor cylinder collision is LIVE by default, and MP3's rungs
+   depend on it: two Player body cylinders land on the one list at
+   _ZN5dCc_c8listHeadE and the host Process's symmetric branch pushes them apart. */
+extern "C" void _ZN5dCc_c7ProcessEv(void);
+
+static int port_cylinder_pass_on(void)
+{
+    static int on = -1;
+    if (on < 0) on = std::getenv("SM64DS_CYLINDER_PASS") != 0;
+    return on;
+}
+
+extern "C" void port_actor_render(void)
+{
+    ++g_k1_f_render;
+    ++g_k1_n_render;
+    if (port_cylinder_pass_on())
+        _ZN5dCc_c7ProcessEv();
+    data_02099f24[0] = 5;
+    _ZN14Absorb02043fdc13func_02043fdcEPNS_21ProcessListDescriptorE(data_020a4b98);
+    data_02099f24[0] = 0;
+}
+
+/* Phase 1: the scene tree. Priority re-sorts, parent flag propagation and the
+   deferred list insertions -- the housekeeping that closes the ROM's frame. */
+extern "C" void port_actor_scene_pass(void)
+{
+    ++g_k1_f_pass;
+    ++g_k1_n_pass;
+    data_02099f24[0] = 1;
+    _ZN11ProcessTree5Thing13func_020441ccEv(data_020a4b6c);
+    data_02099f24[0] = 0;
+}
+
+// ---- THE ROM'S ACTOR FRAME, WHOLE (run linkfull, lane K1LOOP) --------------
+//
+// src/func_020197b8.c phase 4 is one statement, `_Z13func_02044120v();`, and this is
+// where both host loops make it: tests/walk_window.cpp's level loop and
+// hal/scene_boot.cpp's port_scene_tick, each at the point the ROM's loop
+// reaches phase 4 (after phase 3, the scene request). _Z13func_02044120v walks
+// cleanup, init, behaviour, render and the scene tree in that order, setting
+// data_02099f24 to 4 / 2 / 3 / 5 / 1 and back to 0 itself.
+//
+// The four host watchers port_actor_tick runs ahead of its walks run here ahead
+// of the ROM's (debug-only, each inert unless its variable is set), and the
+// SM64DS_TRACE_LISTS lines are printed before the call: the behaviour list is
+// named before the cleanup walk rather than after it, which is the one thing
+// that moves for port/tools/stage_pause_proof.py's rung 2 (it asks only that
+// the Stage heads that list).
+//
+// level_camera = 1 is the level loop: while the ROM walks, the Camera's two
+// harness-owned slots dispatch the ROM's own Camera::Behavior and
+// Camera::Render (hal/camera_bridges.cpp), because the Camera is on these lists
+// at behaviour priority 0x14c and render priority 0 and the level loop no longer
+// drives it by hand on these frames. The scene loop passes 0: a scene's camera
+// slots are whatever they were before this lane.
+extern "C++" void func_02044120(void);
+extern "C" unsigned g_k1_list_disp[5];   /* the faces' counters (hostcopy) */
+static int g_k1_rom_camera;
+static unsigned g_k1_f_rom;
+static unsigned g_k1_n_rom_level, g_k1_n_rom_scene;
+static unsigned g_k1_frames_rom, g_k1_frames_split, g_k1_frames_idle;
+static unsigned g_k1_frames_double;
+static unsigned g_k1_conv_tick, g_k1_conv_pass;
+static unsigned long long g_k1_disp_total[5];
+static int g_k1_census = -1;
+
+extern "C" int port_actor_frame_camera_rom(void) { return g_k1_rom_camera; }
+
+static void k1_report(void)
+{
+    std::fprintf(stderr,
+                 "[k1loop] actor frame: _Z13func_02044120v %u call(s) (level %u, "
+                 "scene %u); frames ROM %u / host split %u / no walk %u; "
+                 "double-walk frames %u; host split calls tick %u render %u "
+                 "scene pass %u (teardown convergence tick %u scene pass %u); "
+                 "dispatches tree %llu init %llu behaviour %llu "
+                 "render %llu cleanup %llu\n",
+                 g_k1_n_rom_level + g_k1_n_rom_scene, g_k1_n_rom_level,
+                 g_k1_n_rom_scene, g_k1_frames_rom, g_k1_frames_split,
+                 g_k1_frames_idle, g_k1_frames_double, g_k1_n_tick,
+                 g_k1_n_render, g_k1_n_pass, g_k1_conv_tick, g_k1_conv_pass,
+                 g_k1_disp_total[0],
+                 g_k1_disp_total[1], g_k1_disp_total[2], g_k1_disp_total[3],
+                 g_k1_disp_total[4]);
+    std::fflush(stderr);
+}
+
+static void k1_arm(void)
+{
+    if (g_k1_census >= 0) return;
+    g_k1_census = std::getenv("SM64DS_K1_CENSUS") != 0;
+    std::atexit(k1_report);
+}
+
+/* SM64DS_K1_SPLIT=1 puts the old split back on this same binary (tick at phase
+   4, render inside the host frame, scene tree after the level draw): the A/B
+   the census is read against, the IRQ2_OFF / NO_FRAME_CLOCK shape. A
+   diagnostic, not a setting; nothing in port/ or a bundle sets it. */
+extern "C" int port_actor_frame_split_forced(void)
+{
+    static int v = -1;
+    if (v < 0) v = std::getenv("SM64DS_K1_SPLIT") != 0;
+    return v;
+}
+
+extern "C" void port_actor_frame(int level_camera)
+{
+    k1_arm();
+    port_bob_debug_watch();
+    port_pound_probe();
+    pp_qblock_follow();
+    port_vt_audit();
+    port_list_trace("cleanup", data_020a4ba8);
+    port_list_trace("pending", data_020a4b88);
+    port_list_trace("behaviour", data_020a4b78);
+    g_k1_rom_camera = level_camera;
+    func_02044120();
+    g_k1_rom_camera = 0;
+    ++g_k1_f_rom;
+    if (level_camera) ++g_k1_n_rom_level; else ++g_k1_n_rom_scene;
+}
+
+/* The loops call this at their phase-4 point, before either shape runs. What
+   the lists saw earlier in the same frame is hal/level_change.cpp's teardown
+   convergence (it calls the split tick and the scene pass in a loop of its own
+   while the dying level empties, at phase 3, on either shape): counted apart
+   as convergence, so the frame's own account below starts clean. */
+extern "C" void port_actor_frame_begin(void)
+{
+    g_k1_conv_tick += g_k1_f_tick;
+    g_k1_conv_pass += g_k1_f_pass;
+    for (int i = 0; i < 5; ++i) {
+        g_k1_disp_total[i] += g_k1_list_disp[i];
+        g_k1_list_disp[i] = 0;
+    }
+    g_k1_f_rom = g_k1_f_tick = g_k1_f_render = g_k1_f_pass = 0;
+}
+
+/* Once per loop frame, at the scene tree's point (the end of the actor work):
+   classify the frame, count a frame that walked a list twice (the ROM frame
+   AND a split call, or either twice), and with SM64DS_K1_CENSUS=1 print the
+   per-list dispatch counts the faces took this frame. */
+extern "C" void port_actor_frame_end(int frame, const char *loop)
+{
+    k1_arm();
+    if (g_k1_f_rom > 1 || g_k1_f_tick > 1 || g_k1_f_render > 1 ||
+        g_k1_f_pass > 1 || (g_k1_f_rom &&
+                            (g_k1_f_tick || g_k1_f_render || g_k1_f_pass))) {
+        ++g_k1_frames_double;
+        std::fprintf(stderr, "[k1loop] %s f%d WALKED TWICE: _Z13func_02044120v %u, "
+                             "tick %u, render %u, scene pass %u\n",
+                     loop, frame, g_k1_f_rom, g_k1_f_tick, g_k1_f_render,
+                     g_k1_f_pass);
+    }
+    if (g_k1_f_rom) ++g_k1_frames_rom;
+    else if (g_k1_f_tick || g_k1_f_render || g_k1_f_pass) ++g_k1_frames_split;
+    else ++g_k1_frames_idle;
+    if (g_k1_census)
+        std::fprintf(stderr, "[k1c] %s f%d %s tree %u init %u beh %u ren %u "
+                             "cln %u\n",
+                     loop, frame,
+                     g_k1_f_rom ? "rom" : (g_k1_f_tick || g_k1_f_render ||
+                                           g_k1_f_pass) ? "split" : "none",
+                     g_k1_list_disp[0], g_k1_list_disp[1], g_k1_list_disp[2],
+                     g_k1_list_disp[3], g_k1_list_disp[4]);
+    for (int i = 0; i < 5; ++i) {
+        g_k1_disp_total[i] += g_k1_list_disp[i];
+        g_k1_list_disp[i] = 0;
+    }
+    g_k1_f_rom = g_k1_f_tick = g_k1_f_render = g_k1_f_pass = 0;
+}
+
+/* How many actors are currently on each list -- the read-back that says the
+   spawn spine really linked them -- plus the AREA table, because an actor
+   whose area is not showing has Actor::BeforeBehavior set its 0x38 flags and
+   Actor::BeforeRender refuses to draw it. Every object in a sub-table carries
+   the sub-table's index as its area id (LoadClsnAndObjects passes it as the
+   loader's second argument; only the main table's objects get -1, which means
+   "not area-bound"), so on the castle grounds that is area 0. */
+extern "C" {
+extern signed char gCurrentAreaId;         /* the area currently shown */
+extern "C++" unsigned char IsAreaShowing(int idx);
+}
+
+extern "C" void port_actor_positions(void);
+extern "C" void port_actor_collision_probe(void);
+
+extern "C" void port_actor_lists_probe(void)
+{
+    std::printf("[area] shown %d, showing:", gCurrentAreaId);
+    for (int i = 0; i < 4; ++i)
+        std::printf(" [%d]=%u", i, IsAreaShowing(i));
+    std::printf("\n");
+    static const struct { const char *n; int *l; int step; } lists[] = {
+        {"behaviour", data_020a4b78, 1}, {"render", data_020a4b98, 1},
+        {"pending", data_020a4b88, 1}, {"cleanup", data_020a4ba8, 1},
+    };
+    for (int i = 0; i < 4; ++i) {
+        int n = 0;
+        for (int *node = (int *)(size_t)lists[i].l[0]; node && n < 4096;
+             node = (int *)(size_t)node[1])
+            ++n;
+        std::printf("[lists] %-9s %d\n", lists[i].n, n);
+    }
+    port_actor_collision_probe();
+    port_actor_positions();
+}
+
+/* THE COLLISION REGISTRY, which is what every Player probe walks.
+   MeshColliderBase::Enable parks a collider in the first free slot of
+   data_020a0c80[24]; RaycastGround::DetectClsn then walks all 24 and, for
+   every slot past 0, applies a DISTANCE CULL before it will even ask the
+   collider: when the owner actor's +0xb0 carries bit 1, the ray is skipped
+   unless it is within (owner+0xb8 << 3) of the owner's position and no lower
+   than owner.y + owner+0xb4 minus the same. owner+0xb8 is the Clipper's own
+   cull radius in SCENE units, which is why the shift is there.
+   So a collider that reads right in every other way can still be invisible to
+   a probe standing on top of it, and this is the line that says so. */
+extern "C" { extern void *data_020a0c80[24]; }
+
+/* A registered collider's own KCL, in the world units its owner's matrix puts
+   it in: MeshCollider+0x20 is the file, its vertex array runs up to the normal
+   table, and every position is stored at 1/64 of a fx32 (the <<6 the ITCM
+   walk does on read). For a MovingMeshCollider the matrix translation is the
+   owner's position, which the line above already prints. A probe that finds no
+   water when it is standing in the moat is answered here: either the mesh is
+   somewhere else, or it is exactly where it should be and the walk is the
+   problem. */
+static void port_clsn_kcl_bounds(const char *o)
+{
+    const char *const *f = (const char *const *)(o + 0x20);
+    if (!*f) { std::printf("[clsnreg]      (no KCL)\n"); return; }
+    const int (*pos)[3] = *(const int (**)[3])(*f + 0x00);
+    const char *norm = *(const char *const *)(*f + 0x04);
+    long n = (norm - (const char *)pos) / 12;
+    if (n <= 0 || n > 65536) { std::printf("[clsnreg]      (KCL %ld?)\n", n);
+                               return; }
+    int lo[3] = {1 << 30, 1 << 30, 1 << 30};
+    int hi[3] = {-(1 << 30), -(1 << 30), -(1 << 30)};
+    for (long i = 0; i < n; ++i)
+        for (int k = 0; k < 3; ++k) {
+            int v = pos[i][k] << 6;
+            if (v < lo[k]) lo[k] = v;
+            if (v > hi[k]) hi[k] = v;
+        }
+    std::printf("[clsnreg]      KCL %ld verts, local world bounds "
+                "x[%.0f..%.0f] y[%.0f..%.0f] z[%.0f..%.0f]\n", n,
+                lo[0] / 4096.0, hi[0] / 4096.0, lo[1] / 4096.0, hi[1] / 4096.0,
+                lo[2] / 4096.0, hi[2] / 4096.0);
+}
+
+extern "C" void port_actor_collision_probe(void)
+{
+    std::printf("[clsnreg] slot owner        id   pos                 "
+                "flags    cull(+0xb8) yoff(+0xb4) +0x0c\n");
+    for (int i = 0; i < 24; ++i) {
+        const char *o = (const char *)data_020a0c80[i];
+        if (!o) continue;
+        const char *a = *(const char *const *)(o + 4);
+        if (!a) {
+            std::printf("[clsnreg] %2d   (level, owner NULL)\n", i);
+            continue;
+        }
+        std::printf("[clsnreg] %2d   %p %4u (%6d,%6d,%6d) %08x %6d %6d %8d\n",
+                    i, (const void *)a, *(const unsigned short *)(a + 0xc),
+                    *(const int *)(a + 0x5c) >> 12,
+                    *(const int *)(a + 0x60) >> 12,
+                    *(const int *)(a + 0x64) >> 12,
+                    *(const unsigned *)(a + 0xb0), *(const int *)(a + 0xb8),
+                    *(const int *)(a + 0xb4), *(const int *)(o + 0x0c));
+        port_clsn_kcl_bounds(o);
+    }
+}
+
+/* Every live actor's own position, read back off the behaviour list in world
+   units and grouped by class. The level's object tables are the reference:
+   an actor that spawned but reads back somewhere else has had its record
+   misread, and a class whose count here is short of the census has destroyed
+   instances (which for the Tree is the ROM's own design -- see the gate-16
+   commit). Actor pos is the Vector3 at +0x5c; the class is the id at +0xc,
+   which the ActorBase constructor copied out of the spawn context. */
+/* The global water level, which is not a harness number any more: since
+   gate 17 CASTLE_WATER's own InitResources clamps data_0209f32c to its own Y
+   minus 100 units, and the Player's state machine reads that word to decide
+   it is swimming. */
+extern "C" { extern int data_0209f32c[]; }
+
+extern "C" void port_actor_positions(void)
+{
+    std::printf("[water] level %d (%.1f units)\n", data_0209f32c[0],
+                data_0209f32c[0] / 4096.0f);
+    for (const PortActorClass *k = port_actor_classes; k->name; ++k) {
+        int n = 0;
+        for (int *node = (int *)(size_t)data_020a4b78[0]; node && n < 4096;
+             node = (int *)(size_t)node[1]) {
+            char *o = (char *)(size_t)node[2];
+            if (!o || *(unsigned short *)(o + 0xc) != k->id)
+                continue;
+            if (!n++)
+                std::printf("[pos] %-17s", k->name);
+            const int *p = (const int *)(o + 0x5c);
+            std::printf(" (%d,%d,%d)", p[0] >> 12, p[1] >> 12, p[2] >> 12);
+        }
+        if (n)
+            std::printf("  [%d]\n", n);
+    }
+}
+
+/* catchup1 round 2: main now defines these as C++ data under the same name,
+   so the C name this file uses is bridged to the decorated one (read off
+   INTEG4's round-1 link map). Data only, so a name bridge is enough. */
+#pragma comment(linker, "/alternatename:_g_profile_BAKUBAKU=?g_profile_BAKUBAKU@@3U?$SpawnInfo@UdaBakubaku_c@@@@A")
+#pragma comment(linker, "/alternatename:_g_profile_BIG_SNOWMAN_BODY=?g_profile_BIG_SNOWMAN_BODY@@3U?$SpawnInfo@UdaBgSnmBdy_c@@@@A")
+#pragma comment(linker, "/alternatename:_g_profile_BOMBKING=?g_profile_BOMBKING@@3U?$SpawnInfo@UdaBombking_c@@@@A")
+#pragma comment(linker, "/alternatename:_g_profile_KERONPA_FIRE=?g_profile_KERONPA_FIRE@@3U?$SpawnInfo@UdaKpFr_c@@@@A")
+#pragma comment(linker, "/alternatename:_g_profile_KURIBO=?g_profile_KURIBO@@3U?$SpawnInfo@UdaKrb_c@@@@A")
+#pragma comment(linker, "/alternatename:_g_profile_KURIBO_L=?g_profile_KURIBO_L@@3U?$SpawnInfo@UdaKrb_c@@@@A")
+#pragma comment(linker, "/alternatename:_g_profile_KURIBO_S=?g_profile_KURIBO_S@@3U?$SpawnInfo@UdaKrb_c@@@@A")
+#pragma comment(linker, "/alternatename:_g_profile_PROPELLER_HEYHO=?g_profile_PROPELLER_HEYHO@@3U?$SpawnInfo@UdaPropeller_Heyho_c@@@@A")
+#pragma comment(linker, "/alternatename:_g_profile_STAR_GATE=?g_profile_STAR_GATE@@3U?$SpawnInfo@UdaStarGate_c@@@@A")
+
+/* catchup1 round 3 (FACE4 rows): main defines these as C++ statics or
+   namespace-scope functions, which facegen does not face. Both sides are
+   __cdecl with the same arguments, so a name bridge is the whole fix
+   (FACE4 round2_done.tsv; each right hand side is in the probe link map). */
+#pragma comment(linker, "/alternatename:__ZN7fBase_c10fBase_makeEiPvji=?fBase_make@fBase_c@@SAPAU1@HPAXIH@Z")
+#pragma comment(linker, "/alternatename:__ZN14Absorb02043fdc13func_02043fdcEPNS_21ProcessListDescriptorE=?func_02043fdc@Absorb02043fdc@@YAPAXPAUProcessListDescriptor@1@@Z")
+
+/* catchup1 Stage C round 3: the cleanup list head is main's ProcessList
+   (src/fListNode.cpp) like its three siblings, which hal/model_host.cpp bridges;
+   this file is its main C reader, so the fourth bridge lives here (data only).
+   It also serves level_change.cpp, func_02043fdc_hostcopy.cpp and the
+   AfterCleanupResources host arm. */
+#pragma comment(linker, "/alternatename:_data_020a4ba8=?data_020a4ba8@@3UProcessList@@A")

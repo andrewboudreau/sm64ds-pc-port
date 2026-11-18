@@ -1,0 +1,115 @@
+# RETIRED at SYNC6: the class translation unit main folded these bodies into
+# is back on its slice rows (today's #2660/#2663/#2666 un-quarantine) and it
+# DEFINES the names below itself, so the mount was the second definition.
+# Measured as LNK2005 rows against this file's generated object in
+# build_s2.log. Removed from the generator's INPUT, per the rule: never
+# edit the generated output. Retired here: data_ov100_02148390, g_profile_STAR_GATE, gObjStargateModelFile, data_ov100_02148948
+# The ov100 data the castle grounds' BUTTERFLY, FISH and DOOR name.
+#
+# The gate-18 shape (see ov085_syms.txt for the long version): an ACTOR
+# overlay is mounted PER SYMBOL with --pack, the list is the overlay's whole
+# data span (.rodata 0x021473a4, .data 0x02147e20, .bss 0x02148600), the
+# vtables are left out because they are host arrays the registry fills, and
+# every *_SpawnInfo is pinned to the record's real 0x1c.
+#
+# TWO VTABLES ARE EXCLUDED BY ADDRESS RATHER THAN BY NAME, which ov085 and
+# ov098 never needed. The "_ZTV*" rule only catches the tables dsd happened to
+# name; ov100 has two REAL actor vtables it left as data_ov100_*, and mounting
+# either would hand a factory a table of DS code addresses:
+#
+#   _ZTV4Door  RTTI 8daDoor_c        <- the DOOR's own, and the
+#                                                 registry fills it
+#   data_ov100_0214857c  RTTI 15daObjPathLift_c
+#
+# Both are real: their slot 1 is Actor::BeforeInitResources, which is what
+# every actor vtable in the game carries and what tells a vtable apart from a
+# typeinfo record that merely sits four bytes before something. The remaining
+# candidates at 0x02148020 and 0x02148544 fail that test -- they are typeinfo
+# tails, not tables -- so they stay mounted as the ordinary data they are.
+#
+# --pack turns each exclusion into a zeroed gap of the right length, so the
+# rest of the overlay's data keeps its ROM spacing and the emitted check still
+# asserts every offset at boot.
+data_ov100_021473a4:0xc data_ov100_021473b0:0xc data_ov100_02147e20@0x02147e20:0x8
+data_ov100_02147e28@0x02147e28:0x8 data_ov100_02147e30@0x02147e30:0x8 data_ov100_02147e38@0x02147e38:0x8
+data_ov100_02147e40@0x02147e40:0x8 data_ov100_02147e48@0x02147e48:0x8 data_ov100_02147e50@0x02147e50:0x8
+data_ov100_02147e58@0x02147e58:0x8 _ZTS9daBtfly_c:0xc _ZTI9daBtfly_c:0xc
+g_profile_BUTTERFLY:0x1c data_ov100_02147f18:0x8 data_ov100_02147f20:0x8
+data_ov100_02147f28:0x8 data_ov100_02147f30:0x8 data_ov100_02147f38:0x8
+_ZTS7daIbl_c:0xc _ZTI7daIbl_c:0xc
+data_ov100_02147ff8:0x8 data_ov100_02148000:0x8 data_ov100_02148008:0xc
+_ZTI11daWanwan2_c:0xc _ZTS11daWanwan2_c:0x10 g_profile_WANWAN2:0x1c
+data_ov100_021480d0:0x4 data_ov100_021480d4:0x8 data_ov100_021480dc:0x8
+data_ov100_021480e4:0x8 data_ov100_021480ec:0x8 data_ov100_021480f4:0x8
+data_ov100_021480fc:0x8 data_ov100_02148104:0x8 data_ov100_0214810c:0x8
+data_ov100_02148114:0x8 data_ov100_0214811c:0x8 data_ov100_02148124:0x8
+data_ov100_0214812c:0x8 data_ov100_02148134:0x8 data_ov100_0214813c:0x8
+data_ov100_02148144:0x8 _ZTS8daDoor_c:0xc _ZTI8daDoor_c:0xc
+g_profile_DOOR:0x1c data_ov100_02148204:0x130 data_ov100_02148334@0x02148334:0x8 data_ov100_0214833c@0x0214833c:0x8
+data_ov100_02148344@0x02148344:0x8 data_ov100_0214834c@0x0214834c:0x8 data_ov100_02148354@0x02148354:0x8
+data_ov100_0214835c@0x0214835c:0x8 data_ov100_02148364@0x02148364:0x8 data_ov100_0214836c@0x0214836c:0x8
+_ZTI12daStarGate_c:0xc _ZTS12daStarGate_c:0x10
+data_ov100_02148448:0x8 data_ov100_02148450:0x8
+data_ov100_02148458:0x8 data_ov100_02148460:0x8 data_ov100_02148468:0x8
+data_ov100_02148470:0x8 data_ov100_02148478:0x8 _ZTS8daFish_c:0xc
+_ZTI8daFish_c:0xc g_profile_FISH:0x1c _ZTI15daObjPathLift_c:0xc _ZTS15daObjPathLift_c:0x14
+g_profile_PATH_LIFT:0x1c
+data_ov100_02148610@0x02148610:0xc data_ov100_0214861c@0x0214861c:0xc
+data_ov100_02148670:0xc
+  
+ data_ov100_021486c4@0x021486c4:0xc data_ov100_021486d0@0x021486d0:0xc
+data_ov100_021486dc@0x021486dc:0xc data_ov100_021486e8@0x021486e8:0xc
+data_ov100_02148704:0x4 data_ov100_02148708:0x4 data_ov100_0214870c@0x0214870c:0x4
+data_ov100_02148710@0x02148710:0x4 data_ov100_02148714@0x02148714:0x4 data_ov100_02148718@0x02148718:0x4
+data_ov100_0214871c@0x0214871c:0x4 data_ov100_02148720@0x02148720:0x4 
+  
+  
+  
+  data_ov100_02148784@0x02148784:0xc
+data_ov100_02148790@0x02148790:0xc data_ov100_0214879c@0x0214879c:0xc data_ov100_021487a8@0x021487a8:0xc
+data_ov100_021487b4@0x021487b4:0xc data_ov100_021487c0@0x021487c0:0xc data_ov100_021487cc@0x021487cc:0xc
+data_ov100_021487d8@0x021487d8:0xc data_ov100_021487e4@0x021487e4:0xc data_ov100_021487f0@0x021487f0:0xc
+data_ov100_021487fc@0x021487fc:0xc data_ov100_02148808@0x02148808:0xc data_ov100_02148814@0x02148814:0xc
+data_ov100_02148820@0x02148820:0xc data_ov100_0214882c@0x0214882c:0xc data_ov100_02148838@0x02148838:0xc
+data_ov100_02148844@0x02148844:0xc data_ov100_02148850@0x02148850:0xc data_ov100_0214885c@0x0214885c:0xc
+data_ov100_02148868@0x02148868:0xc data_ov100_02148874@0x02148874:0xc data_ov100_02148880@0x02148880:0xc
+data_ov100_0214888c@0x0214888c:0xc data_ov100_02148898@0x02148898:0xc 
+  
+  
+ 
+data_ov100_0214893c@0x0214893c:0xc
+
+data_ov100_021489d4@0x021489d4:0xc data_ov100_021489e0@0x021489e0:0xc
+data_ov100_021489ec@0x021489ec:0xc data_ov100_021489f8@0x021489f8:0xc data_ov100_02148a04@0x02148a04:0xc
+data_ov100_02148a10@0x02148a10:0xc 
+ data_ov100_02148a64@0x02148a64:0xc data_ov100_02148a70@0x02148a70:0x10
+
+# RETIRED at PORTSYNC2 (the 2026-10 main merge). Each symbol below was
+# hosted here as a ROM data blob AND is now defined by a translation unit the
+# build compiles (main folded it into the class TU, or the rename by address
+# made a host array's name and this row one name), so the link would report it
+# twice (LNK2005). The src TUs among the definers are on PORT_DSSTATE_FI_SOURCES
+# in port/CMakeLists.txt, so the objects stay inside the captured .dsstate span
+# (hal/dsstate_all.h says why).
+#   gButterflyFlyAnimationFile                        now defined by src/game/actors/d_a_btfly.cpp
+#   gButterflyModelFile                        now defined by src/game/actors/d_a_btfly.cpp
+#   data_ov100_02148628                        now defined by src/game/actors/d_a_btfly.cpp
+#   data_ov100_021486f4                        now defined by src/game/actors/d_a_wanwan2.cpp
+#   gFishModelFile                        now defined by src/game/actors/d_a_fish.cpp
+#   gFishAbSwimAnimationFile                        now defined by src/game/actors/d_a_fish.cpp
+#   gFishBModelFile                        now defined by src/game/actors/d_a_fish.cpp
+#   gFishAModelFile                        now defined by src/game/actors/d_a_fish.cpp
+#   gFishSwimAnimationFile                        now defined by src/game/actors/d_a_fish.cpp
+#   data_ov100_021489cc                        now defined by src/game/actors/d_a_fish.cpp
+#   data_ov100_02148a1c                        now defined by src/game/actors/d_a_fish.cpp
+# PORTSYNC3 name-only rows (the class TU defines the storage):
+data_ov100_021486a4! data_ov100_021486ac! data_ov100_021486b4! data_ov100_021486bc! gObjDoor0Star1ModelFile! gObjDoor0Star3ModelFile! gObjDoor5HorrorModelFile! gObjDoor0StarModelFile! data_ov100_02148744! data_ov100_0214874c! gObjDoor4YamiModelFile! data_ov100_0214875c! gObjDoor0Star10ModelFile! gObjDoor2BoroModelFile! gObjDoor1ModelFile! data_ov100_0214877c! data_ov100_021488a4! data_ov100_021488b4! data_ov100_021488c4! data_ov100_021488d4! data_ov100_021488e4! data_ov100_021488f4! data_ov100_02148904! data_ov100_02148914! data_ov100_02148924! data_ov100_02148a54! data_ov100_02148a5c!
+# PORTSYNC3 name-only rows (extern C definitions in a class TU):
+gButterflyFlyAnimationFile! gButterflyModelFile! data_ov100_02148628! gFishAbSwimAnimationFile! gFishAModelFile! data_ov100_021489cc! gFishSwimAnimationFile! gFishModelFile! gFishBModelFile! data_ov100_02148a1c! data_ov100_02148948! data_ov100_02148390! gObjStargateModelFile! data_ov100_021486f4!
+
+# catchup1 Stage D (PLY4 blocker 1): name-only rows. A linked decomp TU defines each
+# of these objects, so the mount carries no storage for them, but the NAME stays in the
+# list so tools/ovdata.py still rebases ROM pointers into them onto the TU object
+# (SYM4 f1916fd9b2f had deleted the tokens outright, which sent those pointers to gap
+# blocks or left raw DS addresses).
+g_profile_IRONBALL:0x1c! data_ov100_02148668:0x8! gIblKindHandlers:0x28! _ZN12daStarGate_c13ST_OPEN_CLOSEE:0x10! _ZN12daStarGate_c14ST_STAY_CLOSEDE:0x10! _ZN12daStarGate_c7ST_WAITE:0x10! _ZN12daStarGate_c20ST_TALKING_TO_PLAYERE:0x10! _ZN12daStarGate_c12ST_UNLOCKINGE:0x10!

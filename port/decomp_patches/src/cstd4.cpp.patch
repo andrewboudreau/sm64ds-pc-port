@@ -1,0 +1,193 @@
+diff --git a/src/cstd4.cpp b/src/cstd4.cpp
+--- a/src/cstd4.cpp
++++ b/src/cstd4.cpp
+@@ -134,6 +134,7 @@
+ 
+ #pragma push
+ #pragma defer_codegen off
++#ifndef _MSC_VER /* host: mwcc soft-float support, only mwcc-generated code calls it; its dispatcher func_0206de14 is parked */
+ float func_0206dc7c(double a, double b, int op) {
+     Pair u1, u2, out;
+     u1.d = a;
+@@ -141,10 +142,12 @@
+     func_0206de14((int)&out, u1, u2, op);
+     return out.f;
+ }
++#endif
+ #pragma pop
+ 
+ #pragma push
+ #pragma defer_codegen off
++#ifndef _MSC_VER /* host: mwcc soft-float support, only mwcc-generated code calls it; its dispatcher func_0206de14 is parked */
+ double func_0206dcd4(double a, double b, int op) {
+     Pair u1, u2, out;
+     u1.d = a;
+@@ -152,10 +155,12 @@
+     func_0206de14((int)&out, u1, u2, op);
+     return out.d;
+ }
++#endif
+ #pragma pop
+ 
+ #pragma push
+ #pragma defer_codegen off
++#ifndef _MSC_VER /* host: mwcc soft-float support, only mwcc-generated code calls it; its dispatcher func_0206de14 is parked */
+ float func_0206dd30(float a, float b, int op) {
+     Pair u1, u2, out;
+     u1.f = a;
+@@ -163,26 +168,31 @@
+     func_0206de14((int)&out, u1, u2, op);
+     return out.f;
+ }
++#endif
+ #pragma pop
+ 
+ #pragma push
+ #pragma defer_codegen off
++#ifndef _MSC_VER /* host: mwcc soft-float support, only mwcc-generated code calls it; its dispatcher func_0206de14 is parked */
+ double func_0206dd7c(double a, int op) {
+     Pair u1, out;
+     u1.d = a;
+     func_0206de14((int)&out, u1, u1, op);
+     return out.d;
+ }
++#endif
+ #pragma pop
+ 
+ #pragma push
+ #pragma defer_codegen off
++#ifndef _MSC_VER /* host: mwcc soft-float support, only mwcc-generated code calls it; its dispatcher func_0206de14 is parked */
+ float func_0206ddcc(float a, int op) {
+     Pair u1, out;
+     u1.f = a;
+     func_0206de14((int)&out, u1, u1, op);
+     return out.f;
+ }
++#endif
+ #pragma pop
+ 
+ #pragma push
+@@ -287,10 +297,12 @@
+ #pragma defer_codegen off
+ extern "C" {
+ 
++#ifndef _MSC_VER /* host: the CRT supplies this; MSVC refuses to define an intrinsic (C2169) */
+ int abs(int x)
+ {
+   return x<0 ? -x : x;
+ }
++#endif
+ 
+ }
+ #pragma pop
+@@ -315,10 +327,10 @@
+         int ioresult;
+         file->buffer_len = buffer_len;
+         if (!file->mode.binary_io) {
+-            __convert_from_newlines(file->buffer, &file->buffer_len);
++            __convert_from_newlines(file->buffer, (size_t *)&file->buffer_len);
+         }
+         ioresult =
+-            (*file->write_proc)(file->handle, file->buffer, &file->buffer_len, file->idle_proc);
++            (*file->write_proc)(file->handle, file->buffer, (size_t *)&file->buffer_len, file->idle_proc);
+         if (bytes_flushed != 0) {
+             *bytes_flushed = file->buffer_len;
+         }
+@@ -393,6 +405,7 @@
+ #pragma defer_codegen off
+ int wctomb(char *s, unsigned short wchar);
+ 
++#ifndef _MSC_VER /* host: the CRT supplies this; a second strong definition collides with the CRT (LNK2005) */
+ u32 wcstombs(char *dst, u16 *src, u32 max)
+ {
+     u32 total = 0;
+@@ -419,16 +432,21 @@
+     }
+     return total;
+ }
++#else
++u32 wcstombs(char *dst, u16 *src, u32 max); /* the CRT's; __pformatter below still names it */
++#endif
+ #pragma pop
+ 
+ #pragma push
+ #pragma defer_codegen off
+ extern void *data_0209a438[];
+ 
++#ifndef _MSC_VER /* host: the CRT supplies this; a second strong definition collides with the CRT (LNK2005) */
+ int wctomb(char *s, unsigned short wchar) {
+     void **p = (void **)data_0209a438[2];
+     return ((int (*)(char *, unsigned short))p[1])(s, wchar);
+ }
++#endif
+ #pragma pop
+ 
+ #pragma push
+@@ -453,6 +471,7 @@
+ 
+ #pragma push
+ #pragma defer_codegen off
++#ifndef _MSC_VER /* host: the CRT supplies this; MSVC refuses to define an intrinsic (C2169) */
+ int memcmp(const void *src1, const void *src2, unsigned int n) {
+     const u8 *a = (const u8 *)src1;
+     const u8 *b = (const u8 *)src2;
+@@ -467,10 +486,12 @@
+     }
+     return 0;
+ }
++#endif
+ #pragma pop
+ 
+ #pragma push
+ #pragma defer_codegen off
++#ifndef _MSC_VER /* host: the CRT supplies this; MSVC refuses to define an intrinsic (C2169) */
+ void *memchr(const void *src, int c, unsigned int n)
+ {
+     const u8 *p = (const u8 *)src;
+@@ -482,6 +503,7 @@
+     }
+     return 0;
+ }
++#endif
+ #pragma pop
+ 
+ #pragma push
+@@ -489,11 +511,14 @@
+ /* MSL memset: forwards all three args to __fill_mem and returns the
+  * destination. */
+ extern void __fill_mem(void *dst, int val, unsigned int n);
++#ifndef _MSC_VER /* host: the CRT supplies this; MSVC refuses to define an intrinsic (C2169) */
+ void *memset(void *dst, int val, unsigned int n) { __fill_mem(dst, val, n); return dst; }
++#endif
+ #pragma pop
+ 
+ #pragma push
+ #pragma defer_codegen off
++#ifndef _MSC_VER /* host: the CRT supplies this; MSVC refuses to define an intrinsic (C2169) */
+ void *memcpy(void *dst, const void *src, unsigned int n)
+ {
+     unsigned char *d = (unsigned char *)dst;
+@@ -504,6 +529,7 @@
+     }
+     return dst;
+ }
++#endif
+ #pragma pop
+ 
+ /* MSL printf cluster shared layout: print_format is the specifier frame
+@@ -623,6 +649,7 @@
+ #pragma defer_codegen off
+ /* MSL vsnprintf: format into s through __StringWrite, then terminate the
+  * string within n bytes. Returns the length the whole text would take. */
++#ifndef _MSC_VER /* host: the CRT supplies this; a second strong definition collides with the CRT (LNK2005) */
+ int vsnprintf(char *s, size_t n, const char *format, char *arg) {
+     int end;
+     __OutStrCtrl osc;
+@@ -638,6 +665,7 @@
+     }
+     return end;
+ }
++#endif
+ #pragma pop
+ 
+ #pragma push

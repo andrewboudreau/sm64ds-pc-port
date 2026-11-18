@@ -1,0 +1,18 @@
+diff --git a/src/unnamed/arm9/0201/func_0201fec8.cpp b/src/unnamed/arm9/0201/func_0201fec8.cpp
+--- a/src/unnamed/arm9/0201/func_0201fec8.cpp
++++ b/src/unnamed/arm9/0201/func_0201fec8.cpp
+@@ -52,7 +52,8 @@
+ 
+ /* One s32 seeded to 1. The empty destructor is func_0201973c, already
+    defined in func_020196cc.c, so this declaration is not emitted. */
+-#ifndef SM64DS_PLATFORM_PC
++/* host: built on the PC too, so this TU defines the one LevelRng object and
++   seeds it from its own initialiser (was hal/ctor_runner.cpp's hand store). */
+ extern "C" void func_0203b9b4(int *p, int v);
+ #include "LevelRng.h"
+ 
+@@ -61,4 +62,3 @@
+ }
+ 
+ LevelRng data_0209e650;
+-#endif

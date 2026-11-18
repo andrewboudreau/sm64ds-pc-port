@@ -1,0 +1,19 @@
+diff --git a/include/daSpd_c.h b/include/daSpd_c.h
+--- a/include/daSpd_c.h
++++ b/include/daSpd_c.h
+@@ -60,7 +60,14 @@
+     /* Inline: mwcc emits D1 then D0 and no D2, which is the cartridge pair
+        (0x0211f000, 0x0211f048). The body stays on this line so the header
+        field walk still sees the brace. */
+-    virtual ~daSpd_c() {} /* slots 16 (D1), 17 (D0) */
++    #ifdef _MSC_VER
++    /* host two-arm destructor spelling; ruling in include/ModelBase.h */
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~daSpd_c() {}   /* no slot */
++    #else
++    virtual ~daSpd_c() {}
++    #endif /* slots 16 (D1), 17 (D0) */
+ 
+     virtual int   OnYoshiTryEat();               /* slot 18 */
+     virtual void OnTurnIntoEgg(daPly_c &player); /* slot 19 */

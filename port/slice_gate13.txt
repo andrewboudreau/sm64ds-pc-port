@@ -1,0 +1,84 @@
+# Gate 13: the real Camera actor.
+#
+# The hand-tuned follow camera in walk_window is replaced by the ROM's own:
+# Camera::Behavior runs the 19-state machine, Camera::Render builds the
+# projection and view matrices and pushes them at the geometry engine, and
+# GetAngleToCamera reads the heading the camera itself published.
+#
+# Everything below is MATCHED in src -- no new decomp. One file the port
+# cannot take verbatim lives in port/unmatched/ instead and is listed in
+# CMakeLists.txt: ChangeArea (r0 ride-through). _ZN9dCamera_c10EnterStateEv / _ZN9dCamera_c11UpdateStateEv
+# (mwcc PMF dispatch, hostgen CALL_STATE_FN into hal_call_camera_state_fn),
+# G3i::PerspectiveW_ / G3i::LookAt_ (register-bound MMIO pointers, hostgen
+# MMIO_PTR; PerspectiveW_'s DIVCNT seam is an MMIO_EXTERN entry),
+# Camera::Render, VEC_Mag and cstd::ldiv_result go through hostgen
+# (CMakeLists.txt GATE13_SYMS).
+
+# ---- the actor itself
+src/engine/view/d_camera.cpp
+src/engine/view/d_camera_dtor.cpp
+# RETIRED at SLICE1: body now in src/_ZN6CameraD1Ev.cpp. MSVC folds the ROM destructor variants into one symbol, so only one of a class two per-function destructor TUs can be compiled.
+#src/_ZN6CameraD0Ev.cpp
+# FOLDED into src/engine/view/d_camera.cpp (row 18): src/_ZN6Camera13InitResourcesEv.cpp
+# FOLDED into src/engine/view/d_camera.cpp (row 18): src/_ZN6Camera8BehaviorEv.cpp
+# FOLDED into src/engine/view/d_camera.cpp (row 18): src/_ZN6Camera16CleanupResourcesEv.cpp
+# FOLDED into src/engine/view/d_camera.cpp (row 18): src/_ZN6Camera16OnPendingDestroyEv.cpp
+# FOLDED into src/engine/view/d_camera.cpp (row 18): src/_ZNK6Camera12IsUnderwaterEv.cpp
+src/engine/view/d_view.cpp
+src/engine/view/Graphics3D.cpp
+
+# ---- the follow core: state 0's main is _ZN9dCamera_c13func_02009e70Ev, THE follow camera
+# FOLDED into src/engine/view/d_camera.cpp (row 18): src/func_0200bec4.c
+# FOLDED into src/engine/view/d_camera.cpp (row 18): src/func_0200c394.c
+# FOLDED into src/engine/view/d_camera.cpp (row 18): src/func_0200c66c.c
+# FOLDED into src/engine/view/d_camera.cpp (row 18): src/func_0200c9e0.c
+# FOLDED into src/engine/view/d_camera.cpp (row 18): src/func_0200cbe0.c
+
+# ---- the other 18 states (onEnter + main), all matched
+src/game/stages/d_s_boot_methods.cpp
+src/unnamed/arm9/0200/func_02005110.cpp
+src/unnamed/arm9/0200/func_020050dc.cpp
+src/unnamed/arm9/0200/func_02005098.cpp
+src/unnamed/arm9/0200/func_02005060.cpp
+src/unnamed/arm9/0200/func_02005000.cpp
+
+# ---- plumbing the camera's probes and the comms chain need
+src/game/player/d_a_ply_methods.cpp
+port/unmatched/hostarm/Player.cpp
+src/unnamed/arm9/0201/func_0201a03c.c
+src/engine/link/unit0203d7b8.cpp
+src/engine/path/PathPtr.cpp
+src/unnamed/arm9/0203/func_0203ce80.c
+src/unnamed/arm9/0203/func_0203cf94.c
+src/fListNode.cpp
+
+# MTX_Identity43_, memset and __fill_mem are ARM asm-hatch
+# primitives; the HAL already implements the first two (model_host.cpp,
+# cxxname_bridge.cpp) and the third is an SDK memset.
+# ---- matrix / math leaves
+src/NormalizeVec3IfNonZero.c
+src/Vec3_AsrInPlace.c
+src/Vec3_Equal.c
+src/Math_Function_0203b0fc.c
+src/ApproachAngle.cpp
+src/Vec3_ApproachHorz.cpp
+
+# ---- link-sweep round 1: the rest of the follow chain's callees
+src/VEC_DotProduct.c
+src/game/stages/d_s_stage_methods.cpp
+# RETIRED at SLICE1: body now in src/_ZN7fBase_cD1Ev.cpp. MSVC folds the ROM destructor variants into one symbol, so only one of a class two per-function destructor TUs can be compiled.
+#src/_ZN7fBase_cD2Ev.cpp
+# Lane DTOR-PAIRS-C: the three root tables' own D1/D0 pairs, seated into
+# words 16/17 of the host arrays by hal/dtor_seats_base.cpp (ROM relocs named
+# there). Nothing dispatches them; the seat is the ROM's word and the edge.
+src/runtime/actor/ActorBase.cpp
+# RETIRED at SLICE1: body now in src/_ZN7fBase_cD1Ev.cpp. MSVC folds the ROM destructor variants into one symbol, so only one of a class two per-function destructor TUs can be compiled.
+#src/_ZN7fBase_cD0Ev.cpp
+src/runtime/actor/ActorDerived.cpp
+# FOLDED into src/engine/view/d_view.cpp (row 27): src/_ZN4ViewD1Ev.cpp
+# FOLDED into src/engine/view/d_view.cpp (row 27): src/_ZN4ViewD0Ev.cpp
+port/unmatched/hostarm/_ZN4ViewD0Ev.cpp
+# FOLDED into src/engine/path/PathPtr.cpp (row 81): src/_ZNK7PathPtr5LoopsEv.cpp
+# FOLDED into src/engine/view/d_camera.cpp (row 18): src/_ZN6Camera25SaveCameraStateBeforeTalkEv.cpp
+src/engine/gx/G2x.cpp
+src/engine/particle/Particle.cpp

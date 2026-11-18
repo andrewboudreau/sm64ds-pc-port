@@ -1,0 +1,18 @@
+diff --git a/src/game/actors/d_a_trs.cpp b/src/game/actors/d_a_trs.cpp
+--- a/src/game/actors/d_a_trs.cpp
++++ b/src/game/actors/d_a_trs.cpp
+@@ -191,7 +191,14 @@
+ int func_ov063_0211a0a8(int a0, int a1, int a2, int a3, int a4);
+ extern void func_020167a4(dExtAnmModel_c *model);
+ extern void func_ov055_02111264(void);
++#ifdef _MSC_VER
++/* Host: src/engine/sound/Sound.cpp defines this `void func_02011d14(void)`,
++   and MSVC puts the return type in the decorated name, so a u16 declaration
++   names a function nothing defines. The call below discards the value. */
++extern void func_02011d14(void);
++#else
+ extern u16 func_02011d14(void);
++#endif
+ 
+ /* Actor ids this file spawns, finds or compares (the names are the ones in
+    symbols/actor_debug_names.tsv). */

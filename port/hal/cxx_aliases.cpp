@@ -1,0 +1,4126 @@
+// Gate-10 linkage aliases: C++-mangled references -> C-named definitions.
+//
+// Slice .cpp TUs that declare externs without extern "C" emit MSVC
+// manglings for what are C-named symbols everywhere else. The linker
+// alias closes the gap without touching src/. Decorated names are
+// lifted verbatim from the link log; each maps to its cdecl C name.
+#include <stdio.h>
+#include <string.h>
+
+#include "dsstate_seg.h"
+#include "ntr/ppu_audit.h"
+
+#pragma comment(linker, "/alternatename:?FUN_02029a68@@YAXXZ=_FUN_02029a68")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c11ChangeStateERNS_5StateE@@YAXPAUdaPly_c@@PAUState@@@Z=__ZN7daPly_c11ChangeStateERNS_5StateE")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c11ChangeStateERNS_5StateE@@YAXPAXPAUState@@@Z=__ZN7daPly_c11ChangeStateERNS_5StateE")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEFEATED: the left hand side is a real definition in this link now (player_bridges.cpp.obj), so the directive is inert and alternatename_guard fails on it. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c4HealEi@@YAXPAUdaPly_c@@H@Z=__ZN7daPly_c4HealEi")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c7IsStateERNS_5StateE, and nothing references ?_ZN7daPly_c7IsStateERNS_5StateE@@YAHPAXPAUState@@@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c7IsStateERNS_5StateE@@YAHPAXPAUState@@@Z=__ZN7daPly_c7IsStateERNS_5StateE")
+#pragma comment(linker, "/alternatename:?_ZN15dExtFrameCtrl_c8GetFlagsEv@@YAHPAX@Z=__ZN15dExtFrameCtrl_c8GetFlagsEv")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEFEATED: the left hand side is a real definition in this link now (player_bridges.cpp.obj), so the directive is inert and alternatename_guard fails on it. */
+// #pragma comment(linker, "/alternatename:?_ZNK9Animation12WillHitFrameEi@@YAHPAXH@Z=__ZNK9Animation12WillHitFrameEi")
+#pragma comment(linker, "/alternatename:?data_0208e6ec@@3PAHA=_data_0208e6ec")
+#pragma comment(linker, "/alternatename:?gPlayerHealth@@3PAFA=_gPlayerHealth")
+#pragma comment(linker, "/alternatename:?_ZTV9dBgCh_Lin@@3PAXA=__ZTV9dBgCh_Lin")
+#pragma comment(linker, "/alternatename:?VTable_dBgPi_dBgCh_LinThunk@@3PAXA=_VTable_dBgPi_dBgCh_LinThunk")
+#pragma comment(linker, "/alternatename:?data_0209b0c8@@3HA=?data_0209b0c8@@3UState@dCamera_c@@A")
+#pragma comment(linker, "/alternatename:?data_0209f49c@@3PADA=_data_0209f49c")
+#pragma comment(linker, "/alternatename:?data_0209f49e@@3PAEA=_data_0209f49e")
+#pragma comment(linker, "/alternatename:?data_0209f4ab@@3PAEA=_data_0209f4ab")
+#pragma comment(linker, "/alternatename:?data_ov002_0211073c@@3PAHA=_data_ov002_0211073c")
+#pragma comment(linker, "/alternatename:?data_ov002_021103f4@@3DA=_data_ov002_021103f4")
+#pragma comment(linker, "/alternatename:?data_ov002_021101fc@@3PAHA=_data_ov002_021101fc")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020dba0cEv@@YAXPAX@Z=__ZN7daPly_c19func_ov002_020dba0cEv")
+#pragma comment(linker, "/alternatename:?data_020a0e40@@3EA=_data_020a0e40")
+#pragma comment(linker, "/alternatename:?data_020a0e40@@3PAEA=_data_020a0e40")
+#pragma comment(linker, "/alternatename:?data_ov002_020ff1b0@@3PAHA=_data_ov002_020ff1b0")
+#pragma comment(linker, "/alternatename:?data_ov002_020ff480@@3PAHA=_data_ov002_020ff480")
+#pragma comment(linker, "/alternatename:?data_ov002_02110034@@3UState@@A=_data_ov002_02110034")
+#pragma comment(linker, "/alternatename:?data_ov002_0211010c@@3UState@@A=_data_ov002_0211010c")
+#pragma comment(linker, "/alternatename:?data_ov002_02110124@@3UState@@A=_data_ov002_02110124")
+#pragma comment(linker, "/alternatename:?data_ov002_0211019c@@3PAHA=_data_ov002_0211019c")
+#pragma comment(linker, "/alternatename:?data_ov002_0211019c@@3UState@@A=_data_ov002_0211019c")
+#pragma comment(linker, "/alternatename:?data_ov002_021101e4@@3UState@@A=_data_ov002_021101e4")
+#pragma comment(linker, "/alternatename:?data_ov002_0211022c@@3UState@@A=_data_ov002_0211022c")
+#pragma comment(linker, "/alternatename:?data_ov002_0211049c@@3PAHA=_data_ov002_0211049c")
+#pragma comment(linker, "/alternatename:?data_ov002_0211052c@@3UState@@A=_data_ov002_0211052c")
+#pragma comment(linker, "/alternatename:?data_ov002_0211055c@@3UState@@A=_data_ov002_0211055c")
+#pragma comment(linker, "/alternatename:?data_ov002_02110574@@3UState@@A=_data_ov002_02110574")
+#pragma comment(linker, "/alternatename:?data_ov002_0211058c@@3HA=_data_ov002_0211058c")
+#pragma comment(linker, "/alternatename:?data_ov002_021105bc@@3UState@@A=_data_ov002_021105bc")
+#pragma comment(linker, "/alternatename:?data_ov002_021105d4@@3UState@@A=_data_ov002_021105d4")
+#pragma comment(linker, "/alternatename:?_ZN9dCamera_c15UpdateTargetPosEv@@YAXPAX@Z=__ZN9dCamera_c15UpdateTargetPosEv")
+#pragma comment(linker, "/alternatename:?_ZN9dCamera_c10EnterStateEv@@YAHPAX@Z=__ZN9dCamera_c10EnterStateEv")
+#pragma comment(linker, "/alternatename:?func_ov002_020bcdf0@@YAXPAX@Z=_func_ov002_020bcdf0")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c6adc, and nothing references ?func_ov002_020c6adc@@YAHPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c6adc@@YAHPAX@Z=_func_ov002_020c6adc")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d2da0Ev@@YAHPAX@Z=__ZN7daPly_c19func_ov002_020d2da0Ev")
+#pragma comment(linker, "/alternatename:?func_ov002_020d2e74@@YAXPAX@Z=_func_ov002_020d2e74")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d2f24Ev@@YAXPAX@Z=__ZN7daPly_c19func_ov002_020d2f24Ev")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d2fdcEv@@YAHPAX@Z=__ZN7daPly_c19func_ov002_020d2fdcEv")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d413cEi@@YAXPAXF@Z=__ZN7daPly_c19func_ov002_020d413cEi")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d45c0Ev@@YAXPAX@Z=__ZN7daPly_c19func_ov002_020d45c0Ev")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d4748Ev@@YAXPAX@Z=__ZN7daPly_c19func_ov002_020d4748Ev")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020e6780Ev@@YAXPAD@Z=__ZN7daPly_c19func_ov002_020e6780Ev")
+#pragma comment(linker, "/alternatename:?Disable@IRQ@@SAIXZ=_OS_DisableInterrupts")
+#pragma comment(linker, "/alternatename:?Restore@IRQ@@SAXI@Z=_OS_RestoreInterrupts")
+
+extern "C" {
+/* BSS the aliased data references land on (non-ov002 ring) */
+DSSTATE_BEGIN
+int data_0208e6ec[4]; short gPlayerHealth[4];
+void *_ZTV9dBgCh_Lin[4], *VTable_dBgPi_dBgCh_LinThunk[4];
+DSSTATE_END
+/* data_0209b0c8 moved to hal/camera_states.cpp (camera State object 12) */
+
+}
+
+/* The cstd::strcmp / cstd::strchr flat-name bridge is retired (catchup1 Stage C
+   round 3): main's include/msl/string.h declares both with C linkage and
+   src/cstd6.cpp defines them, so the namespace members it forwarded to are gone,
+   and nothing in the tree names _ZN4cstd6strcmpEPKcS1_ or _ZN4cstd6strchrEPKcc. */
+extern "C" {
+
+/* MIi_CpuCopy16 IS THE ROM'S OWN BODY: src/MultiCopyHalf.c is C since main
+   #3167 (the halfword loop, `s32 size` compared signed as the ROM's blt does),
+   and the port compiles it under a per-source rename,
+   MIi_CpuCopy16=MultiCopyHalf_rom (the ASMCPORT block of port/CMakeLists.txt).
+   This definition keeps the ROM name every caller links against and makes one
+   call into that body, so the copy itself is the cartridge's code. What stays
+   here is host instrumentation at the seam between the callers and the body:
+   run link60 Stage 5 lane T2's census of every halfword block copy, counted by
+   destination region in the 2D audit. The BG tilemap upload path
+   (func_ov007_020c076c -> func_020565xx -> G2::GetBGxScrPtr) ends in this
+   primitive, so "the tilemap is empty" and "nothing ever tried to write it"
+   are separable from one table. Inert unless SM64DS_PPU_AUDIT is set, and it
+   still counts before the copy, as the census's source-nonzero column needs. */
+void MultiCopyHalf_rom(const void *src, void *dst, int size);
+void MIi_CpuCopy16(const void *src, void *dst, int size)
+{
+    ntr::ppu_audit_note_copy((unsigned)(size_t)src, (unsigned)(size_t)dst,
+                             (unsigned)size);
+    MultiCopyHalf_rom(src, dst, size);
+}
+
+/* PORT_HOST_ABI: ARM/Thumb asm primitives (matrix builders), MSVC cannot assemble.
+   Thumb matrix builders (asm primitives; semantics from their headers):
+   4x3 fx32 rotation matrices from (sin, cos), 4096 = 1.0 */
+/* THE ARGUMENT IS SIXTEEN BITS WIDE, AND THAT IS THE WHOLE FIX.
+
+   These three are host reimplementations of ARM/Thumb asm primitives that
+   take their sine and cosine in registers, so the DS body reads a full 32-bit
+   word. Their ROM callers do not agree on how wide the argument is:
+
+     include/decl_common.h:2144-2146   (struct Matrix4x3*, short, short)
+     src/func_ov007_020c39f8.c:5-7     (struct Matrix4x3*, short, short)
+     src/Matrix4x3_FromRotationX/Y/Z.c (void*, int, int)
+
+   On ARM that disagreement is invisible. AAPCS makes the CALLER widen a
+   narrow argument into the whole register, sign-extending a signed one, so
+   the asm primitive's `stmia r0!, {r2}` stores a correct negative either way.
+   On the host's 32-bit cdecl the caller only has to define the LOW SIXTEEN
+   BITS of the argument slot when the prototype says `short`, and MSVC
+   zero-extends there -- so a definition taking `int` reads the upper half as
+   whatever the caller happened to leave, which for a negative cosine is zero.
+
+   Measured on SCENE_TITLE: the star's Z angle crosses 90 degrees at frame 42,
+   the table's cosine goes -44, and func_ov007_020c39f8 -- the ONE caller in
+   the tree using the `short` prototype -- delivered 0x0000ffd4 (65492) rather
+   than 0xffffffd4. 65492/4096 = 15.99, so the star's x and y scale jumped by
+   almost exactly 16 and it snapped to fill the screen until the cosine came
+   back positive 43 frames later. Matrix4x3_FromRotationX/Y/Z never showed it
+   because their `int` prototype makes the caller push all 32 bits.
+
+   Taking the parameters as `short` fixes both prototypes at once and is
+   lossless for every caller in the tree: all four pass an entry of
+   `extern short FX_SinCosTable_[]`, the unit sine table, whose values live in
+   [-4096, 4096]. A caller declaring `int` pushes 32 bits and the callee reads
+   the low 16, which is the same number; a caller declaring `short` defines
+   exactly those 16 bits. Narrowing at the boundary is safe in a way that
+   widening is not, which is why the type moves here rather than in the ROM
+   headers -- and it keeps src/ and include/ untouched.
+
+   The DS semantics are unchanged: 4096 = 1.0, rows as the asm banners give
+   them in src/func_02052800.c, src/func_02052820.c and src/func_0205283c.c. */
+void MTX_RotX43_(int *m, short s, short c)   /* X rotation */
+{
+    m[0] = 0x1000; m[1] = 0; m[2] = 0;
+    m[3] = 0; m[4] = c; m[5] = s;
+    m[6] = 0; m[7] = -s; m[8] = c;
+    m[9] = 0; m[10] = 0; m[11] = 0;
+}
+/* PORT_HOST_ABI: ARM/Thumb asm primitive (Z-rotation matrix), MSVC cannot assemble. */
+void MTX_RotZ43_(int *m, short s, short c)   /* Z rotation */
+{
+    m[0] = c; m[1] = s; m[2] = 0;
+    m[3] = -s; m[4] = c; m[5] = 0;
+    m[6] = 0; m[7] = 0; m[8] = 0x1000;
+    m[9] = 0; m[10] = 0; m[11] = 0;
+}
+
+/* PORT_HOST_ABI: ARM asm veneer (ldr/bx tail-call), MSVC cannot assemble.
+   asm veneer OSi_AlarmHandler just tail-calls its C body */
+void OSi_ArrangeTimer(void);
+void OSi_AlarmHandler(void) { OSi_ArrangeTimer(); }
+
+/* ITCM soft-float library, explicit call sites only (implicit double ops
+   compile to native FP on host). Semantics fixed by the callers:
+   the double formatter zero-tests with 9d40, negates via 8e10(0.0, v),
+   and extracts digits through 859c.
+
+   PORT_HOST_ABI: ARM asm primitives (the ITCM soft-float runtime block,
+   0x01ff8000..0x01ffb078), MSVC cannot assemble. Run linkw wave 9 (lane
+   w9-harvest) checked each of these against origin/main rather than
+   against this 626-commit-stale branch: main HAS matched five of them --
+   func_01ff859c, func_01ffa344, func_01ffa4bc, func_01ff8708 (filed as
+   src/_dmul.c) and 0x01ffabe4 (src/_s32_div_f.c, hosted in
+   hal/actor_vtables.cpp) -- and every one is a bannered HAND-ASM
+   PRIMITIVE, an `asm` block of ARM instructions. They are matched decomp
+   and they are still unusable here, so these host bodies stay. The tag is
+   on them now so that when the port does catch up to main, linkage.py
+   files them as documented exceptions instead of as replacement work. */
+int func_01ff9d40(double x, double y) { return x == y; }
+/* PORT_HOST_ABI: ARM asm primitive (ITCM soft-float block), MSVC cannot
+   assemble -- see the block comment above. */
+double func_01ff8708(double x, double y) { return x * y; }  /* dmul (frexp) */
+/* single-precision ITCM pair cstd::atan2 leans on: i2f then float-compare */
+/* PORT_HOST_ABI: ARM asm primitive (ITCM soft-float block), MSVC cannot
+   assemble -- see the block comment above. */
+int func_01ffa4bc(int a) { float f = (float)a; int b; memcpy(&b, &f, 4); return b; }
+int func_01ff98f4(int a, int b)
+{ float x, y; memcpy(&x, &a, 4); memcpy(&y, &b, 4); return x < y; }
+/* float greater-than: the slide friction gate (i2f(speed) > 48.0f) */
+int func_01ff99a4(int a, int b)
+{ float x, y; memcpy(&x, &a, 4); memcpy(&y, &b, 4); return x > y; }
+/* ---- THE SINGLE-PRECISION ADD/SUB PAIR ---------------------------------
+   run rel0215 lane prop17, first host callers: src/func_ov074_021204c0.c
+   (the Goomboss scale interpolation) calls both, and it is the only TU in
+   either line that does.
+
+   WHICH IS WHICH WAS READ OFF THE ROM, not off the caller's prose. The two
+   are one routine wearing two hats and they prove each other -- carved the
+   ITCM autoload block out of extracted/arm9_dec.bin (autoload list at
+   file+0x9cf60 says ram 0x01ff8000, size 0x5f40; the block lands at
+   file+0x097000, and config/arm9/itcm/symbols.txt's 46 symbols all fall
+   inside it) and disassembled both heads:
+
+     func_01ff9378        mov r2,#1        <- the operation tag
+       +0x08  eors r2,r0,r1               <- do the signs differ?
+       +0x0c  eormi r1,r1,#0x80000000     <- if so, flip b's sign
+       +0x10  bmi  0x01ffa5a8             <- ...and finish in a594's body
+       +0x14  subs ip,r0,r1               <- same-sign path, no sign fixup
+
+     func_01ffa594        mov r2,#2        <- the other tag
+       +0x08  eors r2,r0,r1
+       +0x0c  eormi r1,r1,#0x80000000
+       +0x10  bmi  0x01ff938c             <- ...and finish in 9378's body
+       +0x14  subs ip,r0,r1
+       +0x18  eorlo ip,ip,#0x80000000     <- THE DISTINGUISHING LINE: the
+                                             |a| < |b| sign fixup only a
+                                             SUBTRACT needs
+
+   So 9378 is ADD and a594 is SUBTRACT, each delegating to the other when the
+   signs disagree. That matches what the caller does with them independently:
+   it takes a594(table[k], table[k+1]) as the GAP between two sizes and feeds
+   9378(table[k+1], step) back as the stepped-toward value.
+
+   Both take and return RAW IEEE-754 SINGLE BIT PATTERNS in r0/r1, the same
+   convention as func_01ff98f4 and func_01ff99a4 above, so the host bodies go
+   through memcpy the same way.
+
+   WHAT THE HOST BODIES DO AND DO NOT REPRODUCE, stated rather than implied.
+   The ROM bodies are 0x460 and 0x448 bytes because they carry their own
+   denormal and NaN handling AND their own IEEE STATUS-FLAG bookkeeping -- the
+   tails call out to an FP status block and OR a bit in (the `bl #0x207322c`
+   at 0x01ffa624 and the `ldr r3,[ip] / orr r3,r3,#0x10 / str r3,[ip]` that
+   follows it; 0x01ffa5b8 is `mov r2, #0x80000000`). The host bodies are
+   native `float` add/subtract. This build takes MSVC's x86 default, which is
+   /arch:SSE2 (no /arch: or /fp: appears in port/CMakeLists.txt -- only /Oy-),
+   so the arithmetic is single-precision SSE with round-to-nearest-even and
+   agrees with the ROM on every normal value. It does NOT set the status flags,
+   and NaN payloads are not guaranteed to match.
+
+   THAT DIFFERENCE IS NOT OBSERVABLE, and here is the whole chain rather than an
+   assurance. The status block is data_020aa3f4, kind:bss. Across all 106 module
+   reloc files there is EXACTLY ONE reference to that address in the entire game:
+   the literal-pool word at 0x02073234, inside its own getter func_0207322c
+   (`ldr r0,[pc] / bx lr`, twelve bytes). So the only route to it is through that
+   getter -- and the getter has 47 callers game-wide, of which ZERO lie outside
+   0x01ff8000..0x01ffb078. Every caller IS the soft-float block, writing its own
+   flags. No game code reads them.
+   On the host the question does not arise at all: neither _func_0207322c nor
+   _data_020aa3f4 appears in walk_window.map, and src/func_0207322c.c is in no
+   slice and no CMake source list, because the port does not host the ROM's
+   soft-float block -- every primitive in it is a native body like these two.
+   The status word does not exist on the host, so nothing can read it.
+   A documented non-observable difference, and the standing trade for this whole
+   block rather than a new one this pair introduces.
+
+   PORT_HOST_ABI: ARM asm primitives (the ITCM soft-float runtime block),
+   MSVC cannot assemble -- see the block comment above. */
+int func_01ff9378(int a, int b)
+{ float x, y, r; memcpy(&x, &a, 4); memcpy(&y, &b, 4); r = x + y;
+  { int o; memcpy(&o, &r, 4); return o; } }
+/* PORT_HOST_ABI: ARM asm primitives (the ITCM soft-float runtime block),
+   MSVC cannot assemble -- see the block comment above. TAG REPEATED HERE, run
+   link100 wave 14, lane SHADOWS3: the tag at the foot of that comment binds to
+   func_01ff9378 on the line above and stops there, so this half of the pair
+   the comment spends forty lines deriving read as undocumented work. Same
+   ruling, same evidence, same permanence: src/func_01ffa594.c is the ROM's
+   hand-written single-precision subtract. */
+int func_01ffa594(int a, int b)
+{ float x, y, r; memcpy(&x, &a, 4); memcpy(&y, &b, 4); r = x - y;
+  { int o; memcpy(&o, &r, 4); return o; } }
+/* f2i truncation. ONE PARAMETER, and that is the ROM's own answer.
+   This used to be `int (int a, int b)` with `(void)b`, carrying a comment
+   that called the second word "one caller's r1 ride-through" -- the caller
+   being src/func_ov002_020dc560.c, which spells the prototype with two.
+   run rel0215 lane prop17 disassembled the ROM body instead of taking that
+   on trust, and the FIRST INSTRUCTION settles it:
+
+     01FFA344  bic r1, r0, #0x80000000     <- r1 is WRITTEN before it is read
+     01FFA348  mov r2, #0x9e
+     01FFA34C  subs r2, r2, r1, lsr #23    <- exponent, straight out of r0
+
+   Nothing on entry reads r1, so there is no ride-through and there never
+   was: this takes ONE argument. The two-parameter host body was a fiction
+   that the tree then had to keep feeding, and it cost real edits -- the
+   host copy port/unmatched/Goomboss_InitResources.cpp lists "func_01ffa344(x)
+   -> func_01ffa344(x, 0)" among the changes it makes to a matched TU, and two
+   rows sat in port/tools/aritycheck_plainfunc_baseline.txt for src TUs that
+   declared the honest one-parameter form.
+
+   Narrowing it is safe in both directions under __cdecl: a caller that still
+   pushes two words (func_ov002_020dc560.c, and the InitResources host copy)
+   has the callee read the first and cleans its own stack, exactly as the ROM
+   discards r1. Both baseline rows are deleted with this change; the list only
+   shrinks.
+
+   PORT_HOST_ABI: ARM asm primitive (ITCM soft-float block), MSVC cannot
+   assemble -- see the block comment above. */
+int func_01ffa344(int a)
+{ float x; memcpy(&x, &a, 4); return (int)x; }
+/* ITCM signed divide (walk-speed scaling) */
+/* PORT_HOST_ABI: ARM asm primitive (ITCM soft-float block), MSVC cannot
+   assemble -- see the block comment above. */
+int func_01ffabe4(int a, int b) { return b ? a / b : 0; }
+/* gArctanTable, cstd::atan2's own table, IS NOT HERE ANY MORE. It was
+   storage with a guess for a comment ("the boot builds it at runtime") and
+   nothing ever filled it, so atan2 returned 0 for every direction that was
+   not exactly on an axis -- and every heading in the game goes through
+   atan2. The camera could not hold a rotation, Vec3_HorzAngle answered 0
+   for Mario, and slopes read as flat. The table is plain arm9 .data at
+   0x020994e0 (0x804 bytes, atan(i/1024) in binangs for i = 0..0x400), well
+   below bss_start 0x0209b000, so it comes out of the ROM image with the
+   rest: port/tools/romdata.py NAMED. */
+/* PORT_HOST_ABI: ARM asm primitive (ITCM soft-float block), MSVC cannot
+   assemble -- see the block comment above. TAG ADDED, run link100 wave 14,
+   lane SHADOWS3. Every other body in this block carries this ruling and this
+   one never did: the comment directly above it is the atan2 table's, so the
+   row read as owed work. src/func_01ff8e10.c is the toolchain's own
+   double-precision subtract, shipped as assembly, taking its operands in
+   r0:r1 and r2:r3 -- outside the C ABI for doubles, which is the other half of
+   why no C spelling of it exists. */
+double func_01ff8e10(double x, double y) { return x - y; }
+/* PORT_HOST_ABI: ARM asm primitive (ITCM soft-float block), MSVC cannot
+   assemble -- see the block comment above. */
+unsigned long long func_01ff859c(double x) { return (unsigned long long)x; }
+
+/* ITCM soft-float compare: double(a:b) < double(c:d), EABI r0=low word */
+int func_01ff9e2c(unsigned a, unsigned b, unsigned c, unsigned d)
+{
+    double x, y;
+    unsigned long long xb = ((unsigned long long)b << 32) | a;
+    unsigned long long yb = ((unsigned long long)d << 32) | c;
+    memcpy(&x, &xb, 8);
+    memcpy(&y, &yb, 8);
+    return x < y;
+}
+
+/* PORT_HOST_ABI: reads the ARM CPSR mode bits, no host equivalent.
+   src/ARMProcessorMode.c is one instruction and a mask:
+       asm void OS_GetProcMode(void) { mrs r0, cpsr; and r0, r0, #0x1f; bx lr }
+   The host has no CPSR. It has the one thing the ROM's single caller asks this
+   function about, though: whether the core is in IRQ mode. There is exactly one
+   caller in the linked set, src/func_02057f54.c:25 --
+       if (s->m4 == 0) { if (OS_GetProcMode() != 0x12) goto cont; }
+       s->m0 = 1; return;
+   -- and hal/boot2_thread.cpp raises port_irq_mode_depth for exactly the span an
+   ARM would be in IRQ mode, from the dispatch of IRQ::VBlankHandler to its
+   return. So 0x12 there and system mode everywhere else, which is what makes
+   OS_RescheduleThread's own line 27 raise the manager's pending flag and return
+   instead of switching a thread from inside an interrupt handler; the IRQ
+   return performs the switch, as it does on the cartridge (run link100, lane
+   DET3, which replaces lane DET2's host-side deferral in OS_LoadContext).
+   SM64DS_DET3=0 leaves the depth at zero and this answers 0x1f all run. */
+extern unsigned port_irq_mode_depth;
+int OS_GetProcMode(void) { return port_irq_mode_depth ? 0x12 : 0x1f; }
+
+/* DS thread scheduler context ops -- MOVED, run link2 lane THR.
+   OS_SaveContext and OS_LoadContext used to be stubbed here: a save that
+   reported "already resumed" (setjmp-nonzero) so OS_RescheduleThread backed out
+   without switching, and a restore that trapped because "a second DS thread
+   went live" was assumed impossible. A second DS thread IS live now -- the
+   ROM's own idle thread, src/func_02057e34.c -- so both bodies are in
+   hal/boot2_thread.cpp, backed by the fiber seam ntr/include/ntr/rt.h:11-14
+   describes. They are still PORT_HOST_ABI and for the same reason (hand-asm
+   ARM register-file primitives); the tag and its evidence moved with them.
+   OS_GetProcMode above used to answer 0x1f unconditionally, which is what
+   made OS_RescheduleThread take the switching arm of its own branch even inside an
+   interrupt handler; run link100 lane DET3 gave it the IRQ-mode answer the ROM
+   reads there. */
+
+/* __dorounddecup: src/lib/msl/ansi_fp.c defines it on the host now (catchup1
+   Stage C round 2); the hand-written body that stood here is retired. */
+
+/* C-linkage face of Animation::WillHitFrame (C++ face lives in
+   player_bridges; one TU cannot name both linkages) */
+int hal_anim_willhit(void *self, int f);
+int _ZNK15dExtFrameCtrl_c12WillHitFrameEi(void *self, int f)
+{ return hal_anim_willhit(self, f); }
+
+/* SharedFilePtr construct veneers: on the DS these pass fileID in r1
+   through a tail call the C decl never names (the ride-through catalog).
+   Host spells out both args and routes to the HAL Construct. */
+void *_ZN13SharedFilePtr9ConstructEj(void *self, unsigned id);
+/* RETIRED, run link100 wave 15 lane SEAT15C: src/func_02017acc.c now spells
+   both arguments, so the matched TU carries this row. See port/slice_l15fs.txt. */
+/* RETIRED, run link100 wave 15 lane SEAT15C: src/SharedFilePtr_Construct_TexSeq.c
+   now spells both arguments. See port/slice_l15fs.txt. */
+/* PORT_HOST_ABI: ARM r1 fileID ride-through, run mg9 lane PSY. THE FIFTH
+   MEMBER OF THIS CATALOG AND THE ONE THAT WAS MISSING. _Z13func_02017a24Pvj is the
+   same veneer as its four siblings above and below -- ROM 0x02017a24 is
+   `push {r4,lr} / mov r4,r0 / bl 0x2017ae4 / mov r0,r4 / pop / bx lr`, r1
+   never written, so the fileID rides through -- but it was the only one left
+   compiled from src, where src/func_02017a24.c spells `int f(int x)` and
+   drops the id. The chain below it drops the id twice more before anything
+   stores it: _Z13func_02017ae4Pvj and _Z13func_02017e48Pvj are the same shape, and
+   _Z13func_02017e0cPvj is the first body that takes two parameters. So on the host
+   the id that reached func_02018a24 was _Z13func_02017e48Pvj's OWN RETURN ADDRESS.
+
+   MEASURED, scene 389 (dScMg3DEsp_c), the first class to construct a
+   SharedFilePtr through this entry point:
+
+       [mg-snd] scene 0x185 ov005 row 18: music=20 enable=2 (start)
+       FATAL: fs fileID 0xf40c matches no archive range
+
+   where the constructor asked for 0x1ef. Every other seated minigame reaches
+   its files through _ZN13SharedFilePtr9ConstructEj or one of the four veneers
+   here, all of which already spell both arguments, which is why eleven classes
+   booted over this hole.
+
+   THE BLAST RADIUS IS EVERY ov006 SCENE, NOT JUST 389, and that is the part
+   worth stating plainly rather than leaving to be inferred from "one veneer".
+   The seven call sites are all in ov006 STATIC INITIALISERS -- one each in
+   __sinit_ov006_0212f52c, _0212f6b4 and _0213322c, and four in
+   __sinit_ov006_02130a08 -- and port_scene_mg_overlay_load runs all
+   thirty-five ov006 constructors ONCE PER PROCESS at the tail of the first
+   minigame row's fill. So this line runs on EVERY ov006 scene boot, and it was
+   handing four SharedFilePtrs outside scene 389 a garbage id too. Nothing
+   faulted on them because nothing had loaded through them yet, which is the
+   same reason the hole survived eleven seats.
+
+   WHICH IS WHY THE NET IS THE FULL BATTERY AND NOT SCENE 389. A change that
+   runs in every ov006 constructor cannot be proved by the one scene that
+   exposed it. port/tools/battery.py's fourteen hosted scenes and fifty-one
+   levels are the check that matters here, and they are ALL GREEN across this
+   repair; the curling canary reproducing 32557/32557/0 is the second.
+
+   port/tools/aritycheck.py's census NAMED IT and nobody had read it: the JSON
+   carries `_Z13func_02017a24Pvj def_n 1 / decl_n 2 INVENTS` twice, once for
+   __sinit_d_mg_trmpln2_mario.cpp and once for __sinit_ov006_02130a08. That census is
+   REPORT ONLY -- only the receiver and plain-name subsets are ratcheted -- so
+   it never failed a build. src/func_02017a24.c was taken out of
+   port/slice_mg1.txt and this became the definition.
+
+   RETIRED, run link100 wave 15 lane SEAT15C. Everything above is why the
+   veneer was right, and it is also the reason it can go now: what PSY
+   measured was a SOURCE that spelled one parameter, and main has since
+   matched src/func_02017a24.c with both spelled --
+
+       extern void *_Z13func_02017ae4Pvj(void *self, unsigned int fileID);
+       void *_Z13func_02017a24Pvj(void *self, unsigned int fileID)
+       { _Z13func_02017ae4Pvj(self, fileID); return self; }
+
+   -- and _Z13func_02017ae4Pvj and _Z13func_02017e48Pvj under it are now the same shape and
+   are both on the link line, so the id reaches _Z13func_02017e0cPvj instead of
+   becoming a return address. This row is NOT in LINK15's census: the census
+   listed its four siblings and missed this one because PSY had already moved
+   it off its slice. Seated last and alone, and gated on the whole sweep
+   exactly as the paragraph above asks, because it runs in every ov006
+   constructor. port/slice_l15fs.txt carries the row. */
+/* RETIRED, run linkfull wave 23 lane BANNER3, LINK15 batch W23-3: the "host
+   card seam does not refcount" reason (this comment's old text) is stale for
+   this row. src/func_02017ab4.c is `_Z13func_02017e34Pv(x); return x;` and is
+   directly called (not through the __global_destructor_chain MSL dtor-chain head) from
+   the already-linked class destructor family _ZN12MascotWalkerD1Ev /
+   020c1c64 / 020c21e4 / 020c3e70 (dScMgBSC_c / dScMgMemory_c, ninja_objs.json
+   confirms these compile from their real src/ paths, not a hal/ substitute),
+   which runs whenever an instance of that class is torn down in normal play.
+   See port/slice_w23_stale3.txt. */
+/* RETIRED, run link100 wave 15 lane SEAT15C: src/func_02017b4c.c now spells
+   both arguments. See port/slice_l15fs.txt. */
+/* RETIRED, run link100 wave 15 lane SEAT15C: src/func_020178cc.c now spells
+   both arguments. gate 50 (ov080's PAINTING): the third ov080 sinit constructs
+   its SharedFilePtrs through _Z13func_020178ccPvj, the same veneer chain as
+   _Z13func_02017accPvj, and both chains end at _Z13func_02017e0cPvj, which is where
+   hal/fs.cpp's Construct ends too. _Z13func_020178b4i below is the matching
+   dtor-chain callback the sinit registers by address and stays a host no-op,
+   because the card seam does not refcount. See port/slice_l15fs.txt. */
+/* RE-CHECKED, run linkfull wave 23 lane BANNER3, LINK15 batch W23-3: KEPT AS
+   HOST. The refcount reason above may be stale, but that is not why this one
+   stays out. __register_global_object (src/func_020731dc.c) is the MSL global-dtor-chain
+   push: node[0]=__global_destructor_chain (prev head), node[1]=fn, node[2]=obj,
+   __global_destructor_chain=node. __sinit_d_s_entry_entry.cpp and __sinit_ov080_02127b2c pass
+   &_Z13func_020178b4i as that node[1] to register it on the chain, not to call it.
+   port/hal/ctor_runner.cpp's dtor_chain_len() only walks node[0] (a counter,
+   for the [ctor] diagnostic line) and never reads or calls node[1]; the same
+   pattern is independently documented as undriven in port/fader_boot_map.txt
+   ("registered on __global_destructor_chain's chain, nothing in the port walks that
+   chain"). No honest edge: stays a host no-op. */
+/* PORT_HOST_ABI: fileptr dtor callback the third ov080 sinit registers by
+   address; host card seam does not refcount, so the body is a no-op. */
+int func_020178b4(int x) { return x; }   /* fileptr dtor callback: host no-op */
+/* RETIRED, run linkfull wave 23 lane BANNER3, LINK15 batch W23-3: the "host
+   card seam does not refcount" reason (this comment's old text) is stale for
+   this row. src/func_02017e34.c is `data_0209d3bc=*(unsigned short*)c;
+   return c;`, writing the same "last fileID touched" breadcrumb
+   port/hal/fs.cpp:171/590 already keeps for the load side; this is the
+   release side. Called directly from _Z13func_02017ab4i and from the
+   already-linked _ZN12MascotWalkerD1Ev/020c1c64/020c21e4/020c3288/020c3e70
+   destructor family (see the _Z13func_02017ab4i retirement note above) -- 104
+   src/ files call this chain in all. See port/slice_w23_stale3.txt. */
+/* RETIRED, run linkfull wave 23 lane BANNER3, LINK15 batch W23-3: same
+   stale reason and same honest edge as _Z13func_02017e34Pv/_Z13func_02017ab4i above:
+   src/SharedFilePtr_Destruct_TexSeq.c and src/SharedFilePtr_Destruct_Anim.c
+   are each `_Z13func_02017e34Pv(x); return x;`, directly called from the
+   already-linked _ZN12MascotWalkerD1Ev/020c1c64/020c21e4/020c3288/020c3e70
+   destructor family (dScMgBSC_c / dScMgMemory_c). See
+   port/slice_w23_stale3.txt. */
+DSSTATE_BEGIN
+void *__global_destructor_chain;                     /* MSL global-dtor chain head */
+DSSTATE_END
+
+/* RETIRED, run link100 wave 15 lane SEAT15C: the OBJECT-message box-open
+ * ride-through, and the veneer is no longer what expresses it.
+ *
+ * St_Talk_Main opens a sign/NPC box (mStateWork==0) by calling
+ * func_0201fc88(mAttachOffsetY) -- the raw object-message id. On the DS that
+ * 0x24-byte function leaves the id in r0 across a call to
+ * ObjectMessageIDToActualMessageID, which reads r0 and remaps the object id to
+ * a real text id, then tail-calls _Z13func_0201f32ci(text id) to raise the box.
+ * This veneer existed because the matched src spelled BOTH callees
+ * argumentless to mirror that ride-through, so under MSVC the id was dropped
+ * and the box opened on an invalid id. src/func_0201fc88.c today declares
+ * `ObjectMessageIDToActualMessageID(s32)` and `_Z13func_0201f32ci(s16)` and passes
+ * the id through both, which is the same statement pair this veneer held, so
+ * the matched TU carries the row: port/slice_l15fs.txt.
+ *
+ * The /alternatename below at the ?func_0201fc88@@YAXF@Z row still resolves:
+ * the matched TU defines the same flat _func_0201fc88 this veneer defined. */
+
+/* PORT_HOST_ABI: SDK memset asm primitive (MI_CpuFill8) -- the edge-preserving
+   RMW byte-fill the FS/decompress path uses. No C to compile under MSVC, so the
+   port spells it as memset, which is what its asm computes. gate 51 (the iron
+   ball's shatter path reaches it). */
+extern "C" void MI_CpuFill8(void *p, int v, int n) { memset(p, v, n); }
+
+/* gate 51: the ROLLING_IRON_BALL's state TUs call func_020ad660 by its
+   un-prefixed name; the definition is the ov002-prefixed _Z19func_ov002_020ad660PvS_S_i.
+   Same cdecl symbol, so a plain alias. */
+#pragma comment(linker, "/alternatename:_func_020ad660=__Z19func_ov002_020ad660PvS_S_i")
+
+/* PORT_HOST_ABI: soft reset -- ARM7 IPC, card reload, unmapped 0x27ffc40 read.
+   crash-screen-only ITCM entry; trap keeps it honest if ever reached */
+void OS_ResetSystem(int a) { (void)a; __debugbreak(); }
+
+DSSTATE_BEGIN
+int data_0209cdcc, data_0209cde4[4], data_0209cde8[4];
+int data_020a4b4c, data_020a4b50;
+int data_020a7fc0[8];
+int data_0209a5e4, data_0209a5e8, OSi_CurrentThreadPtr[4], data_0209a438[8];
+/* OS scheduler/thread BSS band 0x0209a628..0x0209a6f8 */
+int data_0209a628[12], data_0209a658[10], data_0209a680[6], data_0209a698[4];
+int data_0209a6a8[2], data_0209a6b0[2], data_0209a6b8[2], data_0209a6c0[2];
+int data_0209a6c8, data_0209a6cc, data_0209a6d0, data_0209a6d4, data_0209a6d8;
+int data_0209a6dc, data_0209a6e0, data_0209a6e4, data_0209a6e8, data_0209a6ec;
+int data_0209a6f0, data_0209a6f4, data_0209a6f8;
+unsigned char data_020a0e98;
+/* The 32 sound-player records, stride 0x1c (func_0204f63c, func_0204f958,
+   func_0204f9c4 and func_0204f504 all index it that way, and the ROM runs
+   0x020a4d6c..0x020a50ec = 32 * 0x1c exactly). It was one int while sound was
+   stubbed. Field +0x18 is the playable-sequence limit that
+   Stage::InitResources sets and func_0204f63c tests before it evicts a voice;
+   the ROM's literal for it is 0x020a4d84, which the symbol list also names
+   data_020a4d84. The matched Sound::Player::SetPlayableSeqCount writes it as
+   data_020a4d6c[index].mPlayableSeqCount (include/SoundPlayerRecord.h), so the
+   write lands in THIS object. The row below points the C callers' flat name
+   at that class static: both sides __cdecl, two ints, no receiver. */
+unsigned char data_020a4d6c[32 * 0x1c];
+#pragma comment(linker, "/alternatename:__ZN5Sound6Player19SetPlayableSeqCountEii=?SetPlayableSeqCount@Player@Sound@@SAXHH@Z")
+/* gMgPHeyhoMiniModelFile and gMgPHeyhoWaitAnimFile, the two ov006 fileptrs
+   St_LevelEnter_Main releases, used to be zeroed stand-ins here. The ov006
+   mount hosts them now (run link60 lane s2-m46): both are ov006 .bss, both
+   are eight bytes by ROM span, and both are zero, so Release still reads
+   numRefs 0 and guards exactly as before. Removed rather than kept, because
+   two definitions of one DS symbol is a link error. */
+/* data_ov089_02132894 / _021328b4 used to be sixteen zero bytes each
+   here. They are ov089's own mount now (gate 22): the DOOR indexes
+   element 5 of both and walked off the end of the fiction. */
+int data_0209b48c, sMusicHandle[4];  /* gCurrentMusicID: the decomp TU defines it; mount_reconcile aliases the C name */
+/* The music fade engine's per-channel records: _Z13func_020490b0P12NNSSndHandle runs i = 0..1
+   over ALL FOUR of these (c48 the u16 channel ids, c4c the ramp rate, c54
+   the target, c5c the current volume), and func_02049764 seeds [0] and [1]
+   of c4c/c54/c5c on every course boot. Hosted as bare ints, c4c[1] zeroed
+   data_020a4c54[0] behind it and c5c[1] wrote 0x7f000 over gParticleControl,
+   the particle tracker one word later, which is what killed the direct
+   Bob-omb Battlefield boot the moment the level had a layer-1 track. The
+   fade loop then read what survived at that word back as a volume every
+   frame, which is the audio-corruption side of the same line. Full DS
+   extent for all of them; c48 is u16[2] on the DS, one int here. */
+int data_020a4c48, data_020a4c4c[2], data_020a4c54[2], data_020a4c5c[2];
+/* gParticleControl IS A SysTracker*, not storage: every src reference spells it
+   `extern char *gParticleControl` and then indexes off its VALUE
+   (_ZN8Particle6System9NewSplashEiii reads +0x774, _ZN8Particle6System20NewFlamethrowerBlueAEiiiss writes +0x7d0..+0x7dc,
+   _ZN8Particle6System13NewCheckWaterEjjiiiPK11Vector3_16f passes +0x7f0).
+
+   THE 0x1000-BYTE STAND-IN THAT USED TO BACK IT IS GONE (gate 29). It was a
+   zeroed block standing in for a tracker that did not exist, with this
+   pointer initialised to it so the first effect to fire would find something
+   rather than take the process with it. The tracker is real now: it is the
+   Stage's own sub-object at Stage+0x50, and Particle::SysTracker::SysTracker
+   publishes it here itself -- `gParticleControl = this` is the second-to-last
+   line of src/_ZN8Particle10SysTrackerC1Ev.c. Nothing needs to seed it.
+
+   PARTICLE_SYS_TRACKER is the SAME STORAGE, not a second object. decl_common.h
+   declares it `extern char *PARTICLE_SYS_TRACKER` and
+   Particle::RunningSlidingDustAt -- the Player's skid and slide dust -- reads
+   its handle out of `PARTICLE_SYS_TRACKER + 0x750`; the ROM's own
+   RunningSlidingDustAt loads from 0x0209ee74 for exactly that (relocs.txt
+   from:0x02022bac to:0x0209ee74), so the two names are one global with two
+   spellings. Aliased rather than duplicated: as a separate array it read as a
+   null pointer and the first skid faulted at +0x750. */
+void *gParticleControl[4];
+#pragma comment(linker, "/alternatename:_PARTICLE_SYS_TRACKER=_gParticleControl")
+int data_0209b4a4[4];  /* data_0209f32c: the decomp TU defines it */
+/* camera + player-list globals (gate-9 scoping notes) */
+int data_0209d4b0[8];
+/* data_0209f324 (WIPES) moved to hal/fader_wipes.cpp: it is a POINTER to a
+   staged array now, not blank storage, or the death path faults on it. */
+int data_0209a5ec, data_0209a5f4[2], data_0209a5fc, data_0209a600;
+int data_0209a604, data_0209a60c[2], data_0209a614, data_0209a618;
+int data_0209a61c[4], OSi_SystemCallbackInSwitchThread;
+/* OSi_ThreadInfo IS NOT HERE ANY MORE -- see the link100 GLOBALS block at the
+   foot of this file. It is not a 16-byte object of its own: it is the first of
+   three dsd names over ONE 0x54-byte ROM record, and hosting it as int[4] on
+   this line is what refused OS_InitThread in hal/boot_os.cpp. */
+/* (run link2 lane THR sized this int[5]; the grouped 0x54-byte record in the
+   GLOBALS block below supersedes that at integration, and the slot table it
+   feared duplicating is hosted once, inside the record.) */
+DSSTATE_END
+
+/* ---- THE GX BANK-STATE BLOCK, 0x020a6088..0x020a60a4, IN ROM ORDER ---------
+ *
+ * WHAT THIS REPLACES, AND WHY THE OLD SHAPE'S OWN CAVEAT CAME TRUE. These
+ * thirteen used to be plain separate objects here and in hal/player_bridges
+ * .cpp, under a note that said the split was "fine while nothing in the slice
+ * mixes the struct view with the field view on the same bit of state". Scene 4
+ * mixes exactly that, and it is not a corner: EIGHTEEN src TUs name
+ * data_020a6088, and the whole SetBankFor* family reaches it by struct offset
+ * by construction. Every one of those TUs declares its own window onto ONE
+ * struct at 0x020a6088 and writes a member at a fixed offset --
+ *
+ *     SetBankForTexPltt        +0x0a      GX_SetBankForBGExtPltt            +0x0e
+ *     SetBankForSubBG          +0x12      SetBankForSubOBJ         +0x14
+ *     SetBankForSubBGExtPltt   +0x16      SetBankForSubOBJExtPltt  +0x18
+ *
+ * -- while GX_ResetBankForSubOBJExtPltt, GX_ResetBankForSubBGExtPltt, GX_DisableBankForSubOBJExtPltt and resetBankForX_ reach
+ * the same words by their own DS names, and GX_InitGXState zeroes the block as
+ * data_020a6088[0..12], THIRTEEN u16 stores, 26 BYTES PER CALL.
+ *
+ * HOW SMALL THE OLD OBJECT REALLY WAS. It was `int[2]` in hal/player_bridges
+ * .cpp, eight bytes, and even that overstates it: the symbol's own span in
+ * config/arm9/symbols.txt is TWO bytes, because data_020a608a starts at +2.
+ * Neither figure is the 0x1c the struct view needs. So all six member stores
+ * and all 26 bytes of GX_InitGXState's clear ran past the end of the object
+ * into whatever the linker had put next, and every field read came back as the
+ * zero of an unrelated symbol. Review read the base map and named the
+ * casualties there -- all of PMi_Work plus two bytes of data_0208e6ec,
+ * with the +0x18 store landing on data_0208e6ec -- and those names are a
+ * property of one link, not a constant: what travels is that a 26-byte write
+ * into a two-byte symbol lands on whatever follows.
+ *
+ * MEASURED COST, ONE SCREEN. GX::SetBankForSubOBJExtPltt(0x100) sets DISPCNT_B
+ * bit 31 and records the bank at +0x18, which on the DS IS data_020a60a0.
+ * GXS::BeginLoadOBJExtPltt then reads data_020a60a0 through GX_ResetBankForSubOBJExtPltt,
+ * clears it and hands it to EndLoadOBJExtPltt to restore. Split apart, Begin
+ * read a permanently-zero object, End restored bank 0, and
+ * SetBankForSubOBJExtPltt(0) CLEARED bit 31 again -- so scene 4 reached
+ * scan-out with its extended palette loaded (473 nonzero bytes at 0x068a0000)
+ * and switched off, and the character portrait decoded through the standard
+ * palette. That is the round trip the ROM makes and the port did not.
+ *
+ * THE BG PATH HAD THE IDENTICAL DEFECT AND IS REPAIRED BY THE SAME LAYOUT.
+ * GX::SetBankForSubBGExtPltt records its bank at +0x16, and GX_ResetBankForSubBGExtPltt --
+ * GXS::BeginLoadBGExtPltt's callee, the exact sibling of GX_ResetBankForSubOBJExtPltt --
+ * clears DISPCNT_B bit 30 and reads that word back as data_020a609e. Split
+ * apart it read zero for the same reason, so EndLoadBGExtPltt restored bank 0
+ * and bit 30 went with it. hal/sub_screen.cpp's Stage bring-up sets bit 30 by
+ * hand (`*p1 |= 0x40000000`) with a comment saying the bank allocator under
+ * GXS::EndLoadBGExtPltt is "the port does not host"; the allocator was hosted
+ * all along and the restore was landing on the wrong word. That hand-set is
+ * now very likely redundant. NOT PULLED HERE: proving it needs a minimap run
+ * with the hand-set removed, and hal/sub_screen.cpp's bring-up is the SUB
+ * lane's. Recorded in port/ppu_gap_audit.txt section 11 as a follow-up.
+ *
+ * HOW IT IS FIXED. Grouped sections, in ROM order, the mechanism hal/
+ * model_host.cpp already uses for the OAM shadow and hal/sub_actors.cpp for
+ * the minimap descriptor. Each size is the symbol's own delta in
+ * config/arm9/symbols.txt: twelve u16 then a four-byte tail at 0x020a60a0,
+ * 0x1c bytes end to end. align(2) on the members and align(4) on the head:
+ * align(4) on every member would pad each one to four and put +0x18 at +0x30.
+ * port_gxbank_layout_check reads the result back the way
+ * hal_oam_layout_check does, because a layout trick that stops working has to
+ * fail loudly rather than go back to reading zeroes.                        */
+#define GXBANK(sec, name, size, algn)                             \
+    __pragma(section(sec, read, write))                           \
+    extern "C" __declspec(allocate(sec)) __declspec(align(algn))  \
+    unsigned char name[size] = {0}
+
+GXBANK(".dsstate$gxbank00", data_020a6088, 2, 4);
+GXBANK(".dsstate$gxbank01", data_020a608a, 2, 2);
+GXBANK(".dsstate$gxbank02", data_020a608c, 2, 2);
+GXBANK(".dsstate$gxbank03", data_020a608e, 2, 2);
+GXBANK(".dsstate$gxbank04", data_020a6090, 2, 2);
+GXBANK(".dsstate$gxbank05", data_020a6092, 2, 2);
+GXBANK(".dsstate$gxbank06", data_020a6094, 2, 2);
+GXBANK(".dsstate$gxbank07", data_020a6096, 2, 2);
+GXBANK(".dsstate$gxbank08", data_020a6098, 2, 2);
+GXBANK(".dsstate$gxbank09", data_020a609a, 2, 2);
+GXBANK(".dsstate$gxbank10", data_020a609c, 2, 2);
+GXBANK(".dsstate$gxbank11", data_020a609e, 2, 2);
+GXBANK(".dsstate$gxbank12", data_020a60a0, 4, 2);
+
+#undef GXBANK
+
+/* Reads the section trick back. Nonzero when the band came out at the ROM's
+   own offsets, which is the precondition for every SetBankFor* member write
+   landing on the word its reader names. */
+extern "C" int port_gxbank_layout_check(void)
+{
+    const unsigned char *base = data_020a6088;
+    const long a = (long)(data_020a609c - base);   /* SetBankForSubOBJ    */
+    const long b = (long)(data_020a60a0 - base);   /* SubOBJExtPltt, and
+                                                      GX_ResetBankForSubOBJExtPltt's read */
+    if (a == 0x14 && b == 0x18)
+        return 1;
+    printf("  [gx] BANK BAND NOT CONTIGUOUS: 609c +%ld (want 20), 60a0 +%ld "
+           "(want 24) -- every SetBankFor* member write misses its reader\n",
+           a, b);
+    return 0;
+}
+}
+
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GX_SetBankForBG=?SetBankForBG@GX@@YAXG@Z")
+
+/* dScene_c::ResetHardwareRegisters is STATIC (include/dScene_c.h) and the ROM
+   reaches it with a bare bl and nothing set up in r0 (_Z15InitCrashScreenv at
+   0x02014150, whose src calls this flat name with no argument), so the face
+   takes nothing. It used to take `void *s` and call a shadow member on it,
+   which read a stack slot the argless caller never wrote. The one-member
+   shadow mangles to the matched static, ?ResetHardwareRegisters@dScene_c@@SAXXZ
+   (this file includes no dScene_c header). Run linkfull, lane RS2PORT. */
+struct dScene_c { static void ResetHardwareRegisters(); };
+extern "C" void _ZN8dScene_c22ResetHardwareRegistersEv(void)
+{ dScene_c::ResetHardwareRegisters(); }
+
+#pragma comment(linker, "/alternatename:?data_020a0e98@@3EA=_data_020a0e98")
+#pragma comment(linker, "/alternatename:?data_020a4d6c@@3PAEA=_data_020a4d6c")
+
+/* A slice TU sees NestedHeapIterator::Next through a local shadow returning
+   unsigned char*; the real definition returns int against the shared header.
+   Mirror the shadow and hop through the C-named helper in player_bridges. */
+struct HeapAllocator;
+struct NestedHeapIterator { unsigned char *Next(HeapAllocator *h); };
+extern "C" int hal_nhi_next(void *self, void *h);
+unsigned char *NestedHeapIterator::Next(HeapAllocator *h)
+{ return (unsigned char *)(size_t)hal_nhi_next(this, h); }
+#pragma comment(linker, "/alternatename:?GiveHealth@@YAHHH@Z=_GiveHealth")
+#pragma comment(linker, "/alternatename:?data_0209caa0@@3PAHA=_data_0209caa0")
+#pragma comment(linker, "/alternatename:?gGameMode@@3EA=_gGameMode")
+#pragma comment(linker, "/alternatename:?data_0209f49c@@3GA=_data_0209f49c")
+#pragma comment(linker, "/alternatename:?data_0209f4a0@@3FA=_data_0209f4a0")
+#pragma comment(linker, "/alternatename:?data_0209f4ac@@3EA=_data_0209f4ac")
+#pragma comment(linker, "/alternatename:?data_0209f4ae@@3EA=_data_0209f4ae")
+#pragma comment(linker, "/alternatename:?data_ov002_0211010c@@3PAHA=_data_ov002_0211010c")
+#pragma comment(linker, "/alternatename:?data_ov002_02110124@@3PAHA=_data_ov002_02110124")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?gSubSoundID@@3HA=_gSubSoundID")
+#pragma comment(linker, "/alternatename:?data_0209f32c@@3HA=_data_0209f32c")
+#pragma comment(linker, "/alternatename:?_ZN8Particle6System19NewCheckWaterRippleEjjiiiPK11Vector3_16f@@YAIIIHHHPAX@Z=__ZN8Particle6System19NewCheckWaterRippleEjjiiiPK11Vector3_16f")
+#pragma comment(linker, "/alternatename:?NewSimple@System@Particle@@SAXIHHH@Z=__ZN8Particle6System9NewSimpleEjiii")
+/* ---- gate 29, the particle subsystem --------------------------------------
+   All of these are STATIC members or namespace-scope data, so both sides are
+   already cdecl and a plain alias is honest -- the four particle callbacks
+   that are __thiscall METHODS are not here, they get real forwarding faces in
+   hal/particle_bridges.cpp instead.
+
+   The six Particle::*::Func are the effect VM's whole dispatch surface:
+   func_0204a17c takes their addresses when it builds each definition's
+   Behavior[] array, and it is a .cpp that spells them as C++ statics while
+   the six defining TUs emit C names. */
+#pragma comment(linker, "/alternatename:?Func@Acceleration@Particle@@SAXAAUEffectData@2@PADAAUVector3@@@Z=?Func@Acceleration@Particle@@SAXAATEffectData@2@PADAAUVector3@@@Z")
+#pragma comment(linker, "/alternatename:?Func@Jitter@Particle@@SAXAAUEffectData@2@PADAAUVector3@@@Z=?Func@Jitter@Particle@@SAXAATEffectData@2@PADAAUVector3@@@Z")
+#pragma comment(linker, "/alternatename:?Func@Converge@Particle@@SAXAAUEffectData@2@PADAAUVector3@@@Z=?Func@Converge@Particle@@SAXAATEffectData@2@PADAAUVector3@@@Z")
+#pragma comment(linker, "/alternatename:?Func@Turn@Particle@@SAXAAUEffectData@2@PADAAUVector3@@@Z=?Func@Turn@Particle@@SAXAATEffectData@2@PADAAUVector3@@@Z")
+#pragma comment(linker, "/alternatename:?Func@LimitPlane@Particle@@SAXAAUEffectData@2@PADAAUVector3@@@Z=?Func@LimitPlane@Particle@@SAXAATEffectData@2@PADAAUVector3@@@Z")
+#pragma comment(linker, "/alternatename:?Func@RadiusConverge@Particle@@SAXAAUEffectData@2@PADAAUVector3@@@Z=?Func@RadiusConverge@Particle@@SAXAATEffectData@2@PADAAUVector3@@@Z")
+/* the C++ face of the spawn entry, reached from ov002 actor code */
+#pragma comment(linker, "/alternatename:?New@System@Particle@@SAXIIHHHPBUVector3_16@@PAUCallback@2@@Z=__ZN8Particle6System3NewEjjiiiPK11Vector3_16fPN5dPa_c7level_c10callback_cE")
+/* the engine's globals, spelled without extern "C" by the .cpp TUs that
+   touch them: the tracker pointer, the two VRAM cursors, the default heap */
+#pragma comment(linker, "/alternatename:?gParticleControl@@3PAUSomeGlobal@@A=_gParticleControl")
+#pragma comment(linker, "/alternatename:?gParticleControl@@3PAXA=_gParticleControl")
+#pragma comment(linker, "/alternatename:?sParticlePalVramLowCursor@@3HA=_sParticlePalVramLowCursor")
+#pragma comment(linker, "/alternatename:?sParticlePalVramHighCursor@@3HA=_sParticlePalVramHighCursor")
+#pragma comment(linker, "/alternatename:?data_020a0ea0@@3PAXA=_data_020a0ea0")
+#pragma comment(linker, "/alternatename:?PlayBank0@Sound@@SAXIABUVector3@@@Z=?PlayBank0@Sound@@YAXIABUVector3@@@Z")
+/* The intro voice command (src/func_ov002_020bd480.cpp) declares its callee as
+   `namespace Sound { void PlayCharVoice(...); }`, which MSVC mangles YA (a free
+   function), while the one real definition carries the Itanium C name with C
+   linkage. Same three-argument cdecl shape, so a link alias bridges it. */
+#pragma comment(linker, "/alternatename:?PlayCharVoice@Sound@@YAXIIABUVector3@@@Z=?PlayCharVoice@Sound@@YAIIIABUVector3@@@Z")
+#pragma comment(linker, "/alternatename:?FX_SinCosTable_@@3PAFA=_data_02082214")
+#pragma comment(linker, "/alternatename:?gCurrentEntranceId@@3EA=_gCurrentEntranceId")
+#pragma comment(linker, "/alternatename:?gCurrentSublevel@@3CA=_gCurrentSublevel")
+#pragma comment(linker, "/alternatename:?gPrevReturnState@@3EA=_gPrevReturnState")
+#pragma comment(linker, "/alternatename:?data_ov002_0210a7e8@@3PAIA=_data_ov002_0210a7e8")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020bdd2c, and nothing references ?func_ov002_020bdd2c@@YAXPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020bdd2c@@YAXPAX@Z=_func_ov002_020bdd2c")
+
+/* Sound sequence-info lookup. This returned 0 the whole time the SDAT root
+   was null, which is what made func_02051fb4 give up before every music
+   start. The root is real now (hal/sdat/sdat.cpp), so the MSVC-mangled face
+   forwards to the matched walker in src/, which reads root+0x84 and the SEQ
+   record at sub+0x08 for real. */
+struct SeqEntry;
+extern "C" SeqEntry *_ZN5Sound17InfoSequenceEntry9GetWithIDEj(unsigned id);
+struct Sound {
+    struct InfoSequenceEntry { static SeqEntry *GetWithID(unsigned id); };
+};
+SeqEntry *Sound::InfoSequenceEntry::GetWithID(unsigned id)
+{ return _ZN5Sound17InfoSequenceEntry9GetWithIDEj(id); }
+
+/* Heap::_Deallocate, the DS tail-call veneer to Deallocate that operator
+   delete dispatches as a method, was defined here as a host stand-in: RETIRED
+   at run linkfull wave 27 (lane P1). Its ruling was that the matched
+   src/engine/heap/Heap.cpp was a zero-argument veneer whose this and
+   ptr rode in on r0/r1. It is now the member
+   `void Heap::_Deallocate(void *ptr) { Deallocate(ptr); }`, which passes both
+   (the receiver in ECX, the pointer on the stack) to the decorated
+   ?Deallocate@Heap_t@mHeap@@QAEXPAX@Z the link already carries, so the matched TU is
+   linked instead (port/slice_w28_p1.txt). The flat name keeps its reverse face
+   in port/faces_sync.txt. hal/blend_vtable.cpp's copy of this definition
+   stays off on every target that links this file (PORT_CXX_ALIASES_LINKED). */
+
+/* RaycastGround::DetectClsn is defined against a local shadow in its own
+   TU; mirror the shadow (no real header here) so the manglings agree. */
+class RaycastGround { public: int DetectClsn(); };
+extern "C" int _ZN9dBgCh_Gnd10DetectClsnEv(void *self)
+{ return ((RaycastGround *)self)->DetectClsn(); }
+#pragma comment(linker, "/alternatename:?data_0209f254@@3EA=_data_0209f254")
+#pragma comment(linker, "/alternatename:?data_0209f4a6@@3FA=_data_0209f4a6")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020bdd9c, and nothing references ?func_ov002_020bdd9c@@YAXPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020bdd9c@@YAXPAX@Z=_func_ov002_020bdd9c")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020bdef0, and nothing references ?func_ov002_020bdef0@@YAXPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020bdef0@@YAXPAX@Z=_func_ov002_020bdef0")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020bf13c, and nothing references ?func_ov002_020bf13c@@YAXPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020bf13c@@YAXPAX@Z=_func_ov002_020bf13c")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020bf36c, and nothing references ?func_ov002_020bf36c@@YAXPAX0@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020bf36c@@YAXPAX0@Z=_func_ov002_020bf36c")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c2db8, and nothing references ?func_ov002_020c2db8@@YAXPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c2db8@@YAXPAX@Z=_func_ov002_020c2db8")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c2e78, and nothing references ?func_ov002_020c2e78@@YAXPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c2e78@@YAXPAX@Z=_func_ov002_020c2e78")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c4188, and nothing references ?func_ov002_020c4188@@YAHPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c4188@@YAHPAX@Z=_func_ov002_020c4188")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c19func_ov002_020ca940Ev, and nothing references ?_ZN7daPly_c19func_ov002_020ca940Ev@@YAXPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020ca940Ev@@YAXPAX@Z=__ZN7daPly_c19func_ov002_020ca940Ev")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d8158Ev@@YAXPAX@Z=__ZN7daPly_c19func_ov002_020d8158Ev")
+/* RETIRED at catchup1 (SYM4, information row from CUST4): the flat host copy and its one caller are gone (the hit test goes through port_luigi_resolve_hit), so nothing references the left hand side any more. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d869cEv@@YAXPAX@Z=__ZN7daPly_c19func_ov002_020d869cEv")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c15UpdateScaleAnimEv@@YAXPAX@Z=__ZN7daPly_c15UpdateScaleAnimEv")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020e032cEv@@YAXPAX@Z=__ZN7daPly_c19func_ov002_020e032cEv")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020e4bb8Ev@@YAXPAX@Z=__ZN7daPly_c19func_ov002_020e4bb8Ev")
+#pragma comment(linker, "/alternatename:?_ZN5dCc_c8listHeadE@@3PAXA=__ZN5dCc_c8listHeadE")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?gSubVolume@@3HA=_gSubVolume")
+#pragma comment(linker, "/alternatename:?data_ov002_02110094@@3DA=_data_ov002_02110094")
+#pragma comment(linker, "/alternatename:?data_ov002_0211013c@@3UState@@A=_data_ov002_0211013c")
+#pragma comment(linker, "/alternatename:?data_ov002_021101b4@@3UState@@A=_data_ov002_021101b4")
+#pragma comment(linker, "/alternatename:?data_ov002_0211034c@@3DA=_data_ov002_0211034c")
+#pragma comment(linker, "/alternatename:?AngleDiff@@YAHHH@Z=_AngleDiff")
+#pragma comment(linker, "/alternatename:?IsButtonInputValid@@YAHXZ=_IsButtonInputValid")
+#pragma comment(linker, "/alternatename:?_ZN3OAM6RenderEbP7OamAttriiiiiiii@@YAPAXHPAXHHHHHHHH@Z=__ZN3OAM6RenderEbP7OamAttriiiiiiii")
+#pragma comment(linker, "/alternatename:?_ZN17dExtSimpleModel_c14SetPolygonModeEi@@YAHPAXH@Z=__ZN17dExtSimpleModel_c14SetPolygonModeEi")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZNK7daPly_c14GetBodyModelIDEjb, and nothing references ?_ZNK7daPly_c14GetBodyModelIDEjb@@YAHPAXIH@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZNK7daPly_c14GetBodyModelIDEjb@@YAHPAXIH@Z=__ZNK7daPly_c14GetBodyModelIDEjb")
+#pragma comment(linker, "/alternatename:?data_0208ee44@@3HA=_data_0208ee44")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?gMsgBoxLeft@@3EA=_gMsgBoxLeft")
+#pragma comment(linker, "/alternatename:?data_0209d65c@@3CA=?data_0209d65c@@3EA")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?data_0209d66c@@3EA=_data_0209d66c")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?data_0209d670@@3EA=_data_0209d670")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?data_0209d684@@3EA=_data_0209d684")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?gMsgChoiceLine@@3EA=_gMsgChoiceLine")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?gMsgChoiceIndex@@3EA=_gMsgChoiceIndex")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?data_0209d69c@@3EA=_data_0209d69c")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?data_0209d6a0@@3EA=_data_0209d6a0")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?data_0209d6a8@@3EA=_data_0209d6a8")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?data_0209d6b0@@3EA=_data_0209d6b0")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?data_0209d6b4@@3EA=_data_0209d6b4")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?data_0209d6bc@@3EA=_data_0209d6bc")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?gMsgBoxStyle@@3EA=_gMsgBoxStyle")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?gMsgBoxCenterY@@3EA=_gMsgBoxCenterY")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?gMsgBoxTop@@3EA=_gMsgBoxTop")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?gMsgBoxCenterX@@3EA=_gMsgBoxCenterX")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?data_0209d6d8@@3FA=_data_0209d6d8")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?data_0209d6dc@@3FA=_data_0209d6dc")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?gMsgChoicePositions@@3PAEA=_gMsgChoicePositions")
+#pragma comment(linker, "/alternatename:?data_0209d6f0@@3PAUStruct6f0@@A=?data_0209d6f0@@3PAEA")
+#pragma comment(linker, "/alternatename:?data_0209d6f4@@3HA=?data_0209d6f4@@3HC")
+#pragma comment(linker, "/alternatename:?data_0209f4a2@@3EA=_data_0209f4a2")
+#pragma comment(linker, "/alternatename:?data_0209f4a4@@3EA=_data_0209f4a4")
+#pragma comment(linker, "/alternatename:?data_020a0c80@@3PAPAXA=_data_020a0c80")
+#pragma comment(linker, "/alternatename:?data_020a0db0@@3HA=_data_020a0db0")
+#pragma comment(linker, "/alternatename:?data_020a0de8@@3PAEA=_data_020a0de8")
+#pragma comment(linker, "/alternatename:?data_020a0de9@@3PAEA=_data_020a0de9")
+/* the third byte of the stylus record (x). It had no host storage at all until
+   hal/auto_bss.cpp hosted the block properly, so no .cpp reader of it could
+   ever have linked; the route is here so the next slice of a TouchArea TU that
+   declares it outside extern "C" resolves like its three siblings. */
+#pragma comment(linker, "/alternatename:?data_020a0dea@@3PAEA=_data_020a0dea")
+#pragma comment(linker, "/alternatename:?data_020a0deb@@3PAEA=_data_020a0deb")
+#pragma comment(linker, "/alternatename:?data_020a0e5a@@3EA=_data_020a0e5a")
+#pragma comment(linker, "/alternatename:?data_ov002_020ff128@@3PAGA=_data_ov002_020ff128")
+#pragma comment(linker, "/alternatename:?data_ov002_0210c390@@3EA=_data_ov002_0210c390")
+#pragma comment(linker, "/alternatename:?data_ov002_0210c398@@3EA=_data_ov002_0210c398")
+#pragma comment(linker, "/alternatename:?data_ov002_0210c3a0@@3EA=_data_ov002_0210c3a0")
+#pragma comment(linker, "/alternatename:?data_ov002_0210c3a8@@3EA=_data_ov002_0210c3a8")
+#pragma comment(linker, "/alternatename:?data_ov002_0210ffec@@3UState@@A=_data_ov002_0210ffec")
+#pragma comment(linker, "/alternatename:?data_ov002_0211001c@@3UState@@A=_data_ov002_0211001c")
+#pragma comment(linker, "/alternatename:?data_ov002_021100ac@@3HA=_data_ov002_021100ac")
+#pragma comment(linker, "/alternatename:?data_ov002_02110574@@3DA=_data_ov002_02110574")
+#pragma comment(linker, "/alternatename:?data_ov002_021105a4@@3UState@@A=_data_ov002_021105a4")
+#pragma comment(linker, "/alternatename:?data_ov002_021105bc@@3DA=_data_ov002_021105bc")
+#pragma comment(linker, "/alternatename:?data_ov002_0211067c@@3DA=_data_ov002_0211067c")
+#pragma comment(linker, "/alternatename:?func_02012790@@YAXH@Z=_func_02012790")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_02014fa4, and nothing references ?_ZN5dCc_c6UnlinkEv@@YAXPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN5dCc_c6UnlinkEv@@YAXPAD@Z=_func_02014fa4")
+#pragma comment(linker, "/alternatename:?_Z13func_0201adfcv@@YAXXZ=__Z13func_0201adfcv")
+#pragma comment(linker, "/alternatename:?_Z13func_0201b388i@@YAXH@Z=__Z13func_0201b388i")
+#pragma comment(linker, "/alternatename:?_Z13func_0201b6f8i@@YAXH@Z=__Z13func_0201b6f8i")
+#pragma comment(linker, "/alternatename:?_ZN7Message10LayoutLineEv@@YAPAXXZ=__ZN7Message10LayoutLineEv")
+#pragma comment(linker, "/alternatename:?OS_GetTick@@YA_JXZ=_OS_GetTick")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d82f0Ev@@YAHPAX@Z=__ZN7daPly_c19func_ov002_020d82f0Ev")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d91b8Ei@@YAXPADH@Z=__ZN7daPly_c19func_ov002_020d91b8Ei")
+#pragma comment(linker, "/alternatename:?func_ov002_020e6b74@@YAHPAXH@Z=_func_ov002_020e6b74")
+#pragma comment(linker, "/alternatename:?data_ov002_02110064@@3PAHA=_data_ov002_02110064")
+#pragma comment(linker, "/alternatename:?data_ov002_02110094@@3UState@daPly_c@@A=_data_ov002_02110094")
+#pragma comment(linker, "/alternatename:?data_ov002_021101cc@@3UState@@A=_data_ov002_021101cc")
+#pragma comment(linker, "/alternatename:?data_ov002_02110604@@3UState@@A=_data_ov002_02110604")
+#pragma comment(linker, "/alternatename:?GetSoundMode@@YAHXZ=_GetSoundMode")
+#pragma comment(linker, "/alternatename:?SetSoundMode@@YAXH@Z=_SetSoundMode")
+#pragma comment(linker, "/alternatename:?sCutsceneEndWaving@@3HA=_sCutsceneEndWaving")
+#pragma comment(linker, "/alternatename:?sCutsceneIntroPeachLetter@@3HA=_sCutsceneIntroPeachLetter")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?gKuppaScriptNumPlayers@@3EA=_gKuppaScriptNumPlayers")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?gKuppaScriptPlayerIDs@@3PAIA=_gKuppaScriptPlayerIDs")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?gDemoActorIDs@@3PAIA=_gDemoActorIDs")
+#pragma comment(linker, "/alternatename:?gNextActorUpdateMask@@3HA=_gNextActorUpdateMask")
+#pragma comment(linker, "/alternatename:?gNumPlayers@@3EA=_gNumPlayers")
+#pragma comment(linker, "/alternatename:?gRunningKuppaScript@@3HA=_gRunningKuppaScript")
+#pragma comment(linker, "/alternatename:?gSavedKuppaScript@@3HA=_gSavedKuppaScript")
+#pragma comment(linker, "/alternatename:?_Z13func_02011c8cv@@YAXXZ=__Z13func_02011c8cv")
+#pragma comment(linker, "/alternatename:?data_ov002_0210a054@@3P8C@@AEXPAEHH@ZQ1@=_data_ov002_0210a054")
+#pragma comment(linker, "/alternatename:?data_ov002_0210a064@@3P8C@@AEXPAEHH@ZQ1@=_data_ov002_0210a064")
+#pragma comment(linker, "/alternatename:?data_ov002_0210a094@@3P8C@@AEXPAEHH@ZQ1@=_data_ov002_0210a094")
+#pragma comment(linker, "/alternatename:?data_ov002_0210a0b4@@3P8C@@AEXPAEHH@ZQ1@=_data_ov002_0210a0b4")
+#pragma comment(linker, "/alternatename:?data_ov002_0210a0dc@@3P8C@@AEXPAEHH@ZQ1@=_data_ov002_0210a0dc")
+#pragma comment(linker, "/alternatename:?data_ov002_0210a124@@3P8C@@AEXPAEHH@ZQ1@=_data_ov002_0210a124")
+#pragma comment(linker, "/alternatename:?data_ov002_0210a14c@@3P8C@@AEXPAEHH@ZQ1@=_data_ov002_0210a14c")
+#pragma comment(linker, "/alternatename:?data_ov002_0210a36c@@3P8C@@AEXPAEHH@ZQ1@=_data_ov002_0210a36c")
+#pragma comment(linker, "/alternatename:?data_ov002_0210a3c4@@3P8C@@AEXPAEHH@ZQ1@=_data_ov002_0210a3c4")
+#pragma comment(linker, "/alternatename:?data_ov002_0210a3fc@@3P8C@@AEXPAEHH@ZQ1@=_data_ov002_0210a3fc")
+#pragma comment(linker, "/alternatename:?data_ov002_0210a40c@@3P8C@@AEXPAEHH@ZQ1@=_data_ov002_0210a40c")
+#pragma comment(linker, "/alternatename:?data_ov002_0210a44c@@3P8C@@AEXPAEHH@ZQ1@=_data_ov002_0210a44c")
+#pragma comment(linker, "/alternatename:?data_ov002_0210a474@@3P8C@@AEXPAEHH@ZQ1@=_data_ov002_0210a474")
+#pragma comment(linker, "/alternatename:?data_ov002_0210a534@@3P8C@@AEXPAEHH@ZQ1@=_data_ov002_0210a534")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c12AdvanceAnimsEv, and nothing references ?_ZN7daPly_c12AdvanceAnimsEv@@YAHPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c12AdvanceAnimsEv@@YAHPAX@Z=__ZN7daPly_c12AdvanceAnimsEv")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c17ScaleByCharFactorEi, and nothing references ?_ZN7daPly_c17ScaleByCharFactorEi@@YAHPAXH@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c17ScaleByCharFactorEi@@YAHPAXH@Z=__ZN7daPly_c17ScaleByCharFactorEi")
+#pragma comment(linker, "/alternatename:?_ZN7dBgW_Kc7SetFileEP8KCL_FileR10CLPS_Block@@YAXPAX00@Z=__ZN7dBgW_Kc7SetFileEP8KCL_FileR10CLPS_Block")
+#pragma comment(linker, "/alternatename:?_ZN7dBgW_Kc8LoadFileER13SharedFilePtr@@YAPAXPAX@Z=__ZN7dBgW_Kc8LoadFileER13SharedFilePtr")
+#pragma comment(linker, "/alternatename:?_ZN7dBgW_KcC1Ev@@YAXPAX@Z=__ZN7dBgW_KcC1Ev")
+#pragma comment(linker, "/alternatename:?_ZN13SharedFilePtr9ConstructEj@@YAPAXPAXI@Z=__ZN13SharedFilePtr9ConstructEj")
+#pragma comment(linker, "/alternatename:?_ZN4dBgW6EnableEP8dActor_c@@YAHPAX0@Z=__ZN4dBgW6EnableEP8dActor_c")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c11ChangeStateERNS_5StateE@@YAHPAX0@Z=__ZN7daPly_c11ChangeStateERNS_5StateE")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c6IsAnimEj@@YAHPAXI@Z=__ZN7daPly_c6IsAnimEj")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c7SetAnimEjiit, and nothing references ?_ZN7daPly_c7SetAnimEjiit@@YAHPAXIHHI@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c7SetAnimEjiit@@YAHPAXIHHI@Z=__ZN7daPly_c7SetAnimEjiit")
+#pragma comment(linker, "/alternatename:?data_0209f4a0@@3PADA=_data_0209f4a0")
+#pragma comment(linker, "/alternatename:?data_ov002_0211007c@@3HA=_data_ov002_0211007c")
+#pragma comment(linker, "/alternatename:?data_ov002_0211019c@@3HA=_data_ov002_0211019c")
+#pragma comment(linker, "/alternatename:?data_ov002_021101b4@@3HA=_data_ov002_021101b4")
+#pragma comment(linker, "/alternatename:?data_ov002_021101e4@@3HA=_data_ov002_021101e4")
+#pragma comment(linker, "/alternatename:?data_ov002_02110424@@3PADA=_data_ov002_02110424")
+#pragma comment(linker, "/alternatename:?data_ov002_02110454@@3HA=_data_ov002_02110454")
+#pragma comment(linker, "/alternatename:?data_ov002_0211052c@@3HA=_data_ov002_0211052c")
+#pragma comment(linker, "/alternatename:?data_ov002_0211055c@@3HA=_data_ov002_0211055c")
+#pragma comment(linker, "/alternatename:?data_ov002_0211055c@@3PAHA=_data_ov002_0211055c")
+#pragma comment(linker, "/alternatename:?data_ov002_02110724@@3HA=_data_ov002_02110724")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d5c6cEv@@YAHPAX@Z=__ZN7daPly_c19func_ov002_020d5c6cEv")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020dde74Ev@@YAHPAX@Z=__ZN7daPly_c19func_ov002_020dde74Ev")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020e04a4Ev@@YAXPAX@Z=__ZN7daPly_c19func_ov002_020e04a4Ev")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020e2664Ev@@YAHPAX@Z=__ZN7daPly_c19func_ov002_020e2664Ev")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020e28d4Eii@@YAHPAXHH@Z=__ZN7daPly_c19func_ov002_020e28d4Eii")
+#pragma comment(linker, "/alternatename:?data_ov002_021101e4@@3UState@daPly_c@@A=_data_ov002_021101e4")
+#pragma comment(linker, "/alternatename:?data_ov002_0211040c@@3UState@daPly_c@@A=_data_ov002_0211040c")
+#pragma comment(linker, "/alternatename:?data_ov002_021105a4@@3UState@daPly_c@@A=_data_ov002_021105a4")
+#pragma comment(linker, "/alternatename:?data_ov002_021105bc@@3UState@daPly_c@@A=_data_ov002_021105bc")
+
+/* stale caller names -> renamed callees (the #973 class, host side) */
+#pragma comment(linker, "/alternatename:_func_02037670=__ZN9dBgCh_Lin13SetObjAndLineERK7Vector3S2_P8dActor_c")
+#pragma comment(linker, "/alternatename:_func_02037764=__ZN9dBgCh_LinD1Ev")
+#pragma comment(linker, "/alternatename:_func_020377b0=__ZN9dBgCh_LinC1Ev")
+#pragma comment(linker, "/alternatename:_func_02038638=__ZN9dBgCh_Lin10DetectClsnEv")
+#pragma comment(linker, "/alternatename:_func_0203b0e8=_AngleDiff")
+#pragma comment(linker, "/alternatename:_func_0203b4dc=__ZN4cstd5atan2Eii")
+#pragma comment(linker, "/alternatename:_func_0203cf78=_Vec3_HorzLen")
+
+/* gate-13 state-family ring (sprint/crouch/punch/slope-jump wave):
+   C++-mangled refs from the new St_ TUs -> C-named defs/storage */
+#pragma comment(linker, "/alternatename:?data_ov002_020ff130@@3PAHA=_data_ov002_020ff130")
+#pragma comment(linker, "/alternatename:?data_ov002_020ff164@@3PAHA=_data_ov002_020ff164")
+#pragma comment(linker, "/alternatename:?data_ov002_021101e4@@3PAHA=_data_ov002_021101e4")
+#pragma comment(linker, "/alternatename:?data_ov002_02110694@@3PAHA=_data_ov002_02110694")
+#pragma comment(linker, "/alternatename:?data_ov002_021106dc@@3PAHA=_data_ov002_021106dc")
+#pragma comment(linker, "/alternatename:?data_ov002_02110724@@3PAHA=_data_ov002_02110724")
+#pragma comment(linker, "/alternatename:?data_ov002_0210e160@@3HA=_data_ov002_0210e160")
+#pragma comment(linker, "/alternatename:?data_ov002_0211013c@@3HA=_data_ov002_0211013c")
+#pragma comment(linker, "/alternatename:?data_0209f4a4@@3PAFA=_data_0209f4a4")
+#pragma comment(linker, "/alternatename:?gCamera@@3PAUCamera@@A=_gCamera")
+/* gate 18 (RABBIT_KEY): func_ov085_0212cd0c.cpp spells the live Camera as a
+   C++ `int *` at file scope -- the fourth spelling of the same object. */
+#pragma comment(linker, "/alternatename:?gCamera@@3PAHA=_gCamera")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d1164Ev@@YAHPAX@Z=__ZN7daPly_c19func_ov002_020d1164Ev")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d1204Ev@@YAHPAX@Z=__ZN7daPly_c19func_ov002_020d1204Ev")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d12b0Ev@@YAHPAX@Z=__ZN7daPly_c19func_ov002_020d12b0Ev")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020dc020Ev@@YAHPAX@Z=__ZN7daPly_c19func_ov002_020dc020Ev")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020e25f0Ei@@YAHPAXH@Z=__ZN7daPly_c19func_ov002_020e25f0Ei")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020e2ad0Ev@@YAHPAX@Z=__ZN7daPly_c19func_ov002_020e2ad0Ev")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020e2b6cEv@@YAHPAX@Z=__ZN7daPly_c19func_ov002_020e2b6cEv")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020e2ba8Ev@@YAHPAX@Z=__ZN7daPly_c19func_ov002_020e2ba8Ev")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020e2be4Ev@@YAHPAX@Z=__ZN7daPly_c19func_ov002_020e2be4Ev")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020e2c84Ev@@YAHPAD@Z=__ZN7daPly_c19func_ov002_020e2c84Ev")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c16ReleaseHeldActorEv@@YAHPAX@Z=__ZN7daPly_c16ReleaseHeldActorEv")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN5Sound9PlayBank0EjRK7Vector3, and nothing references ?_ZN5Sound9PlayBank0EjRK7Vector3@@YAHIPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN5Sound9PlayBank0EjRK7Vector3@@YAHIPAX@Z=__ZN5Sound9PlayBank0EjRK7Vector3")
+#pragma comment(linker, "/alternatename:?data_ov002_0211061c@@3UState@@A=_data_ov002_0211061c")
+/* ADDED at the main -> port sync (lane SYNC7, wave 9, origin/main 4382d447e).
+   Four data words whose ROM address the port already hosts under the flat C
+   name, and whose SPELLING moved when main gave the reading TU a real type: a
+   file-scope C++ declaration decorates the tag into the symbol, so
+   `daPropeller_Heyho_c::State` and `FaderColor` are new names for words the
+   link already has. Same shape as the gCamera rows above and the
+   ?data_ov002_0211061c@@3UState@@A row this block follows: a name bridge over
+   one address, no convention crossed, the definition unmoved. Each RHS was
+   checked as DEFINED in walk_window's own link inputs before the row was
+   written, and each LHS is an unresolved row of that same link. */
+#pragma comment(linker, "/alternatename:?gSceneColorFader@@3UFaderColor@@A=_gSceneColorFader")
+#pragma comment(linker, "/alternatename:?data_ov002_0210af70@@3PAHA=_data_ov002_0210af70")
+/* ADDED at the main -> port sync (lane SYNC7, wave 9). Five more of the same
+   shape, each RHS checked as defined in walk_window's own link inputs and each
+   LHS an unresolved row of that link.
+
+   THE FIRST ONE WAS THE VTABLE (daObjPathLift_c's _ZTV15daObjPathLift_c onto
+   the host array data_ov100_0214857c). It is retired below: the class is
+   native now, dispatches its compiled table, and the host array is gone.
+
+   THE OTHER FOUR ARE POINTER-TYPED DATA (PAU, PAPAU, PAD, PAH), so nothing
+   reads a struct layout through the name. Thirteen more decorated data rows on
+   this wall have a defined flat counterpart and are NOT written here: nine are
+   the ov006 PmfRecord and Pair words and one is ?data_ov002_0210dc00@@3PAP8C
+   @@AEXXZA, which is pointer-to-member typed outright -- the consumer-spelling
+   law (port/mg_fanout_costs.txt section 4) says a consumer naming a member
+   pointer needs a host copy whether it is called or only copied -- and three
+   are struct-by-value words (CLPS_Block, two SharedFilePtr) whose hosted size
+   this lane did not measure. They are listed in lane SYNC7's report. */
+/* RETIRED (plain cleanup). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _data_ov100_0214857c since the host table was deleted, and nothing references ?_ZTV15daObjPathLift_c@@3PAHA (a reference would fail the link), so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZTV15daObjPathLift_c@@3PAHA=_data_ov100_0214857c")
+#pragma comment(linker, "/alternatename:?data_0209cef4@@3PAUShadowModel@@A=_data_0209cef4")
+#pragma comment(linker, "/alternatename:?gPlayers@@3PAPAUdaPly_c@@A=_gPlayers")
+#pragma comment(linker, "/alternatename:?data_020a0ebc@@3PADA=_data_020a0ebc")
+#pragma comment(linker, "/alternatename:?data_ov022_021145a0@@3PAHA=_data_ov022_021145a0")
+#pragma comment(linker, "/alternatename:?data_ov002_02110634@@3UState@@A=_data_ov002_02110634")
+#pragma comment(linker, "/alternatename:?gCamera@@3PAXA=_gCamera")
+#pragma comment(linker, "/alternatename:?_ZN9dCamera_c17SetHeadstandStateEi@@YAXPAUCamera@@H@Z=__ZN9dCamera_c17SetHeadstandStateEi")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c19func_ov002_020cc05cEt, and nothing references ?_ZN7daPly_c19func_ov002_020cc05cEt@@YAXPAXG@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020cc05cEt@@YAXPAXG@Z=__ZN7daPly_c19func_ov002_020cc05cEt")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020dbaecEv@@YAXPAX@Z=__ZN7daPly_c19func_ov002_020dbaecEv")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020dd5ecEv@@YAXPAX@Z=__ZN7daPly_c19func_ov002_020dd5ecEv")
+#pragma comment(linker, "/alternatename:?_Z19func_ov002_020eee3cPcS_@@YAXPAD0@Z=__Z19func_ov002_020eee3cPcS_")
+
+/* gate-10 tier-2 state wave: C++-mangled refs from the new St_ TUs
+   resolved onto the C-named defs and storage they actually link to. */
+#pragma comment(linker, "/alternatename:?FUN_02029934@@YAXXZ=_FUN_02029934")
+#pragma comment(linker, "/alternatename:?FUN_02029980@@YAXXZ=_FUN_02029980")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c12AdvanceAnimsEv, and nothing references ?_ZN7daPly_c12AdvanceAnimsEv@@YAXPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c12AdvanceAnimsEv@@YAXPAD@Z=__ZN7daPly_c12AdvanceAnimsEv")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c12AdvanceAnimsEv, and nothing references ?_ZN7daPly_c12AdvanceAnimsEv@@YAXPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c12AdvanceAnimsEv@@YAXPAX@Z=__ZN7daPly_c12AdvanceAnimsEv")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c18DisableInteractionEv, and nothing references ?_ZN7daPly_c18DisableInteractionEv@@YAHPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c18DisableInteractionEv@@YAHPAX@Z=__ZN7daPly_c18DisableInteractionEv")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c18DisableInteractionEv, and nothing references ?_ZN7daPly_c18DisableInteractionEv@@YAXPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c18DisableInteractionEv@@YAXPAX@Z=__ZN7daPly_c18DisableInteractionEv")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c16ReleaseHeldActorEv@@YAXPAX@Z=__ZN7daPly_c16ReleaseHeldActorEv")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c17ScaleByCharFactorEi, and nothing references ?_ZN7daPly_c17ScaleByCharFactorEi@@YAHPADH@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c17ScaleByCharFactorEi@@YAHPADH@Z=__ZN7daPly_c17ScaleByCharFactorEi")
+#pragma comment(linker, "/alternatename:?_Z14ApproachLinearRiii@@YAXPAHHH@Z=__Z14ApproachLinearRiii")
+#pragma comment(linker, "/alternatename:?_ZN4cstd5atan2Eii@@YAHHH@Z=__ZN4cstd5atan2Eii")
+#pragma comment(linker, "/alternatename:?_ZN8dActor_c10SpawnCoinsERK7Vector3iis@@YAXPAXABUVector3@@IHF@Z=__ZN8dActor_c10SpawnCoinsERK7Vector3iis")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN5Sound13PlayCharVoiceEjjRK7Vector3, and nothing references ?_ZN5Sound13PlayCharVoiceEjjRK7Vector3@@YAXIIPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN5Sound13PlayCharVoiceEjjRK7Vector3@@YAXIIPAX@Z=__ZN5Sound13PlayCharVoiceEjjRK7Vector3")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c11ChangeStateERNS_5StateE@@YAXPAX0@Z=__ZN7daPly_c11ChangeStateERNS_5StateE")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c12FinishedAnimEv@@YAHPAX@Z=__ZN7daPly_c12FinishedAnimEv")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c7SetAnimEjiit, and nothing references ?_ZN7daPly_c7SetAnimEjiit@@YAXPADIHHI@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c7SetAnimEjiit@@YAXPADIHHI@Z=__ZN7daPly_c7SetAnimEjiit")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c7SetAnimEjiit, and nothing references ?_ZN7daPly_c7SetAnimEjiit@@YAXPAXHHHI@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c7SetAnimEjiit@@YAXPAXHHHI@Z=__ZN7daPly_c7SetAnimEjiit")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c7SetAnimEjiit, and nothing references ?_ZN7daPly_c7SetAnimEjiit@@YAXPAXIHHI@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c7SetAnimEjiit@@YAXPAXIHHI@Z=__ZN7daPly_c7SetAnimEjiit")
+#pragma comment(linker, "/alternatename:?_ZN8Particle20RunningSlidingDustAtEiii@@YAXHHH@Z=__ZN8Particle20RunningSlidingDustAtEiii")
+#pragma comment(linker, "/alternatename:?_ZN7fBase_c18MarkForDestructionEv@@YAXPAX@Z=__ZN7fBase_c18MarkForDestructionEv")
+#pragma comment(linker, "/alternatename:?_ZNK5dBgPi9GetClsnIDEv@@YAHPAX@Z=__ZNK5dBgPi9GetClsnIDEv")
+#pragma comment(linker, "/alternatename:?_ZNK10dBgCh_Actr13GetWallResultEv@@YAPAXPAX@Z=__ZNK10dBgCh_Actr13GetWallResultEv")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZNK7daPly_c14GetBodyModelIDEjb, and nothing references ?_ZNK7daPly_c14GetBodyModelIDEjb@@YAHPADIH@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZNK7daPly_c14GetBodyModelIDEjb@@YAHPADIH@Z=__ZNK7daPly_c14GetBodyModelIDEjb")
+#pragma comment(linker, "/alternatename:?gNextSublevel@@3CA=_gNextSublevel")
+#pragma comment(linker, "/alternatename:?gLocalPlayerId@@3EA=_gLocalPlayerId")
+#pragma comment(linker, "/alternatename:?data_0209f28c@@3EA=_data_0209f28c")
+#pragma comment(linker, "/alternatename:?gCamera@@3PADA=_gCamera")
+#pragma comment(linker, "/alternatename:?data_0209f49e@@3GA=_data_0209f49e")
+#pragma comment(linker, "/alternatename:?data_0209f49e@@3PAGA=_data_0209f49e")
+#pragma comment(linker, "/alternatename:?data_0209f4a0@@3PAFA=_data_0209f4a0")
+#pragma comment(linker, "/alternatename:?data_020a0e5a@@3PADA=_data_020a0e5a")
+#pragma comment(linker, "/alternatename:?data_ov002_020ff0ec@@3PAEA=_data_ov002_020ff0ec")
+#pragma comment(linker, "/alternatename:?data_ov002_020ff1c0@@3PAHA=_data_ov002_020ff1c0")
+#pragma comment(linker, "/alternatename:?data_ov002_020ff1d0@@3PAHA=_data_ov002_020ff1d0")
+#pragma comment(linker, "/alternatename:?data_ov002_020ff254@@3PAHA=_data_ov002_020ff254")
+#pragma comment(linker, "/alternatename:?data_ov002_02109fe4@@3PAHA=_data_ov002_02109fe4")
+#pragma comment(linker, "/alternatename:?data_ov002_0210a560@@3PAHA=_data_ov002_0210a560")
+#pragma comment(linker, "/alternatename:?data_ov002_0210a578@@3PAIA=_data_ov002_0210a578")
+#pragma comment(linker, "/alternatename:?data_ov002_0210a584@@3PAIA=_data_ov002_0210a584")
+#pragma comment(linker, "/alternatename:?data_ov002_0210a60c@@3PAIA=_data_ov002_0210a60c")
+#pragma comment(linker, "/alternatename:?data_ov002_0210a6d4@@3PAIA=_data_ov002_0210a6d4")
+#pragma comment(linker, "/alternatename:?data_ov002_0211004c@@3UState@@A=_data_ov002_0211004c")
+#pragma comment(linker, "/alternatename:?data_ov002_0211007c@@3PAHA=_data_ov002_0211007c")
+#pragma comment(linker, "/alternatename:?data_ov002_0211013c@@3DA=_data_ov002_0211013c")
+#pragma comment(linker, "/alternatename:?data_ov002_0211013c@@3PADA=_data_ov002_0211013c")
+#pragma comment(linker, "/alternatename:?data_ov002_021101b4@@3DA=_data_ov002_021101b4")
+#pragma comment(linker, "/alternatename:?data_ov002_0211031c@@3DA=_data_ov002_0211031c")
+#pragma comment(linker, "/alternatename:?data_ov002_021103dc@@3DA=_data_ov002_021103dc")
+#pragma comment(linker, "/alternatename:?data_ov002_02110424@@3DA=_data_ov002_02110424")
+#pragma comment(linker, "/alternatename:?data_ov002_021106c4@@3PAHA=_data_ov002_021106c4")
+/* ST_CLIMB: St_Climb_Init and St_Climb_Cleanup declare their externs without
+   extern "C", so MSVC C++-mangles every reference. 021106f4 (ST_HEADSTAND)
+   needs two aliases because the two sources spell its type differently. */
+#pragma comment(linker, "/alternatename:?data_ov002_021106f4@@3PADA=_data_ov002_021106f4")
+#pragma comment(linker, "/alternatename:?data_ov002_021106f4@@3PAHA=_data_ov002_021106f4")
+/* ST_LEDGE_HANG (data_ov002_0210ffec): the same case as ST_CLIMB above.
+   All three St_LedgeHang halves pull their declarations from
+   include/decl_common.h, which is not wrapped in extern "C", so every
+   reference comes out C++-mangled against a C-named definition. Init's
+   SetPosRelativeToActor is worse -- it is declared at file scope in the
+   source itself, outside any extern "C" -- and 02110004 (ST_LEDGE_GRAB,
+   the pull-up Main changes into) is the data half of the same problem.
+   Seven references, seven aliases; the sources stay byte-verified. */
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c19func_ov002_020cfaf0Ev, and nothing references ?_ZN7daPly_c19func_ov002_020cfaf0Ev@@YAHPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020cfaf0Ev@@YAHPAX@Z=__ZN7daPly_c19func_ov002_020cfaf0Ev")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c19func_ov002_020cfbdcEv, and nothing references ?_ZN7daPly_c19func_ov002_020cfbdcEv@@YAHPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020cfbdcEv@@YAHPAX@Z=__ZN7daPly_c19func_ov002_020cfbdcEv")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020cfea4Ev@@YAHPAX@Z=__ZN7daPly_c19func_ov002_020cfea4Ev")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d0948Ev@@YAXPAX@Z=__ZN7daPly_c19func_ov002_020d0948Ev")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020e63a4Ev@@YAXPAX@Z=__ZN7daPly_c19func_ov002_020e63a4Ev")
+#pragma comment(linker, "/alternatename:?data_ov002_02110004@@3PAHA=_data_ov002_02110004")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN10dCcAcPos_c21SetPosRelativeToActorERK7Vector3, and nothing references ?_ZN10dCcAcPos_c21SetPosRelativeToActorERK7Vector3@@YAXPADPAUVec3@@@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN10dCcAcPos_c21SetPosRelativeToActorERK7Vector3@@YAXPADPAUVec3@@@Z=__ZN10dCcAcPos_c21SetPosRelativeToActorERK7Vector3")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c16ReleaseHeldActorEv@@YAHPAD@Z=__ZN7daPly_c16ReleaseHeldActorEv")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020e3078EPv@@YAHPAX0@Z=__ZN7daPly_c19func_ov002_020e3078EPv")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c18ClearClimbColliderEv, and nothing references ?_ZN7daPly_c18ClearClimbColliderEv@@YAHPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c18ClearClimbColliderEv@@YAHPAX@Z=__ZN7daPly_c18ClearClimbColliderEv")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN5Sound13PlayCharVoiceEjjRK7Vector3, and nothing references ?_ZN5Sound13PlayCharVoiceEjjRK7Vector3@@YAXIIABUVector3@@@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN5Sound13PlayCharVoiceEjjRK7Vector3@@YAXIIABUVector3@@@Z=__ZN5Sound13PlayCharVoiceEjjRK7Vector3")
+#pragma comment(linker, "/alternatename:?_ZN9dCamera_c22SetGrabBowserTailStateEh@@YAXPAXE@Z=__ZN9dCamera_c22SetGrabBowserTailStateEh")
+#pragma comment(linker, "/alternatename:?_ZN9dCamera_c13func_0200d1e4Ev@@YAXPAD@Z=__ZN9dCamera_c13func_0200d1e4Ev")
+#pragma comment(linker, "/alternatename:?_ZN9dCamera_c13func_0200d63cEh@@YAXPAXE@Z=__ZN9dCamera_c13func_0200d63cEh")
+#pragma comment(linker, "/alternatename:?_ZN9dCamera_c13func_0200d6b4Eh@@YAXPAXE@Z=__ZN9dCamera_c13func_0200d6b4Eh")
+#pragma comment(linker, "/alternatename:?_ZN9dCamera_c13func_0200d768Eh@@YAXPAXE@Z=__ZN9dCamera_c13func_0200d768Eh")
+#pragma comment(linker, "/alternatename:?_ZN9dCamera_c13func_0200d7a4Eh@@YAXPAXE@Z=__ZN9dCamera_c13func_0200d7a4Eh")
+#pragma comment(linker, "/alternatename:?_ZN9dCamera_c13func_0200d89cEv@@YAXPAD@Z=__ZN9dCamera_c13func_0200d89cEv")
+#pragma comment(linker, "/alternatename:?func_0201226c@@YAHHHHHHF@Z=_func_0201226c")
+#pragma comment(linker, "/alternatename:?func_0201fc88@@YAXF@Z=_func_0201fc88")
+#pragma comment(linker, "/alternatename:?func_02020388@@YAXH@Z=_func_02020388")
+#pragma comment(linker, "/alternatename:?_ZN8Particle24MegaRunningSlidingDustAtEiii@@YAXHHH@Z=__ZN8Particle24MegaRunningSlidingDustAtEiii")
+#pragma comment(linker, "/alternatename:?func_02035638@@YAHPAE@Z=_func_02035638")
+#pragma comment(linker, "/alternatename:?func_0203564c@@YAHH@Z=_func_0203564c")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020bdb50Ei@@YAXPADH@Z=__ZN7daPly_c19func_ov002_020bdb50Ei")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020beb38, and nothing references ?func_ov002_020beb38@@YAHPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020beb38@@YAHPAD@Z=_func_ov002_020beb38")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c19func_ov002_020bf56cEi, and nothing references ?_ZN7daPly_c19func_ov002_020bf56cEi@@YAHPAXH@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020bf56cEi@@YAHPAXH@Z=__ZN7daPly_c19func_ov002_020bf56cEi")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020bf5e0, and nothing references ?func_ov002_020bf5e0@@YAXPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020bf5e0@@YAXPAX@Z=_func_ov002_020bf5e0")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020bf88c, and nothing references ?func_ov002_020bf88c@@YAXPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020bf88c@@YAXPAX@Z=_func_ov002_020bf88c")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c04e0, and nothing references ?func_ov002_020c04e0@@YAHPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c04e0@@YAHPAD@Z=_func_ov002_020c04e0")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c1eb4, and nothing references ?func_ov002_020c1eb4@@YAXPAXH@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c1eb4@@YAXPAXH@Z=_func_ov002_020c1eb4")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c2f64, and nothing references ?func_ov002_020c2f64@@YAXPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c2f64@@YAXPAX@Z=_func_ov002_020c2f64")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c47f4, and nothing references ?func_ov002_020c47f4@@YAHPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c47f4@@YAHPAD@Z=_func_ov002_020c47f4")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c19func_ov002_020cc660Ei, and nothing references ?_ZN7daPly_c19func_ov002_020cc660Ei@@YAXPADH@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020cc660Ei@@YAXPADH@Z=__ZN7daPly_c19func_ov002_020cc660Ei")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020cd190, and nothing references ?func_ov002_020cd190@@YAXPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020cd190@@YAXPAX@Z=_func_ov002_020cd190")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c19func_ov002_020cf20cEv, and nothing references ?_ZN7daPly_c19func_ov002_020cf20cEv@@YAHPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020cf20cEv@@YAHPAD@Z=__ZN7daPly_c19func_ov002_020cf20cEv")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c19func_ov002_020cf2f8Ev, and nothing references ?_ZN7daPly_c19func_ov002_020cf2f8Ev@@YAXPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020cf2f8Ev@@YAXPAD@Z=__ZN7daPly_c19func_ov002_020cf2f8Ev")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c19func_ov002_020cf384Ev, and nothing references ?_ZN7daPly_c19func_ov002_020cf384Ev@@YAXPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020cf384Ev@@YAXPAD@Z=__ZN7daPly_c19func_ov002_020cf384Ev")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d1f78Ej@@YAXPAXI@Z=__ZN7daPly_c19func_ov002_020d1f78Ej")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d3498Ev@@YAXPAX@Z=__ZN7daPly_c19func_ov002_020d3498Ev")
+#pragma comment(linker, "/alternatename:?func_ov002_020d5ab4@@YAHPAX@Z=_func_ov002_020d5ab4")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d6368Ev@@YAXPAD@Z=__ZN7daPly_c19func_ov002_020d6368Ev")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d674cEv@@YAHPAD@Z=__ZN7daPly_c19func_ov002_020d674cEv")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d718cEv@@YAXPAX@Z=__ZN7daPly_c19func_ov002_020d718cEv")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d71a0Ev@@YAXPAD@Z=__ZN7daPly_c19func_ov002_020d71a0Ev")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d93acEv@@YAXPAD@Z=__ZN7daPly_c19func_ov002_020d93acEv")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d9dccEv@@YAHPAX@Z=__ZN7daPly_c19func_ov002_020d9dccEv")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020daa74Ev@@YAXPAX@Z=__ZN7daPly_c19func_ov002_020daa74Ev")
+#pragma comment(linker, "/alternatename:?func_ov002_020db54c@@YAXPADHHH@Z=_func_ov002_020db54c")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020dcafcEv@@YAXPAD@Z=__ZN7daPly_c19func_ov002_020dcafcEv")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020de968Ev@@YAXPAX@Z=__ZN7daPly_c19func_ov002_020de968Ev")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020e0f38Ei@@YAXPAXE@Z=__ZN7daPly_c19func_ov002_020e0f38Ei")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020e0f38Ei@@YAXPAXH@Z=__ZN7daPly_c19func_ov002_020e0f38Ei")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020e28d4Eii@@YAXPAXHH@Z=__ZN7daPly_c19func_ov002_020e28d4Eii")
+#pragma comment(linker, "/alternatename:?_Z19func_ov100_02144fccv@@YAHXZ=__Z19func_ov100_02144fccv")
+
+/* PORT_HOST_ABI: shared-load-window NAME COLLISION -- this symbol is ov002 DATA here and an ov006 FUNCTION in src/; they are different objects at one address.
+   daPly_c::ST_WAIT is an ov006 FUNCTION name; at that address ov002 holds
+   the Wait State object, which is what St_WaitQuicksand_Main wants.
+
+   THE RULING, and why this is not replacement work. ov002 and ov006 share a
+   DS overlay load window, so both cover 0x02110154 and only one of them is
+   resident at a time on hardware. config/arm9/overlays/ov006/symbols.txt says
+   `_ZN19cMgSmartball_slot_c14RestoreInitialEv kind:function(arm,size=0x68) addr:0x02110154` -- that
+   is ov006's code -- while the byte the port needs at that address is ov002's
+   Wait State object, emitted by ovdata.py as __ZN7daPly_c7ST_WAITE. The alias
+   below binds the name its ov002 CALLER spells to the ov002 bytes it means.
+   src/_ZN19cMgSmartball_slot_c14RestoreInitialEv.cpp is a real matched TU of ov006's FUNCTION, and it
+   is a different object that happens to carry the same dsd-exported name. The
+   queue pairs them by name, which is all a name can do. Linking that TU here
+   would not replace this definition; it would collide with it, because in the
+   port every overlay is resident at once and the window no longer separates
+   them. Nothing about this is a stub standing in for a linkable body. */
+#pragma comment(linker, "/alternatename:__ZN19cMgSmartball_slot_c14RestoreInitialEv=?ST_WAIT@daPly_c@@2UState@1@A")
+
+/* THE ROOT-HEAP BOOT SPINE (lane w8-shadows). Seating
+   src/engine/heap/Heap.cpp -- the ROM's own entry into root-heap
+   setup, which tests/walk_window.cpp used to skip by calling the inner
+   SetupRootHeap directly -- needs three names bound, and all three are
+   alias-legal because every function involved is __cdecl: the matched TU
+   spells Heap's two entries as STATIC members, and a static member takes no
+   `this`. None of the thiscall hazards this file warns about apply.
+
+   Manglings read off the linker's own error text, not guessed. */
+/* the matched TU calls Heap::SetupRootHeap as a static member; the port's
+   SetupRootHeap is the C name from a .c matched TU. Return types differ (void
+   against HeapS*) and that is harmless for cdecl -- the pointer comes back in
+   EAX and this caller discards it. The boot guard that used to read that
+   return now reads data_020a0ea0, which SetupRootHeap writes on the success
+   path and leaves alone on failure; see the call site. */
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN5mHeap6Heap_t13SetupRootHeapEv, and nothing references ?SetupRootHeap@Heap_t@mHeap@@SAXXZ, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?SetupRootHeap@Heap_t@mHeap@@SAXXZ=__ZN5mHeap6Heap_t13SetupRootHeapEv")
+/* Memory::rootParamOffset is the matched TU's name for 0x020a0ea4. The name is
+   wrong and the address is right: src/engine/heap/Heap.cpp passes that
+   word as the FIRST argument to every arena accessor (OS_GetArenaLo,
+   OS_GetArenaHi, OS_InitAlloc, OS_SetArenaLo, OS_AllocFromArenaLo), so it is the OS
+   globals POINTER and InitializeRootHeap NULLs it to mean "use the default".
+   hal/os_arena.cpp had it right. Bound to the storage that file already owns. */
+#pragma comment(linker, "/alternatename:?rootParamOffset@Memory@@3IA=_data_020a0ea4")
+/* and the ROM's C name onto the matched static member, so the boot site can
+   spell it the way every other seated entry in walk_window.cpp is spelled */
+#pragma comment(linker, "/alternatename:__ZN5mHeap6Heap_t18InitializeRootHeapEv=?InitializeRootHeap@Heap_t@mHeap@@SAXXZ")
+
+/* PORT_HOST_ABI: shared-load-window NAME COLLISION -- this symbol is ov013 BSS here and an ov045 FUNCTION in src/; they are different objects at one address.
+   Moved here from hal/actor_classes_ov013.cpp with its ruling. ov013 and ov045
+   share a load window and both cover 0x02112280. The Pendulum's Init (ov013)
+   reaches its own SharedFilePtr at that bss address, and dsd's ov045 export
+   won the naming race inside that TU, so the recovered source spells it
+   `__sinit_ov045_02112280`; port/ov013_syms.txt's header records the same for
+   its two window-alias siblings. src/__sinit_ov045_02112280.c is ov045's real
+   static-initialiser FUNCTION -- four calls building two SharedFilePtrs out of
+   data_ov045_021131d8/d0 -- a different object that happens to share the name.
+   Linking it would not replace this definition; on hardware the two overlays
+   are never resident together, but in the port they are, so the name has one
+   holder and ov013's storage is the one its own caller means. */
+#pragma comment(linker, "/alternatename:___sinit_ov045_02112280=_data_ov013_02112280")
+
+/* PORT_HOST_ABI: shared-load-window NAME COLLISION -- this symbol is ov070 RODATA here and an ov074 FUNCTION in src/; they are different objects at one address.
+   Moved here from hal/actor_classes_ov070.cpp with its ruling. ov070 and ov074
+   share a load window and both cover 0x021222e0, where ov070 holds FlameChomp
+   Behavior's fix table (port/ov070_syms.txt names it data_ov070_021222e0) and
+   dsd's ov074 export won the naming race inside Amp::CleanupResources, which
+   walks the two-pointer SharedFilePtr table under the ov074 FUNCTION spelling.
+   The use is address-only -- indexed reads, never a call -- so the alias is
+   storage identity, not a code seam. src/func_ov074_021222e0.cpp is ov074's
+   real function at the same window address, a different object under a shared
+   name; linking it would collide with this storage rather than replace it.
+
+   RETIRED, run rel0215 wave 2 (lane w2-ov074), AND THE RULING ABOVE STILL
+   APPLIES UNCHANGED -- including its own prediction, which came true exactly
+   as written. The directive here used to be
+     /alternatename:_func_ov074_021222e0=_data_ov070_021222e0
+   which worked only while nothing DEFINED the LHS. ov074 is now seated and
+   func_ov074_021222e0 is real code in this link: Goomboss::Render calls it on
+   the mParam == 0x1111 path, and port/unmatched/Goomboss_HostSites.cpp defines
+   it (the ModelAnim slot-5 collision took that TU out of src/). The alias
+   became inert and Amp::CleanupResources would have walked GOOMBOSS'S
+   INSTRUCTIONS as a two-pointer SharedFilePtr table and Released whatever they
+   decoded to -- no link error, no byte-gate signal.
+   port/tools/alternatename_guard.py catches it at the link. The routing moved
+   to the guard's own remedy, a per-source -D on the ONE reader
+   (src/game/actors/daBrq_c.cpp) in port/CMakeLists.txt beside the ov074
+   slice block. Nothing about Amp changes; what changes is that its storage no
+   longer depends on ov074 staying unmounted. */
+
+/* Return-type-only variants of methods the port already faces. __thiscall,
+   same argument list, result in EAX -- the existing face is ABI-identical
+   and every call site here discards or byte-truncates the result. */
+#pragma comment(linker, "/alternatename:?ChangeState@daPly_c@@QAEXAAUState@@@Z=?ChangeState@daPly_c@@QAEHAAUState@@@Z")
+#pragma comment(linker, "/alternatename:?SetAnim@daPly_c@@QAEHIHHI@Z=?SetAnim@daPly_c@@QAEXIHHI@Z")
+#pragma comment(linker, "/alternatename:?SetAnim@daPly_c@@QAEIIHHI@Z=?SetAnim@daPly_c@@QAEXIHHI@Z")
+#pragma comment(linker, "/alternatename:?GetBodyModelID@daPly_c@@QBEEI_N@Z=?GetBodyModelID@daPly_c@@QBEII_N@Z")
+
+/* tier-2 round 2: the rest of the ring the new state TUs reach. */
+#pragma comment(linker, "/alternatename:?_ZN8dActor_c13SpawnSoundObjEj@@YAPADPADI@Z=__ZN8dActor_c13SpawnSoundObjEj")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN8dActor_c5SpawnEjjRK7Vector3PK10Vector3_16as, and nothing references ?_ZN8dActor_c5SpawnEjjRK7Vector3PK10Vector3_16as@@YAPADIIABUVector3@@PBXHH@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN8dActor_c5SpawnEjjRK7Vector3PK10Vector3_16as@@YAPADIIABUVector3@@PBXHH@Z=__ZN8dActor_c5SpawnEjjRK7Vector3PK10Vector3_16as")
+/* RETIRED at catchup1 round 3: DEAD RHS (nothing defines __ZN5Sound7PlaySubEjjjib) and the only reference,
+   reverse_bridges.cpp, now reaches Sound::PlaySub through its own C name (PLY4 0524d20f882). */
+// #pragma comment(linker, "/alternatename:?_ZN5Sound7PlaySubEjjjib@@YAHIIIHH@Z=__ZN5Sound7PlaySubEjjjib")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c18SetNewHatCharacterEjjb@@YAXPADII_N@Z=__ZN7daPly_c18SetNewHatCharacterEjjb")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c8HasNoCapEv@@YA_NPAD@Z=__ZN7daPly_c8HasNoCapEv")
+#pragma comment(linker, "/alternatename:?data_0209212c@@3HA=_data_0209212c")
+#pragma comment(linker, "/alternatename:?gNumStageStars@@3CA=_gNumStageStars")
+#pragma comment(linker, "/alternatename:?data_ov002_02110364@@3UState@@A=_data_ov002_02110364")
+#pragma comment(linker, "/alternatename:?data_ov002_02110394@@3UState@@A=_data_ov002_02110394")
+#pragma comment(linker, "/alternatename:?_Z19func_ov100_02145014v@@YAHXZ=__Z19func_ov100_02145014v")
+
+/* Same ADDRESS, different overlay label: 0x020e3078 and 0x020c5dec carry
+   an ov002 function too, and ov002 is the overlay the port runs. The src
+   files naming them ov006/ov007 describe a different overlay's bytes.
+
+   THE ov006 HALF OF THAT IS NO LONGER TRUE and its alias is deleted. Run
+   link60 lane MG2 seats dScMgCurling_c, so ov006 IS an overlay the port runs
+   now, and the real ov006 body at 0x020e3078 is in the link -- as
+   port/unmatched/MgCurling_StateDispatch.cpp's host copy of
+   src/Scene_Play.cpp, which the pointer-to-member wall forced. With a
+   real definition present the /alternatename went inert and
+   port/tools/alternatename_guard.py failed the build on it by name, which is
+   exactly the R1/R2 arrival shape that guard exists to catch. Deleting the
+   dead directive is that guard's own recipe; the routing is NOT still needed,
+   because every ov006 caller now wants the ov006 body and every ov002 caller
+   spells the ov002 name. port/ov006_player_map.txt section 4 recorded this
+   alias as "the shared-window artifact again in a third form" and noted that
+   src/Scene_Play.cpp was not linked -- that note is now history.
+
+   THE ov007 SIBLING STAYS, but now for the two PLAYER TUs ONLY. Those
+   (St_HurtWater_Main, St_WaitQuicksand_Main) spell the ov007 name for what is
+   really ov002's body at 0x020c5dec, pass the ov002 two-argument signature, and
+   still route to ov002 through this alias. ov007's own caller
+   src/func_ov007_020ba2e0.c wants the ov007 body at the same address, which a
+   single /alternatename cannot also express, so the ov007 body and that caller
+   are compiled with COMPILE_DEFINITIONS _Z19func_ov007_020c5decP11Ov007Picker=func_ov007_020c5dec_own
+   in port/CMakeLists.txt (the Spindrift/ov062 rule). That keeps _Z19func_ov007_020c5decP11Ov007Picker
+   UNDEFINED here, so this alias still fires for the two Player TUs and the guard
+   still reports it firing normally. */
+#pragma comment(linker, "/alternatename:__Z19func_ov007_020c5decP11Ov007Picker=__ZN7daPly_c19func_ov002_020c5decEi")
+
+/* gate 42: the same shared-base illusion for PEACH_PAINTING. ov010, ov052 and
+   ov021 all link at 0x021111a0, so dsd named two of PeachPainting's OWN
+   internal references (an arm_call and a load, both module:overlay(10) in the
+   relocs) after ov052/ov021 symbols at the shared address:
+     * data_ov052_02111e84 (ov052's CLPS collision table) is really
+       _ZN13PeachPainting20UpdateModelTransformEv, the InitResources matrix/scale helper.
+     * _Z19daGrock_c_classInitv (ov021 0x02112d64) is really gC1PeachModelFile, the
+       8-byte BSS SharedFilePtr the ov010 sinits build; CleanupResources names
+       it directly. Its address is used as a SharedFilePtr, so the data symbol
+       is the right target. Both decls are C-linkage in decl_common's extern "C"
+       block, so the references are plain cdecl.
+       Since wave 5 the REAL _Z19daGrock_c_classInitv (ov021, id 221's factory) links
+       too, and a defined LHS defeats /alternatename silently -- so this route
+       is a per-source -DRollingRock_Spawn=gC1PeachModelFile on the
+       PeachPainting TU in port/CMakeLists.txt (w5b_review.md R1), not a
+       pragma here.
+   PORT_HOST_ABI: dsd shared-base misname -- the ov021 name at 0x02112d64 is
+   ov010 BSS data in the running overlay set; the ov052 name is aliased by
+   address below, the ov021 name renamed per-TU. */
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov010_02111e84, and nothing references _data_ov052_02111e84, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:_data_ov052_02111e84=_func_ov010_02111e84")
+#pragma comment(linker, "/alternatename:?sMusicVolumeTarget@@3CA=_sMusicVolumeTarget")
+#pragma comment(linker, "/alternatename:?sSubVolumeTarget@@3CA=_sSubVolumeTarget")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?gMusicVolume@@3HA=_gMusicVolume")
+#pragma comment(linker, "/alternatename:?sVolumeRampStep@@3HA=_sVolumeRampStep")
+#pragma comment(linker, "/alternatename:?sSubHandle@@3PAIA=_sSubHandle")
+/* sDanceCutsceneTable: src/KuppaScript.cpp defines the six script pointers
+   (host pointers to its own arrays); hal/ptr_tables.cpp no longer hosts a copy. */
+#pragma comment(linker, "/alternatename:_sDanceCutsceneTable=?sDanceCutsceneTable@@3PAPAEA")
+#pragma comment(linker, "/alternatename:?data_0209f4a4@@3FA=_data_0209f4a4")
+#pragma comment(linker, "/alternatename:?func_ov002_020d5f34@@YAHPADPAX@Z=_func_ov002_020d5f34")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d708cEv@@YAXPAD@Z=__ZN7daPly_c19func_ov002_020d708cEv")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d708cEv@@YAXPAD@Z=__ZN7daPly_c19func_ov002_020d708cEv")
+
+/* shared-body state Inits (Dive, BackFlip, HeadstandJump, SlideKickRecover,
+   WaterJump): the C++-mangled refs their TUs emit -> the C-named storage */
+#pragma comment(linker, "/alternatename:?data_ov002_020ff100@@3PAHA=_data_ov002_020ff100")
+
+/* death-state ring (DeadHit, DeadPit, Squish, BurnLava + the KillPlayer
+   chain): C++-mangled refs -> the C-named defs and ov002 storage */
+#pragma comment(linker, "/alternatename:?KillPlayer@@YAXXZ=_KillPlayer")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c0108, and nothing references ?func_ov002_020c0108@@YAXPAXH@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c0108@@YAXPAXH@Z=_func_ov002_020c0108")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c647c, and nothing references ?func_ov002_020c647c@@YAHPADH@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c647c@@YAHPADH@Z=_func_ov002_020c647c")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c6538, and nothing references ?func_ov002_020c6538@@YAHPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c6538@@YAHPAD@Z=_func_ov002_020c6538")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c6908, and nothing references ?func_ov002_020c6908@@YAHPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c6908@@YAHPAD@Z=_func_ov002_020c6908")
+/* RETARGETED by run link60 lane MG2, for the reason twenty lines up: the real
+   ov006 body at 0x020e3078 is in the link now, so the C++-mangled spelling of
+   the ov006 name must reach the SAME body its C spelling does. Nothing
+   references this LHS today -- the guard reports it absent from the map rather
+   than fired -- so the change is inert in this build and exists so the two
+   spellings cannot drift apart the first time something does. */
+#pragma comment(linker, "/alternatename:?_ZN14dScMgCurling_c10Scene_PlayEv@@YAHPAXPAH@Z=__ZN14dScMgCurling_c10Scene_PlayEv")
+#pragma comment(linker, "/alternatename:?data_ov002_02109db8@@3PAEA=_data_ov002_02109db8")
+#pragma comment(linker, "/alternatename:?data_ov002_0210a07c@@3PAIA=_data_ov002_0210a07c")
+#pragma comment(linker, "/alternatename:?data_ov002_0210a424@@3PAHA=_data_ov002_0210a424")
+#pragma comment(linker, "/alternatename:?data_ov002_021100f4@@3PAHA=_data_ov002_021100f4")
+#pragma comment(linker, "/alternatename:?gMeterShownHealth@@3EA=_gMeterShownHealth")
+
+/* NoControl ring (the cutscene/door/pipe state and its 19 per-step
+   helpers): C++-mangled refs -> the C-named defs and ov002 storage */
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c84b0, and nothing references ?func_ov002_020c84b0@@YAHPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c84b0@@YAHPAD@Z=_func_ov002_020c84b0")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c8540, and nothing references ?func_ov002_020c8540@@YAHPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c8540@@YAHPAD@Z=_func_ov002_020c8540")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c8714, and nothing references ?func_ov002_020c8714@@YAXPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c8714@@YAXPAD@Z=_func_ov002_020c8714")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c897c, and nothing references ?func_ov002_020c897c@@YAXPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c897c@@YAXPAD@Z=_func_ov002_020c897c")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c8b54, and nothing references ?func_ov002_020c8b54@@YAXPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c8b54@@YAXPAD@Z=_func_ov002_020c8b54")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c8b78, and nothing references ?func_ov002_020c8b78@@YAXPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c8b78@@YAXPAD@Z=_func_ov002_020c8b78")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c8cb0, and nothing references ?func_ov002_020c8cb0@@YAXPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c8cb0@@YAXPAD@Z=_func_ov002_020c8cb0")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c8d14, and nothing references ?func_ov002_020c8d14@@YAXPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c8d14@@YAXPAD@Z=_func_ov002_020c8d14")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c8f0c, and nothing references ?func_ov002_020c8f0c@@YAXPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c8f0c@@YAXPAD@Z=_func_ov002_020c8f0c")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c8f80, and nothing references ?func_ov002_020c8f80@@YAXPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c8f80@@YAXPAD@Z=_func_ov002_020c8f80")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c904c, and nothing references ?func_ov002_020c904c@@YAXPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c904c@@YAXPAD@Z=_func_ov002_020c904c")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c9128, and nothing references ?func_ov002_020c9128@@YAHPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c9128@@YAHPAD@Z=_func_ov002_020c9128")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c91bc, and nothing references ?func_ov002_020c91bc@@YAHPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c91bc@@YAHPAD@Z=_func_ov002_020c91bc")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c924c, and nothing references ?func_ov002_020c924c@@YAXPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c924c@@YAXPAD@Z=_func_ov002_020c924c")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c9288, and nothing references ?func_ov002_020c9288@@YAXPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c9288@@YAXPAD@Z=_func_ov002_020c9288")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c92fc, and nothing references ?func_ov002_020c92fc@@YAXPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c92fc@@YAXPAD@Z=_func_ov002_020c92fc")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c94a4, and nothing references ?func_ov002_020c94a4@@YAHPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c94a4@@YAHPAD@Z=_func_ov002_020c94a4")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c965c, and nothing references ?func_ov002_020c965c@@YAXPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c965c@@YAXPAD@Z=_func_ov002_020c965c")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020ca108, and nothing references ?func_ov002_020ca108@@YAXPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020ca108@@YAXPAD@Z=_func_ov002_020ca108")
+#pragma comment(linker, "/alternatename:?_ZN11KuppaScript28IsDanceRotateCutsceneRunningEv@@YAHXZ=__ZN11KuppaScript28IsDanceRotateCutsceneRunningEv")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_020072c0, and nothing references ?_ZN7Vector3D1Ev@@YAXXZ, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7Vector3D1Ev@@YAXXZ=_func_020072c0")
+#pragma comment(linker, "/alternatename:?VEC_Distance@@YAHPBUVector3@@0@Z=_VEC_Distance")
+#pragma comment(linker, "/alternatename:?Vec3_RotateYAndTranslate@@YAXPAUVector3@@PAXH1@Z=_Vec3_RotateYAndTranslate")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEFEATED: the left hand side is a real definition in this link now (_ZN5Sound9PlayBank0EjRK7Vector3.cpp.obj), so the directive is inert and alternatename_guard fails on it. */
+// #pragma comment(linker, "/alternatename:?PlayBank0@Sound@@YAXIABUVector3@@@Z=__ZN5Sound9PlayBank0EjRK7Vector3")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c11ShowMessageER7fBase_cjPK7Vector3hh, and nothing references ?_ZN7daPly_c11ShowMessageER7fBase_cjPK7Vector3hh@@YAXPAUdaPly_c@@AAUActorBase@@IPBUVector3@@II@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daPly_c11ShowMessageER7fBase_cjPK7Vector3hh@@YAXPAUdaPly_c@@AAUActorBase@@IPBUVector3@@II@Z=__ZN7daPly_c11ShowMessageER7fBase_cjPK7Vector3hh")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c12FinishedAnimEv@@YAHPAUdaPly_c@@@Z=__ZN7daPly_c12FinishedAnimEv")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZNK7daPly_c14GetBodyModelIDEjb, and nothing references ?_ZNK7daPly_c14GetBodyModelIDEjb@@YAHPBUdaPly_c@@I_N@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZNK7daPly_c14GetBodyModelIDEjb@@YAHPBUdaPly_c@@I_N@Z=__ZNK7daPly_c14GetBodyModelIDEjb")
+#pragma comment(linker, "/alternatename:?_ZNK15dExtFrameCtrl_c12WillHitFrameEi@@YAHPBUAnimation@@H@Z=__ZNK15dExtFrameCtrl_c12WillHitFrameEi")
+#pragma comment(linker, "/alternatename:?_ZGVsAnchorOff$6223@@3HA=__ZGVsAnchorOff$6223")
+#pragma comment(linker, "/alternatename:?@6226@@3HA=_@6226")
+#pragma comment(linker, "/alternatename:?sAnchorOff$6223@@3PAHA=_sAnchorOff$6223")
+/* The int-returning Animation::WillHitFrame face needs no alias any more.
+   It used to be bridged onto a bool-returning definition, which the callers
+   read as a full int: the body wrote AL and left numFramesAndFlags in the
+   upper 24 bits of EAX, so a false answer came back true. The definition is
+   int now (include/Animation.h, and the ROM writes the whole of r0 on every
+   return path), so every int-declaring shim resolves to it directly. */
+
+/* gate 13, the real Camera: the C++-mangled references its TUs emit (they
+   declare their externs outside extern "C") -> the C-named definitions, plus
+   the two community names that sit on top of matched symbols. */
+#pragma comment(linker, "/alternatename:?CAM_SPACE_CAM_POS_ASR_3@@3DA=_CAM_SPACE_CAM_POS_ASR_3")
+#pragma comment(linker, "/alternatename:?data_0209b008@@3DA=?data_0209b008@@3UState@dCamera_c@@A")
+#pragma comment(linker, "/alternatename:?data_0209b008@@3PAUCamera_State@@A=?data_0209b008@@3UState@dCamera_c@@A")
+#pragma comment(linker, "/alternatename:?data_0209b41c@@3DA=_data_0209b41c")
+#pragma comment(linker, "/alternatename:?data_0208733c@@3IA=_data_0208733c")
+#pragma comment(linker, "/alternatename:?data_0209f20c@@3EA=_data_0209f20c")
+#pragma comment(linker, "/alternatename:?gVsExitScreenActive@@3EA=_gVsExitScreenActive")
+#pragma comment(linker, "/alternatename:?gGamePaused@@3EA=_gGamePaused")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN6Camera11ChangeStateEPNS_5StateE, and nothing references ?_ZN6Camera11ChangeStateEPNS_5StateE@@YAHPAUCamera@@PAUCamera_State@@@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN6Camera11ChangeStateEPNS_5StateE@@YAHPAUCamera@@PAUCamera_State@@@Z=__ZN6Camera11ChangeStateEPNS_5StateE")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZNK6Camera12IsUnderwaterEv, and nothing references ?_ZNK6Camera12IsUnderwaterEv@@YAHPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZNK6Camera12IsUnderwaterEv@@YAHPAX@Z=__ZNK6Camera12IsUnderwaterEv")
+#pragma comment(linker, "/alternatename:?_ZN9dCamera_c11UpdateStateEv@@YAHPAX@Z=__ZN9dCamera_c11UpdateStateEv")
+#pragma comment(linker, "/alternatename:?func_0203dafc@@YAXH@Z=_func_0203dafc")
+#pragma comment(linker, "/alternatename:?Math_Function_0203b0fc@@YAXPAHHHH@Z=_Math_Function_0203b0fc")
+#pragma comment(linker, "/alternatename:?_ZN8Particle6System10NewWeatherEjjiiiPK11Vector3_16fh@@YAIIIHHHPBXE@Z=__ZN8Particle6System10NewWeatherEjjiiiPK11Vector3_16fh")
+/* the G3i pair are the matched TUs through hostgen (lane shadow-A).
+   Camera::Render declares both as class statics (?..@G3i@@SA..). PerspectiveW_
+   is a .c that defines the Itanium C name itself, so its static-member
+   spelling aliases onto that. LookAt_ is a real `namespace G3i` function in
+   its .cpp, so MSVC emits the namespace mangling (?..@G3i@@YA..): the
+   static-member spelling aliases onto THAT, and so does the Itanium C name
+   the four C callers use (_Z21Camera_UpdateMatricesP8MgCamera, func_ov007_020b1fa4/20e8/
+   2160, _ZN12dScStarSel_c6RenderEv, func_ov075_021152d4). bool vs int for `draw`
+   is the same four-byte slot under cdecl. */
+#pragma comment(linker, "/alternatename:?PerspectiveW_@G3i@@SAXHHHHHH_NPAUMatrix4x3@@@Z=_G3i_PerspectiveW_")
+#pragma comment(linker, "/alternatename:?LookAt_@G3i@@SAXPBUVector3@@00_NPAUMatrix4x3@@@Z=?LookAt_@G3i@@YAXPBUVector3@@00_NPAUMatrix4x3@@@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_G3i_LookAt_=?LookAt_@G3i@@YAXPBUVector3@@00_NPAUMatrix4x3@@@Z")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _G2x_SetBlendAlpha_, and nothing references ?SetBlendAlpha@G2x@@SAXPCGGGGG@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?SetBlendAlpha@G2x@@SAXPCGGGGG@Z=_G2x_SetBlendAlpha_")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?Render@OAM@@SAX_NPAUOamAttr@@HHHHHHHH@Z=__ZN3OAM6RenderEbP7OamAttriiiiiiii")
+/* community names for matched symbols: Vec3_DistSq IS func_0203cf94,
+   STAR_MARKERS is the bss array at 0x0209f40c, and func_0200cc5c is
+   Camera::SaveCameraStateBeforeTalk (both callers spell it argless) */
+#pragma comment(linker, "/alternatename:_Vec3_DistSq=_func_0203cf94")
+#pragma comment(linker, "/alternatename:_STAR_MARKERS=_STAR_MARKERS")
+#pragma comment(linker, "/alternatename:_func_0200cc5c=__ZN9dCamera_c25SaveCameraStateBeforeTalkEv")
+/* ActorBase's own vtable symbol: the transient install the ctor/dtor chain
+   writes, already storage in hal/actor_vtables.cpp under its DS name */
+#pragma comment(linker, "/alternatename:__ZTV9ActorBase=_data_02099edc")
+/* Camera::~Camera (D0) frees by C name; Memory::Deallocate's own TU declares
+   Heap as a `class` (PAV) while every header spells it `struct` (PAU), so the
+   alias carries the decorated name from the link log rather than a face */
+#pragma comment(linker, "/alternatename:__ZN6Memory10DeallocateEPvPN5mHeap6Heap_tE=?Deallocate@Memory@@YAXPAXPAUHeap_t@mHeap@@@Z")
+
+/* ---- gate 14, the level boot -------------------------------------------
+   Stage::LoadClsnAndObjects and the sub-loaders pick their externs out of
+   include/decl_common.h, which is generated without extern "C", so a .cpp
+   TU emits MSVC manglings for symbols the .c definitions publish as plain C
+   names. Same closure as the state waves; nothing in src/ changes. */
+#pragma comment(linker, "/alternatename:?_ZN11KuppaScript19ContinueIfNecessaryEv@@YAHXZ=__ZN11KuppaScript19ContinueIfNecessaryEv")
+#pragma comment(linker, "/alternatename:?_ZN11KuppaScript18StartIntroCutsceneEv@@YAXXZ=__ZN11KuppaScript18StartIntroCutsceneEv")
+#pragma comment(linker, "/alternatename:?func_0202a850@@YAXHH@Z=_func_0202a850")
+#pragma comment(linker, "/alternatename:?_ZN7PathPtr12SetPathTableEP7PathDefi@@YAXHH@Z=__ZN7PathPtr12SetPathTableEP7PathDefi")
+#pragma comment(linker, "/alternatename:?_ZN7PathPtr12SetNodeTableEPv@@YAXH@Z=__ZN7PathPtr12SetNodeTableEPv")
+#pragma comment(linker, "/alternatename:?data_02092134@@3HA=_data_02092134")
+#pragma comment(linker, "/alternatename:?sDoorVariants@@3PAEA=_sDoorVariants")
+#pragma comment(linker, "/alternatename:?sDoorActorIds@@3PAGA=_sDoorActorIds")
+#pragma comment(linker, "/alternatename:?sObjToActorIdTable@@3PAGA=_sObjToActorIdTable")
+#pragma comment(linker, "/alternatename:?sNextDeathTableID@@3FA=_sNextDeathTableID")
+/* Sound::LoadInitialGroup is a class static in its TU and a C name to the
+   kuppa tail. LoadGroupAndSetBank is spelled three ways: LoadInitialGroup's TU
+   calls it as a class static (SAXHH), the C callers and hal/star_flow.cpp by
+   its flat name, and its matched TU defines the namespace function (YAXHH).
+   Both reference spellings name that definition directly; all three are
+   __cdecl with two ints and no receiver. */
+#pragma comment(linker, "/alternatename:?LoadGroupAndSetBank@Sound@@SAXHH@Z=?LoadGroupAndSetBank@Sound@@YAXHH@Z")
+#pragma comment(linker, "/alternatename:__ZN5Sound19LoadGroupAndSetBankEii=?LoadGroupAndSetBank@Sound@@YAXHH@Z")
+/* gate 14, stage A2: the entrance step handlers. 020c71e0's own TU spells it
+   as a C name while 020c72a4's declares it without extern "C". */
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020c71e0, and nothing references ?func_ov002_020c71e0@@YAXPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?func_ov002_020c71e0@@YAXPAX@Z=_func_ov002_020c71e0")
+/* NOT aliases: Actor::GetBitInDeathTable and Actor::AfterInitResources are
+   real MSVC methods, so their C-named callers would enter a __thiscall body
+   through a cdecl call and read `this` out of ecx garbage. Both get faces in
+   hal/level_boot.cpp instead. */
+
+/* ---- gate 16, the actor classes ----------------------------------------
+   The class TUs declare their overlay data at C++ linkage (outside the
+   extern "C" block the functions sit in), so each reference carries the
+   MSVC mangling of whatever TYPE that TU happened to spell -- and different
+   TUs of the same class spell the same array differently. ovdata.py
+   publishes one plain C symbol; these are the per-mangling faces onto it.
+
+   Tree: InitResources reads data_ov002_02110a48 as int[] and the model-id
+   table as unsigned short[]; CleanupResources reads the same list heads as
+   char*[]. Two manglings, one array. */
+#pragma comment(linker, "/alternatename:?data_ov002_02110a48@@3PAHA=_data_ov002_02110a48")
+#pragma comment(linker, "/alternatename:?data_ov002_02110a48@@3PAPADA=_data_ov002_02110a48")
+#pragma comment(linker, "/alternatename:?data_ov002_0210abb8@@3PAGA=_data_ov002_0210abb8")
+/* Actor's D2 picks func_0203b27c and _ZN9fLiNdBa_cD1Ev out of decl_common.h,
+   which is generated without extern "C", so the .cpp emits MSVC manglings
+   for two plain C definitions. */
+#pragma comment(linker, "/alternatename:?func_0203b27c@@YAXHH@Z=_func_0203b27c")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_02044104, and nothing references ?_ZN9fLiNdBa_cD1Ev@@YAXH@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN9fLiNdBa_cD1Ev@@YAXH@Z=_func_02044104")
+/* _ZTV5Actor and _ZTV12ActorDerived are 0x0208e3a4 / 0x0208e4b8, the two
+   base tables the constructor and destructor chains install transiently and
+   never dispatch through. hal/actor_vtables.cpp already carries the storage
+   under the data_ names; these are the class-name faces onto the same bytes,
+   the _ZTV9ActorBase pattern one line up. */
+#pragma comment(linker, "/alternatename:__ZTV5Actor=_data_0208e3a4")
+#pragma comment(linker, "/alternatename:__ZTV12ActorDerived=_data_0208e4b8")
+/* AMBIENT_SOUND_EFFECTS: its two TUs declare their overlay and engine data at
+   C++ linkage, with the type each one happened to spell. */
+#pragma comment(linker, "/alternatename:?data_ov002_02110aec@@3HA=_data_ov002_02110aec")
+#pragma comment(linker, "/alternatename:?data_ov002_0210b498@@3PAHA=_data_ov002_0210b498")
+/* RETIRED at catchup1 Stage C round 2 (mount_reconcile). DEFEATED: a decomp TU defines ?gCurrentMusicID@@3HA now; the C name follows it through cxx_data_aliases_gen.cpp. */
+// #pragma comment(linker, "/alternatename:?gCurrentMusicID@@3HA=_gCurrentMusicID")
+#pragma comment(linker, "/alternatename:?gCurrentStarId@@3EA=_gCurrentStarId")
+#pragma comment(linker, "/alternatename:?_Z22IsStarCollectedInLevelai@@YAHCH@Z=__Z22IsStarCollectedInLevelai")
+/* Sound::PlayLong is already in the slice under its C name; the ambient
+   actor references it at C++ linkage. */
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN5Sound8PlayLongEjjjRK7Vector3s, and nothing references ?_ZN5Sound8PlayLongEjjjRK7Vector3s@@YAIIIIPAXI@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN5Sound8PlayLongEjjjRK7Vector3s@@YAIIIIPAXI@Z=__ZN5Sound8PlayLongEjjjRK7Vector3s")
+
+/* ---- gate 16, the ov002 tier -------------------------------------------
+   BLACK_BRICK_BLOCK / SIGN_POST / ONE_UP_MUSHROOM. Same shape as the TREE
+   block above: overlay data declared at C++ linkage in the class TUs, with
+   whatever type each one happened to spell, onto the one plain C symbol
+   ovdata.py publishes. */
+#pragma comment(linker, "/alternatename:?data_ov002_02108ab0@@3PADA=_data_ov002_02108ab0")
+#pragma comment(linker, "/alternatename:?data_ov002_02108ab4@@3PADA=_data_ov002_02108ab4")
+#pragma comment(linker, "/alternatename:?data_ov002_021089e0@@3UV3@@A=_data_ov002_021089e0")
+/* RETIRED at catchup1 Stage C round 4: no TU declares data_ov002_0210e05c at C++ linkage any more (main names the object at its address), so the left side is never referenced; port_refcheck hal-links counted it stale. */
+// #pragma comment(linker, "/alternatename:?data_ov002_0210e05c@@3DA=_SignPost_ClsnFile")
+/* RETIRED at catchup1 Stage C round 4: no TU declares data_ov002_0210e064 at C++ linkage any more (main names the object at its address), so the left side is never referenced; port_refcheck hal-links counted it stale. */
+// #pragma comment(linker, "/alternatename:?data_ov002_0210e064@@3DA=_SignPost_ModelFile")
+#pragma comment(linker, "/alternatename:?data_ov002_0210d9b8@@3UModelCache@@A=?data_ov002_0210d9b8@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov002_0210d9d8@@3USharedFilePtr@@A=?data_ov002_0210d9d8@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov002_0210d9d8@@3PAXA=?data_ov002_0210d9d8@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov002_0210da30@@3USharedFilePtr@@A=?data_ov002_0210da30@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov002_0210da30@@3PAXA=?data_ov002_0210da30@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov002_020ff040@@3PAEA=_data_ov002_020ff040")
+#pragma comment(linker, "/alternatename:?data_ov002_020ff050@@3PAEA=_data_ov002_020ff050")
+/* Plain cdecl on both sides -- the C definition is already in the slice, the
+   reference just carries a C++ mangling from a TU that never wrapped it. */
+#pragma comment(linker, "/alternatename:?DecIfAbove0_Byte@@YAEPAE@Z=_DecIfAbove0_Byte")
+#pragma comment(linker, "/alternatename:?Matrix4x3_FromRotationY@@YAXPAUMatrix4x3@@H@Z=_Matrix4x3_FromRotationY")
+#pragma comment(linker, "/alternatename:?MTX_MultVec43@@YAXPAUVector3@@PAUMatrix4x3@@0@Z=_MTX_MultVec43")
+#pragma comment(linker, "/alternatename:?Vec3_Add@@YAXPAUVector3@@00@Z=_Vec3_Add")
+#pragma comment(linker, "/alternatename:?_ZN15daObjTatefuda_c18UpdateShadowMatrixEv@@YAXPAD@Z=__ZN15daObjTatefuda_c18UpdateShadowMatrixEv")
+#pragma comment(linker, "/alternatename:?_ZN15daObjTatefuda_c14AttachToHolderEv@@YAHPAX@Z=__ZN15daObjTatefuda_c14AttachToHolderEv")
+#pragma comment(linker, "/alternatename:?_ZN10dBgActor_c19func_ov002_020ee5d0Ei@@YAXPAEH@Z=__ZN10dBgActor_c19func_ov002_020ee5d0Ei")
+#pragma comment(linker, "/alternatename:?_ZN10dBgCh_Actr13SetLimMovFlagEv@@YAXPAX@Z=__ZN10dBgCh_Actr13SetLimMovFlagEv")
+/* The shared-header placeholders. G0/G1 are whatever the TU's own literal
+   pool held, so each one is settled from the ROM's relocation table rather
+   than by name:
+     _ZN8SignPost16CleanupResourcesEv  0x020bbe28/2c -> 0x0210e064, 0x0210e05c
+       (the model SharedFilePtr, then the KCL one -- Release in load order)
+     the Platform D0 pair                            -> 0x020a0eac, the heap
+       Memory::Deallocate takes; every other D0 in the family spells the same
+       word data_020a0eac. */
+#pragma comment(linker, "/alternatename:?G0@@3PAHA=_SignPost_ModelFile")
+#pragma comment(linker, "/alternatename:?G1@@3PAHA=_SignPost_ClsnFile")
+#pragma comment(linker, "/alternatename:_G0=_data_020a0eac")
+/* VT/HEAP, the other two shared-header placeholder names, settled the same
+   way for their ONE linked reader: src/_ZN12dEnemyBase_cD0Ev.cpp (the Enemy base
+   table's deleting destructor, seated by hal_fill_enemy_base_vtable). Its
+   ROM relocs are the Enemy base vtable ov002 0x021081e4 for the vptr store
+   and the 0x020a0eac game heap word for the Memory::Deallocate argument.
+   These names are SINGLE in this build, the actor_classes_bob_enemy.cpp
+   caveat: a second VT-spelling TU cannot join a target that links this
+   reader, its store would land on the Enemy's objects. */
+#pragma comment(linker, "/alternatename:_VT=_data_ov002_021081e4")
+#pragma comment(linker, "/alternatename:_HEAP=_data_020a0eac")
+/* THE "ONE LINKED READER" CLAIM ABOVE IS HISTORICAL AND MUST NOT BE READ AS A
+   STANDING FACT. THREE VT-spelling TUs have joined this build since, each a
+   slot 17 deleting destructor of a minigame scene class whose own ROM literal
+   pool names its own table, so bare VT would have stored the ov002 dEnemyBase_c base
+   table into a minigame scene object. All three are exempted by a per-source -D
+   in port/CMakeLists.txt onto their own table rather than by a change here, so
+   the row above keeps serving src/_ZN12dEnemyBase_cD0Ev.cpp untouched:
+     src/minigames/d_s_mg_luigi.cpp  dScMgLuigi_c    -> data_ov006_0213cf10
+     src/_ZN14dScMgCurling_cD0Ev.cpp  dScMgCurling_c  -> data_ov006_0213c304
+     src/_ZN11dScMgCoin_cD0Ev.cpp  dScMgCoin_c     -> data_ov006_0213bf50
+   HEAP is renamed for none of them: all three pools hold 020A0EAC, which is
+   the row below, so that binding is right for every reader it has.
+
+   HOW TO CHECK THE CLOSURE, because the sentence above got it wrong once. The
+   question "who still spells this name" is answered by a COFF census over the
+   BUILT OBJECTS -- scan every .obj for an UNDEFINED external named _VT (short
+   name, inline in the 18-byte symbol record; there is no mangled ?VT@@3PAHA
+   decoration anywhere in this build, so the cdecl spelling is the whole set).
+   That is a measurement of what actually reaches the linker.
+
+   port/tools/alias_audit.py is a DIFFERENT and complementary instrument and is
+   not a substitute. It scans SOURCE TEXT for the identifier and then reads each
+   TU's ROM body, which lets it say a binding is WRONG for a TU that has one. It
+   now discounts the three ways a TU can reuse a spelling without meaning the
+   placeholder -- typedef, struct/union/enum tag, and #define -- and lists them
+   as SHADOW rows rather than findings, so `struct VT` in
+   src/State10_Update.c and `#define G1` in src/func_ov007_020be0dc.c are
+   no longer reported. What it still cannot see is who reaches the LINKER: it
+   reports TUs that are in no target, and it can only ever discuss names it
+   finds in source. Use the audit to decide whether a reader is WRONG; use the
+   census to decide whether the list of readers is COMPLETE. Neither answers
+   the other's question, and lane VTF got one wrong in each direction before
+   this note existed. */
+/* ---- run linkw wave C: THREE LINKED TUs THAT COLLIDE ON THOSE THREE NAMES.
+   port/tools/alias_audit.py found them and each one is ROM-verified below by
+   disassembling the body out of extracted/overlays/ and reading its literal
+   pool. All three are LIVE in the shipping binary today, and none of them
+   fails at link: they are the CannonHatch/MetalNet/PATH_LIFT disease, the
+   fourth, fifth and sixth cases.
+
+   The remedy is the PATH_LIFT one -- a per-source -D in port/CMakeLists.txt
+   onto a private name bound here -- and it has to be, because the rename
+   cannot go straight to the mount name: include/decl_common.h:396 declares
+   `extern int G1[];` while the mounted cells are declared as scalars, and
+   MSVC rejects the redeclaration (C2040, the ov100 measurement).
+
+   (1) src/_ZN6Coffin16CleanupResourcesEv.cpp, ov071 0x02122460, LINKED.
+       Releases two SharedFilePtrs as G0/G1. Its own literal pool, in the
+       order the two Release calls consume it:
+         0x02122480  LDR pc-rel -> 0x021230d0  then BL SharedFilePtr::Release
+         0x02122488  LDR pc-rel -> 0x021230d8  then BL SharedFilePtr::Release
+       Unrenamed, this body binds through the MANGLED rows above, not the
+       cdecl ones -- see BOTH DECORATIONS below -- so bare G0 resolves to
+       0x0210e064 (SignPost's ModelFile) and bare G1 to 0x0210e05c (SignPost's
+       KCL), and the shipping binary Releases SignPost's two files whenever a
+       Coffin is cleaned up. NOT the game heap: _G0 -> _data_020a0eac is the
+       cdecl row, and a .cpp body whose `extern int G0[];` sits outside
+       extern "C" never reaches it.
+
+       THE TARGET NAME IS ov071's, NOT ov070's, and the config disagrees.
+       ov070 and ov071 share the load window (both base 0x0211f000), so both
+       overlays own bytes at 0x021230d0. config/arm9 names those two words
+       data_ov070_021230d0/d8 under ov070's .data, and ov071's own .bss runs
+       0x02122f80..0x02123100 -- the addresses are inside it, and
+       config/arm9/overlays/ov071/symbols.txt names them too. The port mounts
+       BOTH overlays and they are separate host objects (0x00a8145c for
+       ov070's, 0x00a824c8 for ov071's), so picking the config's first answer
+       would be the ov043/ov047 mistake w20 recorded. Coffin is ov071's class
+       and port/unmatched/Coffin_InitResources.cpp already loads these two
+       cells by their ov071 names -- Init and Cleanup now agree.
+
+   (2) src/_ZN15BookShotSpawner13InitResourcesEv.cpp, ov020 0x02112768,
+       LINKED. Passes G0/G1 to dExtSimpleModel_c::LoadFile. Literal pool in call order:
+         0x02112774  LDR pc-rel -> 0x02114aa0  then BL dExtSimpleModel_c::LoadFile
+         0x02112780  LDR pc-rel -> 0x02114ab8  then BL dExtSimpleModel_c::LoadFile
+       Both are ov020 .bss (0x02114aa0..0x02114b20) and both are already
+       mounted; hal/actor_classes_ov063.cpp calls them "the four book
+       SharedFilePtrs ... models 0x2c8/0x2cb". This body is a .cpp with the
+       same outside-extern-"C" declaration, so unrenamed it binds through the
+       mangled rows too: bare G0/G1 send the two LoadFile calls at SignPost's
+       ModelFile and SignPost's KCL, not at the game heap.
+
+   (3) src/_ZN15BookShotSpawnerD0Ev.cpp, ov020 0x02111278, LINKED. Its
+       `t[0] = (int)VT` vptr store means 0x021148d8, its own table, which in
+       this port is the HOST array hal/actor_classes_ov063.cpp declares as
+       _ZTV15BookShotSpawner[31]. Bare VT is bound above to the ENEMY base
+       table, and the comment above says in as many words that VT has ONE
+       linked reader and that "a second VT-spelling TU cannot join a target
+       that links this reader". A later lane linked one anyway. ov063's own
+       block noticed and ruled it harmless as a dying-object store between
+       two direct calls; that reading may well be right, but it is an
+       argument about whether a wrong pointer gets dereferenced rather than
+       about whether it is wrong, the store costs nothing to make correct,
+       and the class's hand-written D1 face two hundred lines below already
+       writes _ZTV15BookShotSpawner for the same reason. Bound, not argued.
+
+   Each LHS below is undefined everywhere else in the build, so none of these
+   aliases can be defeated the way alternatename_guard.py watches for.
+
+   BOTH DECORATIONS, for the same reason ?G0@@3PAHA and _G0 both appear above.
+   The two .cpp bodies declare their own `extern int G0[];` OUTSIDE the file's
+   extern "C" reach, so MSVC mangles the renamed name to ?...@@3PAHA and the
+   cdecl row alone does not satisfy it (measured: LNK2019 on exactly those two
+   and on neither of the G1 rows, because G1 arrives from decl_common.h inside
+   extern "C"). The .c body's VT takes the cdecl form only. */
+#pragma comment(linker, "/alternatename:?port_coffin_file0@@3PAHA=_data_ov071_021230d0")
+#pragma comment(linker, "/alternatename:?port_coffin_file1@@3PAHA=_data_ov071_021230d8")
+#pragma comment(linker, "/alternatename:?port_bookshotspawner_file0@@3PAHA=_data_ov020_02114aa0")
+#pragma comment(linker, "/alternatename:?port_bookshotspawner_file1@@3PAHA=_data_ov020_02114ab8")
+#pragma comment(linker, "/alternatename:_port_coffin_file0=_data_ov071_021230d0")
+#pragma comment(linker, "/alternatename:_port_coffin_file1=_data_ov071_021230d8")
+#pragma comment(linker, "/alternatename:_port_bookshotspawner_file0=_data_ov020_02114aa0")
+#pragma comment(linker, "/alternatename:_port_bookshotspawner_file1=_data_ov020_02114ab8")
+#pragma comment(linker, "/alternatename:_port_bookshotspawner_vt=__ZTV11daBookGen_c")
+/* SignPost::CleanupResources carried from main names its two SharedFilePtrs
+   by role instead of G0/G1: SignPost_ModelFile = 0x0210e064 (released first,
+   ROM order) and SignPost_ClsnFile = 0x0210e05c (main's ov002 symbols.txt
+   rows 2795/2797 pin both addresses). The declarations sit outside the
+   file's extern "C" reach, so MSVC mangles them; same targets as the
+   G0/G1 rows above, which stay for any TU still spelling the placeholders. */
+#pragma comment(linker, "/alternatename:?SignPost_ModelFile@@3PAHA=_SignPost_ModelFile")
+#pragma comment(linker, "/alternatename:?SignPost_ClsnFile@@3PAHA=_SignPost_ClsnFile")
+/* src/_ZN7dCcAc_cD1Ev.cpp spells its two constants by role: the
+   base destructor at 0x02015058 is CylinderClsn::~CylinderClsn (D2) and the
+   vtable it installs first is _ZTV7dCcAc_c (0x0208e6d4). */
+#pragma comment(linker, "/alternatename:_base_dtor_MovingCylinderClsn=__ZN5dCc_cD2Ev")
+#pragma comment(linker, "/alternatename:_vtbl_MovingCylinderClsn=__ZTV7dCcAc_c")
+/* ...and the WithPos derivative one level up, which the butterfly's hosted D1
+   tears down (gate 21 linkloop round 2): its base destructor at 0x02014954 is
+   MovingCylinderClsn's D2 and the vtable is the host storage in
+   hal/actor_vtables.cpp. */
+#pragma comment(linker, "/alternatename:_base_dtor_MovingCylinderClsnWithPos=__ZN7dCcAc_cD2Ev")
+#pragma comment(linker, "/alternatename:_vtbl_MovingCylinderClsnWithPos=__ZTV10dCcAcPos_c")
+/* ov002's Enemy constructor at 0x020aed98 HAS a definition, and its name is
+   _ZN12dEnemyBase_cC2Ev -- so the fallback that used to sit here was removed rather
+   than re-pointed (Opie's third review of PR #2474).
+
+   The evidence, in the order it settles the question:
+     * src/_ZN12dEnemyBase_cC2Ev.cpp is in the slice (port/slice_gate16.txt:233) and
+       the link publishes __ZN12dEnemyBase_cC2Ev from its own object --
+       walk_window.map: `0001:00110a20  __ZN12dEnemyBase_cC2Ev  _ZN12dEnemyBase_cC2Ev.cpp.obj`.
+       An /alternatename only fires while its LHS is UNDEFINED, so with that
+       TU linked the directive could never apply.
+     * the RHS had no definition anywhere: `func_ov002_020aed98` was this
+       port's own spelling and appears in no config symbols.txt, so had the
+       src TU ever left the slice the link would have failed on the fallback
+       name instead of falling back.
+     * the port already routes ov002's constructor the other way round, by
+       renaming its CALLERS onto the defined name: port/CMakeLists.txt
+       compiles src/d_a_kuri_king_kuriking.cpp and src/d_a_kuri_king_kuriking_vanish.cpp with
+       -Dfunc_020aed98=_ZN12dEnemyBase_cC2Ev (the lane w2-ov074 block). That is the
+       live mechanism; the pragma was inert beside it.
+   port/tools/alternatename_baseline.txt loses the matching row with this
+   commit, so the guard's baseline stays exactly the set of pairs that are
+   still defeated. slice_gate16.txt keeps the prose about why the file named
+   _ZN12dEnemyBase_cC2Ev is ov007's -- nothing in that note depended on the pragma. */
+#pragma comment(linker, "/alternatename:?data_ov002_0211025c@@3PAHA=_data_ov002_0211025c")
+/* the same per-mangling faces, one round further into the 1-up's chain */
+#pragma comment(linker, "/alternatename:?STAR_MARKERS@@3PAHA=_STAR_MARKERS")
+#pragma comment(linker, "/alternatename:?data_0209f208@@3EA=_data_0209f208")
+#pragma comment(linker, "/alternatename:?_Z25IsStarCollectedInCurLeveli@@YAHH@Z=__Z25IsStarCollectedInCurLeveli")
+#pragma comment(linker, "/alternatename:?_ZN12dBgCh_SphCrr10DetectClsnEv@@YAHPAX@Z=__ZN12dBgCh_SphCrr10DetectClsnEv")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZNK10dBgCh_Actr15ShouldUpdatePosEv, and nothing references ?_ZNK10dBgCh_Actr15ShouldUpdatePosEv@@YAHPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZNK10dBgCh_Actr15ShouldUpdatePosEv@@YAHPAX@Z=__ZNK10dBgCh_Actr15ShouldUpdatePosEv")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZNK10dBgCh_Actr16ShouldUpdatePosYEv, and nothing references ?_ZNK10dBgCh_Actr16ShouldUpdatePosYEv@@YAHPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZNK10dBgCh_Actr16ShouldUpdatePosYEv@@YAHPAX@Z=__ZNK10dBgCh_Actr16ShouldUpdatePosYEv")
+#pragma comment(linker, "/alternatename:?_ZN10dBgCh_Actr19ClearAllGroundFlagsEv@@YAXPAX@Z=__ZN10dBgCh_Actr19ClearAllGroundFlagsEv")
+#pragma comment(linker, "/alternatename:?_ZN10dBgCh_Actr14IsFlag800ClearEv@@YAHPAX@Z=__ZN10dBgCh_Actr14IsFlag800ClearEv")
+#pragma comment(linker, "/alternatename:?_ZN12dBgCh_SphCrr15DetectClsnSlot0Ev@@YAHPAX@Z=__ZN12dBgCh_SphCrr15DetectClsnSlot0Ev")
+#pragma comment(linker, "/alternatename:?_ZN10dBgCh_Actr14CommitFloorHitEi@@YAXPAXH@Z=__ZN10dBgCh_Actr14CommitFloorHitEi")
+#pragma comment(linker, "/alternatename:?FUN_0202a130@@YAXXZ=_FUN_0202a130")
+#pragma comment(linker, "/alternatename:?_Z13SetStarMarkeriP8dActor_ci@@YAXHHH@Z=__Z13SetStarMarkeriP8dActor_ci")
+
+/* ---- gate 17, the level overlay's own classes ---------------------------
+   Same shape again: overlay data declared at C++ linkage with whatever type
+   the TU spelled, and plain cdecl helpers referenced through a C++ mangling
+   because the declaring TU never wrapped them. */
+#pragma comment(linker, "/alternatename:?data_ov009_02113c20@@3PADA=?data_ov009_02113c20@@3USBirdModelFilePtr@@A")
+#pragma comment(linker, "/alternatename:?data_ov009_02113c28@@3PADA=?data_ov009_02113c28@@3USBirdAnimationFilePtr@@A")
+#pragma comment(linker, "/alternatename:?data_ov009_02113eb0@@3PAHA=_data_ov009_02113eb0")
+#pragma comment(linker, "/alternatename:?data_ov009_02113eb8@@3PAHA=_data_ov009_02113eb8")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?data_ov009_02113d8c@@3PAUVector3@@A=_data_ov009_02113d8c")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?data_ov009_02113de0@@3PAUVector3@@A=_data_ov009_02113de0")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?data_ov009_02113e34@@3PAUVector3@@A=_data_ov009_02113e34")
+#pragma comment(linker, "/alternatename:?data_0209caa0@@3UD0209caa0@@A=_data_0209caa0")
+#pragma comment(linker, "/alternatename:?gGameMode@@3PAEA=_gGameMode")
+#pragma comment(linker, "/alternatename:?_ZN17dExtSimpleModel_c8LoadFileER13SharedFilePtr@@YAHPAX@Z=__ZN17dExtSimpleModel_c8LoadFileER13SharedFilePtr")
+#pragma comment(linker, "/alternatename:?_ZN15dExtFrameCtrl_c8LoadFileER13SharedFilePtr@@YAHPAX@Z=__ZN15dExtFrameCtrl_c8LoadFileER13SharedFilePtr")
+#pragma comment(linker, "/alternatename:?_ZN11dExtModel_c7SetFileEP8BMD_Fileii@@YAHPAXHHH@Z=__ZN11dExtModel_c7SetFileEP8BMD_Fileii")
+#pragma comment(linker, "/alternatename:?_ZN14dExtAnmModel_c7SetAnimEP8BCA_Fileiit@@YAHPAXHHHI@Z=__ZN14dExtAnmModel_c7SetAnimEP8BCA_Fileiit")
+#pragma comment(linker, "/alternatename:?_ZN10dBgActor_c13IsClsnInRangeEii@@YAHPAXHH@Z=__ZN10dBgActor_c13IsClsnInRangeEii")
+#pragma comment(linker, "/alternatename:?_ZN10dBgActor_c19UpdateClsnPosAndRotEv@@YAHPAX@Z=__ZN10dBgActor_c19UpdateClsnPosAndRotEv")
+#pragma comment(linker, "/alternatename:?_ZN10dBgActor_c21UpdateModelPosAndRotYEv@@YAHPAX@Z=__ZN10dBgActor_c21UpdateModelPosAndRotYEv")
+
+/* ---- gate 18: ov085's two classes -------------------------------------
+   The same shape as every wave before it. A slice .cpp that declares its
+   externs without extern "C" emits an MSVC mangling for what is a C name
+   everywhere else in the build; the alias closes the gap without touching
+   src/. Decorated names are lifted verbatim from the link log. */
+
+/* gate 18 link ring */
+#pragma comment(linker, "/alternatename:?_Z8NumStarsv@@YAEXZ=__Z8NumStarsv")
+#pragma comment(linker, "/alternatename:?RandomIntInternal@@YAIPAH@Z=_RandomIntInternal")
+#pragma comment(linker, "/alternatename:?_ZN17dExtShadowModel_c12InitCylinderEv@@YAHPAX@Z=__ZN17dExtShadowModel_c12InitCylinderEv")
+#pragma comment(linker, "/alternatename:?_ZN10dBgCh_Actr4InitEP8dActor_ciiP10Vector3_16S3_@@YAXPAX0HH00@Z=__ZN10dBgCh_Actr4InitEP8dActor_ciiP10Vector3_16S3_")
+#pragma comment(linker, "/alternatename:?_ZN7dCcAc_c4InitEP8dActor_ciijj@@YAXPAX0HHII@Z=__ZN7dCcAc_c4InitEP8dActor_ciijj")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN8dActor_c13ClosestPlayerEv, and nothing references ?_ZN8dActor_c13ClosestPlayerEv@@YAPAXPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN8dActor_c13ClosestPlayerEv@@YAPAXPAX@Z=__ZN8dActor_c13ClosestPlayerEv")
+#pragma comment(linker, "/alternatename:?_ZN17dExtSimpleModel_c8LoadFileER13SharedFilePtr@@YAPAXPAX@Z=__ZN17dExtSimpleModel_c8LoadFileER13SharedFilePtr")
+#pragma comment(linker, "/alternatename:?_ZN7PathPtr6FromIDEj@@YAXPAXI@Z=__ZN7PathPtr6FromIDEj")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7PathPtrC1Ev, and nothing references ?_ZN7PathPtrC1Ev@@YAXPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7PathPtrC1Ev@@YAXPAX@Z=__ZN7PathPtrC1Ev")
+#pragma comment(linker, "/alternatename:?_ZN15dExtFrameCtrl_c8LoadFileER13SharedFilePtr@@YAXPAX@Z=__ZN15dExtFrameCtrl_c8LoadFileER13SharedFilePtr")
+#pragma comment(linker, "/alternatename:?_ZN11dExtModel_c7SetFileEP8BMD_Fileii@@YAHPAX0HH@Z=__ZN11dExtModel_c7SetFileEP8BMD_Fileii")
+#pragma comment(linker, "/alternatename:?_ZNK7PathPtr7GetNodeER7Vector3j@@YAXPAX0I@Z=__ZNK7PathPtr7GetNodeER7Vector3j")
+#pragma comment(linker, "/alternatename:?_ZNK7PathPtr8NumNodesEv@@YAHPAX@Z=__ZNK7PathPtr8NumNodesEv")
+#pragma comment(linker, "/alternatename:?data_0209caa0@@3PADA=_data_0209caa0")
+/* data_0209e650: main's func_0201fec8.cpp defines the LevelRng object (catchup1
+   Stage D), so the int spelling and the C name the hal readers use
+   (comms_conductor.cpp, scene_mg.cpp) both point at it. */
+#pragma comment(linker, "/alternatename:?data_0209e650@@3HA=?data_0209e650@@3ULevelRng@@A")
+#pragma comment(linker, "/alternatename:_data_0209e650=?data_0209e650@@3ULevelRng@@A")
+#pragma comment(linker, "/alternatename:?data_ov085_021305b0@@3DA=_data_ov085_021305b0")
+#pragma comment(linker, "/alternatename:?data_ov085_021305b8@@3DA=_data_ov085_021305b8")
+#pragma comment(linker, "/alternatename:?data_ov085_021305c0@@3DA=_data_ov085_021305c0")
+#pragma comment(linker, "/alternatename:?data_ov085_021305c8@@3DA=_data_ov085_021305c8")
+#pragma comment(linker, "/alternatename:?gMipRunAnimationFile@@3DA=_gMipRunAnimationFile")
+#pragma comment(linker, "/alternatename:?data_ov085_021305d8@@3DA=_data_ov085_021305d8")
+#pragma comment(linker, "/alternatename:?data_ov085_021305e0@@3DA=_data_ov085_021305e0")
+#pragma comment(linker, "/alternatename:?data_ov085_021306cc@@3DA=_data_ov085_021306cc")
+#pragma comment(linker, "/alternatename:?data_ov085_021306ec@@3PADA=_data_ov085_021306ec")
+#pragma comment(linker, "/alternatename:?data_ov085_0213073c@@3USharedFilePtr@@A=_data_ov085_0213073c")
+#pragma comment(linker, "/alternatename:?data_ov085_02130744@@3USharedFilePtr@@A=_data_ov085_02130744")
+#pragma comment(linker, "/alternatename:?data_ov085_0213074c@@3USharedFilePtr@@A=_data_ov085_0213074c")
+#pragma comment(linker, "/alternatename:?data_ov085_02130790@@3HA=_data_ov085_02130790")
+#pragma comment(linker, "/alternatename:?data_ov085_021307b0@@3PAHA=_data_ov085_021307b0")
+#pragma comment(linker, "/alternatename:?data_ov085_021307d0@@3HA=_data_ov085_021307d0")
+#pragma comment(linker, "/alternatename:?data_ov085_021307e0@@3HA=_data_ov085_021307e0")
+#pragma comment(linker, "/alternatename:?data_ov085_02130810@@3PADA=_data_ov085_02130810")
+#pragma comment(linker, "/alternatename:?func_02013890@@YAHHH@Z=_func_02013890")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c19func_ov002_020d228cEv@@YAXPAX@Z=__ZN7daPly_c19func_ov002_020d228cEv")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov085_0212bc78, and nothing references ?_ZN7daMip_c8SetStateEPv@@YAXPAX0@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daMip_c8SetStateEPv@@YAXPAX0@Z=_func_ov085_0212bc78")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov085_0212bcc8, and nothing references ?_ZN7daMip_c21UpdateMatrixAndShadowEv@@YAXPAD@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daMip_c21UpdateMatrixAndShadowEv@@YAXPAD@Z=_func_ov085_0212bcc8")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov085_0212c150, and nothing references ?_ZN7daMip_c17RenderMirrorImageEv@@YAXPAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN7daMip_c17RenderMirrorImageEv@@YAXPAX@Z=_func_ov085_0212c150")
+#pragma comment(linker, "/alternatename:?_ZN11daC_Jugem_c8SetStateEPMS_FivE@@YAHPAX0@Z=__ZN11daC_Jugem_c8SetStateEPMS_FivE")
+
+/* ---- gate 19: ov098's CANNON ------------------------------------------- */
+
+/* gate 19 link ring */
+#pragma comment(linker, "/alternatename:?data_ov098_0213c8e8@@3DA=_data_ov098_0213c8e8")
+#pragma comment(linker, "/alternatename:?data_ov098_0213c8fc@@3PAUEntry@@A=_data_ov098_0213c8fc")
+#pragma comment(linker, "/alternatename:?_ZN7daCnn_c11PickNextAimEv@@YAXPAX@Z=__ZN7daCnn_c11PickNextAimEv")
+#pragma comment(linker, "/alternatename:?data_ov002_021102d4@@3UState@@A=_data_ov002_021102d4")
+
+/* ---- gate 20: ov002's EXIT and WATERFALL_MIST -------------------------- */
+
+/* The exit's camera move is a real C++ method over a LOCAL SHADOW Camera
+   (src/_ZN6Camera10LookAtExitER8dActor_c.cpp declares its own `struct Camera`
+   with just the two methods it needs), so MSVC emits it under the shadow's
+   mangling while its caller -- the exit's own Behavior -- spells it the
+   Itanium way. Both ends are real code; only the spelling differs.
+   The shadow's ChangeState and the State object it enters resolve the same
+   way, onto the camera the port already carries: the dispatcher in
+   hal/camera_bridges.cpp and state 15 of the nineteen in
+   hal/camera_states.cpp (0x020095c4 / 0x02009540 -- the exit look). */
+/* LookAtExit and Camera::ChangeState were the same broken thiscall aliases
+   as the gate-22 door ring (one in each direction); both are real faces in
+   hal/door_ring_faces.cpp now. */
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?data_0209b0f8@@3UState@dCamera_c@@A=_data_0209b0f8")
+
+/* ---- gate 21: ov100's BUTTERFLY and FISH ------------------------------- */
+
+/* gate 21 link ring. Same two shapes as every gate before it: a C++ TU that
+   declares a mounted datum with a type of its own gets MSVC mangling for a
+   symbol the mount emits as plain C, and a TU that declares an Itanium-named
+   function without extern "C" gets it mangled as well. The bytes and the
+   bodies are the same either way. */
+#pragma comment(linker, "/alternatename:?data_ov100_021473a4@@3PAPAHA=_data_ov100_021473a4")
+#pragma comment(linker, "/alternatename:?data_ov100_021473b0@@3PAPAHA=_data_ov100_021473b0")
+#pragma comment(linker, "/alternatename:?data_ov100_021489cc@@3PAHA=_data_ov100_021489cc")
+#pragma comment(linker, "/alternatename:?data_ov100_021473a4@@3PAPAUSharedFilePtr@@A=_data_ov100_021473a4")
+#pragma comment(linker, "/alternatename:?data_ov100_021473b0@@3PAPAUSharedFilePtr@@A=_data_ov100_021473b0")
+#pragma comment(linker, "/alternatename:?data_ov100_021489cc@@3USharedFilePtr@@A=_data_ov100_021489cc")
+#pragma comment(linker, "/alternatename:?data_ov002_0210d9d8@@3USFP@@A=?data_ov002_0210d9d8@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?gButterflyFlyAnimationFile@@3USFP@@A=_gButterflyFlyAnimationFile")
+#pragma comment(linker, "/alternatename:?gButterflyModelFile@@3USFP@@A=_gButterflyModelFile")
+#pragma comment(linker, "/alternatename:?data_ov100_02148668@@3USFP@@A=?data_ov100_02148668@@3UIblModelFile@@A")
+#pragma comment(linker, "/alternatename:?data_020a0e68@@3UMtx@@A=_data_020a0e68")
+#pragma comment(linker, "/alternatename:?data_ov100_02148628@@3PAUPMF@@A=_data_ov100_02148628")
+#pragma comment(linker, "/alternatename:?_ZN8dActor_c10FindWithIDEj@@YAPAXI@Z=__ZN8dActor_c10FindWithIDEj")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN13SharedFilePtr7ReleaseEv, and nothing references ?_ZN13SharedFilePtr7ReleaseEv@@YAXPAUSharedFilePtr@@@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN13SharedFilePtr7ReleaseEv@@YAXPAUSharedFilePtr@@@Z=__ZN13SharedFilePtr7ReleaseEv")
+#pragma comment(linker, "/alternatename:?_ZN8dActor_c15IsPlayerInRangeEi@@YAHPAXH@Z=__ZN8dActor_c15IsPlayerInRangeEi")
+#pragma comment(linker, "/alternatename:?_ZN8daFish_c10OnFishGoneEv@@YAXXZ=__ZN8daFish_c10OnFishGoneEv")
+extern "C" {
+/* PORT_HOST_ABI: ARM r0 ride-through, ov100's fish release pass.
+   Fish::CleanupResources (0x02146a98) calls 0x02146280 with no argument
+   because dActor_c::FindWithID has just returned the actor in r0 and that is
+   what the helper wants; the reloc at 0x02146ae4 and the helper's own
+   `ldrb r1, [r0, #0x158]` settle it. MSVC pushes nothing for an argless call,
+   so the helper read the caller's dead frame slot instead and the level-change
+   teardown faulted at c0000005 on 0x159 (1 + 0x158) on every level that has
+   fish: 8 Jolly Roger Bay, 25 Tiny-Huge Island tiny, 30 The Secret Aquarium.
+   The same value is in the same place on this ABI -- eax at the call site,
+   measured 0x30013be0 with ecx 1 in the crash -- so the thunk pushes it and
+   the ROM's own body runs with the actor the ROM would have handed it. The
+   caller's `je` already skips the call when the lookup found nothing; the
+   test here is that same guard, not a new one. port/CMakeLists.txt renames the
+   symbol for the one TU that makes this call, so nothing else is re-routed. */
+/* RETIRED at PORTSYNC2 (the 2026-10 main merge, 749f5799a): main spells the
+   helper as the member daFish_c::func_ov100_02146280 and its one caller as a
+   member call, which MSVC gives its receiver in ECX, so the ride-through has
+   nothing left to carry -- and the flat name it called is no longer defined.
+   port/CMakeLists.txt's rename is retired with it. Kept as the record. */
+#if 0
+void _ZN8daFish_c10OnFishGoneEv(char *c);
+__declspec(naked) void hal_ov100_02146280_ridethrough(void)
+{
+    __asm {
+        test eax, eax
+        je   SHORT ride_none
+        push eax
+        call _ZN8daFish_c10OnFishGoneEv
+        add  esp, 4
+    ride_none:
+        ret
+    }
+}
+#endif
+}
+/* One TU spells ActorBase::MarkForDestruction by an ad-hoc C name rather than
+   the Itanium one -- the same body either way. */
+#pragma comment(linker, "/alternatename:?ActorBase_MarkForDestruction@@YAXPAX@Z=__ZN7fBase_c18MarkForDestructionEv")
+
+/* ---- gate 22: ov100's DOOR --------------------------------------------- */
+
+/* gate 22 link ring: the same two shapes again. The one that is not just a
+   spelling is `func_02132894` -- the door's InitResources TU declares ov089's
+   key-model SharedFilePtr table under a func_ name and without the overlay
+   prefix, and _Z13LoadKeyModelsi spells the same bytes data_ov089_02132894. One
+   array either way. */
+#pragma comment(linker, "/alternatename:_func_02132894=_data_ov089_02132894")
+#pragma comment(linker, "/alternatename:?gNextSublevel@@3DA=_gNextSublevel")
+#pragma comment(linker, "/alternatename:?data_0209caa0@@3DA=_data_0209caa0")
+#pragma comment(linker, "/alternatename:?gCamera@@3DA=_gCamera")
+#pragma comment(linker, "/alternatename:?data_ov100_021488a4@@3DA=_data_ov100_021488a4")
+#pragma comment(linker, "/alternatename:?data_ov100_021488b4@@3DA=_data_ov100_021488b4")
+#pragma comment(linker, "/alternatename:?data_ov100_021488b4@@3PADA=_data_ov100_021488b4")
+#pragma comment(linker, "/alternatename:?data_ov100_021488f4@@3PADA=_data_ov100_021488f4")
+#pragma comment(linker, "/alternatename:?data_ov100_02148704@@3EA=_data_ov100_02148704")
+#pragma comment(linker, "/alternatename:?data_ov100_02148204@@3PADA=_data_ov100_02148204")
+#pragma comment(linker, "/alternatename:?data_ov100_02148204@@3PAUElem@@A=_data_ov100_02148204")
+#pragma comment(linker, "/alternatename:?_Z15UnloadKeyModelsi@@YAXH@Z=__Z15UnloadKeyModelsi")
+
+/* gate 22 round 1: the Player and Camera door entry points. Each is a real
+   C++ method in its own TU and each caller spells it the Itanium way. These
+   were link aliases here ("the two names are the same body and neither side
+   needs a thunk") -- WRONG on 32-bit MSVC: the method is __thiscall (this in
+   ecx, callee pops stack args) while the Itanium-name callers are cdecl
+   (self on the stack, caller pops). Every call through an alias ran with
+   garbage `this`, and the one-stack-arg methods also unbalanced ESP by 4:
+   the 2026-08-07 door-open crash was func_ov100_02144730's RET landing on
+   its own door argument after GoBehindPlayer's `ret 4`. The whole ring is
+   real cdecl faces in hal/method_faces.cpp now, LookAtExit and
+   TryExitWhiteDoorWithStar included. */
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _func_ov002_020ca78c, and nothing references _func_020ca78c, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:_func_020ca78c=_func_ov002_020ca78c")
+/* ...and the rest of the ring those two pulled in. */
+#pragma comment(linker, "/alternatename:?data_020873dc@@3HA=_data_020873dc")
+#pragma comment(linker, "/alternatename:?data_0208742c@@3HA=_data_0208742c")
+#pragma comment(linker, "/alternatename:?data_0209b0e8@@3HA=?data_0209b0e8@@3UState@dCamera_c@@A")
+#pragma comment(linker, "/alternatename:?_ZN9dCamera_c13func_0200c66cEPvPiS1_S1_@@YAXPAX0PAH11@Z=__ZN9dCamera_c13func_0200c66cEPvPiS1_S1_")
+#pragma comment(linker, "/alternatename:?_ZN9dCamera_c7SetModeEi@@YAXPAXH@Z=__ZN9dCamera_c7SetModeEi")
+#pragma comment(linker, "/alternatename:?data_ov002_020ff480@@3PAPAUSharedFilePtr@@A=_data_ov002_020ff480")
+#pragma comment(linker, "/alternatename:?data_02092128@@3PAEA=_data_02092128")
+#pragma comment(linker, "/alternatename:?data_0209caa0@@3PAEA=_data_0209caa0")
+#pragma comment(linker, "/alternatename:?_ZN15dExtAnm2Model_c13Func_020162C4EP8BCA_Fileiit@@YAXPAXIHHG@Z=__ZN15dExtAnm2Model_c13Func_020162C4EP8BCA_Fileiit")
+#pragma comment(linker, "/alternatename:?_ZN15dExtAnm2Model_c4CopyERKS_PcP8BCA_File@@YAXPAX0PADI@Z=__ZN15dExtAnm2Model_c4CopyERKS_PcP8BCA_File")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c18PlayCharacterSoundEv@@YAXPAX@Z=__ZN7daPly_c18PlayCharacterSoundEv")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c12GetTalkStateEv@@YAHPAX@Z=__ZN7daPly_c12GetTalkStateEv")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c12Unk_020c9e5cEh@@YAHPAXE@Z=__ZN7daPly_c12Unk_020c9e5cEh")
+
+/* gate 22 round 2: the last of the door ring (TryExitWhiteDoorWithStar is a
+   face in hal/method_faces.cpp, see the round-1 note). */
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c17SetNoControlStateEhih@@YAHPAXEHE@Z=__ZN7daPly_c17SetNoControlStateEhih")
+
+/* ---- gate 23: ov102's QUESTION_BLOCK ----------------------------------- */
+
+/* gate 23 link ring, one shape only: C++ TUs that declare a mounted datum or
+   an Itanium-named function with a type of their own get MSVC mangling for
+   symbols the mount and the other TUs emit as plain C. */
+#pragma comment(linker, "/alternatename:?data_ov002_0210d9a0@@3PADA=?data_ov002_0210d9a0@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?gPFlowerOpenModelFile@@3PADA=?gPFlowerOpenModelFile@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov002_0210d9c0@@3PADA=?data_ov002_0210d9c0@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?gPFlowerCloseModelFile@@3PADA=?gPFlowerCloseModelFile@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov002_0210d9d8@@3PADA=?data_ov002_0210d9d8@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov002_0210d9e0@@3PADA=?data_ov002_0210d9e0@@3UOv002ModelFile@@A")
+/* gate 211: EnemySpawner::InitResources declares the same model SharedFilePtr
+   cell as a plain `extern int` outside its extern "C" block, so it carries the
+   @@3HA spelling too. MSVC folds this onto the one C symbol. */
+#pragma comment(linker, "/alternatename:?data_ov002_0210d9e0@@3HA=?data_ov002_0210d9e0@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov002_0210da18@@3PADA=?data_ov002_0210da18@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov002_0210da30@@3PADA=?data_ov002_0210da30@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov002_0210da40@@3PADA=?data_ov002_0210da40@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov002_0210da58@@3PADA=?data_ov002_0210da58@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov102_0214e7d0@@3PADA=_data_ov102_0214e7d0")
+#pragma comment(linker, "/alternatename:?data_ov102_0214e7d8@@3PADA=_data_ov102_0214e7d8")
+#pragma comment(linker, "/alternatename:?data_ov102_0214e7e0@@3PADA=_data_ov102_0214e7e0")
+#pragma comment(linker, "/alternatename:?data_ov102_0214e7e8@@3PADA=_data_ov102_0214e7e8")
+#pragma comment(linker, "/alternatename:?data_ov102_0214e7f0@@3PADA=_data_ov102_0214e7f0")
+#pragma comment(linker, "/alternatename:?data_ov102_0214e7f8@@3PADA=_data_ov102_0214e7f8")
+#pragma comment(linker, "/alternatename:?data_ov102_0214e800@@3PADA=_data_ov102_0214e800")
+#pragma comment(linker, "/alternatename:?data_ov102_0214e808@@3PADA=_data_ov102_0214e808")
+#pragma comment(linker, "/alternatename:?_ZN4dBgW6EnableEP8dActor_c@@YAXPAX0@Z=__ZN4dBgW6EnableEP8dActor_c")
+#pragma comment(linker, "/alternatename:?_ZN8dActor_c9UpdatePosEP5dCc_c@@YAXPAX0@Z=__ZN8dActor_c9UpdatePosEP5dCc_c")
+#pragma comment(linker, "/alternatename:?_ZN15dExtFrameCtrl_c7AdvanceEv@@YAXPAX@Z=__ZN15dExtFrameCtrl_c7AdvanceEv")
+#pragma comment(linker, "/alternatename:?_ZN4dBgW14SetClipOffsetYEi@@YAXPAHH@Z=__ZN4dBgW14SetClipOffsetYEi")
+#pragma comment(linker, "/alternatename:?_ZN4dBgW13SetClipRadiusEi@@YAXPAHH@Z=__ZN4dBgW13SetClipRadiusEi")
+#pragma comment(linker, "/alternatename:?_ZN18daObjHatenaBlock_c15CallStateUpdateEv@@YAXPAX@Z=__ZN18daObjHatenaBlock_c15CallStateUpdateEv")
+#pragma comment(linker, "/alternatename:?_ZN18daObjHatenaBlock_c18UpdateMeshColliderEv@@YAXPAD@Z=__ZN18daObjHatenaBlock_c18UpdateMeshColliderEv")
+#pragma comment(linker, "/alternatename:?_ZN18daObjHatenaBlock_c16UpdateDropShadowEv@@YAXPAX@Z=__ZN18daObjHatenaBlock_c16UpdateDropShadowEv")
+#pragma comment(linker, "/alternatename:?_ZN18daObjHatenaBlock_c17UpdateModelMatrixEv@@YAXPAD@Z=__ZN18daObjHatenaBlock_c17UpdateModelMatrixEv")
+/* One TU declares RaycastGround::SetObjAndPos's second parameter as void*
+   where every other one spells it Actor*; the same body, one mangling apart. */
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines ?SetObjAndPos@dBgCh_Gnd@@QAEXABUVector3@@PAUActor@@@Z, and nothing references ?SetObjAndPos@dBgCh_Gnd@@QAEXABUVector3@@PAX@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?SetObjAndPos@dBgCh_Gnd@@QAEXABUVector3@@PAX@Z=?SetObjAndPos@dBgCh_Gnd@@QAEXABUVector3@@PAUActor@@@Z")
+
+// gate 25, the bottom screen: LoadFont.cpp and Stage::CheckCameraInput both
+// declare their globals outside extern "C", so MSVC emits C++ manglings for
+// what are C-named symbols everywhere else in the port.
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?data_0209d698@@3EA=_data_0209d698")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?data_0209d6f8@@3HA=_data_0209d6f8")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?data_0209d660@@3EA=_data_0209d660")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?data_0209d6d4@@3FA=_data_0209d6d4")
+#pragma comment(linker, "/alternatename:?data_0209f350@@3PAEA=_data_0209f350")
+#pragma comment(linker, "/alternatename:?data_0209f368@@3PAGA=_data_0209f368")
+#pragma comment(linker, "/alternatename:?data_020a0de8@@3PAUTouchInfo@@A=_data_020a0de8")
+#pragma comment(linker, "/alternatename:?data_0209f498@@3PAUCamInput@@A=_data_0209f498")
+#pragma comment(linker, "/alternatename:?gCamera@@3PAEA=_gCamera")
+#pragma comment(linker, "/alternatename:?gZoomButtonActiveTimer@@3EA=_gZoomButtonActiveTimer")
+// Stage::CheckCameraInput is a real MSVC static member; walk_window reaches
+// it by the Itanium name every other caller in the port uses. Same signature,
+// same cdecl, no arguments -- the alias is exact.
+#pragma comment(linker, "/alternatename:__ZN10dScStage_c16CheckCameraInputEv=?CheckCameraInput@dScStage_c@@SAXXZ")
+// LoadFont declares GX/GXS::LoadBGPltt as MSVC static members; their TUs
+// define the Itanium C name. Same cdecl, same three arguments.
+#pragma comment(linker, "/alternatename:?LoadBGPltt@GX@@SAXPBXII@Z=?LoadBGPltt@GX@@YAXPBXII@Z")
+#pragma comment(linker, "/alternatename:?LoadBGPltt@GXS@@SAXPBXII@Z=?LoadBGPltt@GXS@@YAXPBXII@Z")
+/* ---- gate 26: the boot spine ----------------------------------------------
+   Stage::RenderModel declares its two engine globals OUTSIDE extern "C", so
+   the TU emits C++-decorated references while the definitions are C-linkage:
+   data_020755d4 is the {125,125,125} render scale romdata.py emits, and
+   data_0209f340 is the current LVL_Overlay pointer in hal/actor_vtables.cpp.
+   Both are plain storage with no ABI to get wrong, so an alias is right here
+   (unlike dExtSimpleModel_c::LoadAndSetFile, which is a __thiscall member and needs a
+   real face -- see hal/method_faces.cpp). */
+#pragma comment(linker, "/alternatename:?data_020755d4@@3DA=_data_020755d4")
+#pragma comment(linker, "/alternatename:?data_0209f340@@3PAUInfo@@A=_data_0209f340")
+
+/* ---- the tree-grab chain (slice_gate10 tail) -------------------------------
+   _Z13func_02014f5cP5dCc_cj calls the grab test by its arm9-side name; the definition is
+   the ov002 TU. Plain C name to C name, cdecl both sides. */
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN7daPly_c10StartClimbEP5dCc_c, and nothing references _func_020caf98, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:_func_020caf98=__ZN7daPly_c10StartClimbEP5dCc_c")
+/* func_ov002_020caf98.cpp declares its Player externs without extern "C" and
+   its State nested in Player, so every reference lands on the nested-State
+   spelling. The four records are the same C-named storage the rest of the
+   state family already aliases (the line-460 precedent). */
+#pragma comment(linker, "/alternatename:?data_ov002_0211013c@@3UState@daPly_c@@A=_data_ov002_0211013c")
+#pragma comment(linker, "/alternatename:?data_ov002_0211031c@@3UState@daPly_c@@A=_data_ov002_0211031c")
+#pragma comment(linker, "/alternatename:?data_ov002_021101b4@@3UState@daPly_c@@A=_data_ov002_021101b4")
+#pragma comment(linker, "/alternatename:?data_ov002_021106dc@@3UState@daPly_c@@A=_data_ov002_021106dc")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). ONE LEFT HAND SIDE MUST
+   NOT CARRY TWO DIRECTIVES, and ?ChangeState@daPly_c@@QAEHAAUState@1@@Z carried
+   this one and hal/actor_faces_bob.cpp:221's. Both right hand sides are defined
+   in this link, so the tie is settled on which one describes the same call:
+
+     kept    actor_faces_bob.cpp  = ?ChangeState@PlayerChangeStateFace@@QAEHAAUState@1@@Z
+             __thiscall, one reference argument, returns int -- the LHS's own
+             shape letter for letter -- and its body is a receiver-bridging face
+             written for exactly this reference (it moves `this` into the flat
+             _ZN7daPly_c11ChangeStateERNS_5StateE call).
+     retired this row               = ?ChangeState@daPly_c@@QAEXAAUState@1@@Z
+             __thiscall, one reference argument, returns VOID. It happens to work
+             only because the single call site discards the result; the note below
+             said as much. A row that is right by accident loses to one that is
+             right by construction.
+
+   Return-type-only variant of the nested-State ChangeState face in
+   hal/reverse_bridges.cpp -- __thiscall, same argument, result in EAX, and
+   the one call site discards it (the line-616 precedent).
+#pragma comment(linker, "/alternatename:?ChangeState@daPly_c@@QAEHAAUState@1@@Z=?ChangeState@daPly_c@@QAEXAAUState@1@@Z") */
+
+/* ---- after the 2026-08-03 main merge --------------------------------------
+   Main's class-rename and mangled-declaration waves changed which spelling a
+   slice TU reaches a symbol by. Three of those are new C++ manglings over
+   storage the port already hosts under the plain name -- the usual shape, one
+   line each. St_LevelEnter_Main gained a member-function-pointer array type
+   for the state table and an `Obj *` for the camera; the fader wipe starters
+   that main now compiles (4eae13f3b) spell the wipe array as `FaderWipe *`. */
+#pragma comment(linker, "/alternatename:?data_ov002_0211075c@@3PAP8C@@AEXXZA=_data_ov002_0211075c")
+#pragma comment(linker, "/alternatename:?gCamera@@3PAUObj@@A=_gCamera")
+#pragma comment(linker, "/alternatename:?data_0209f324@@3PAUFaderWipe@@A=_data_0209f324")
+
+/* ActorBase::MarkForDestruction under its ad-hoc C name. The C++-mangled
+   spelling was already aliased above (line ~987); the sweep moved
+   _ZN9Butterfly6State6Ev onto the plain one, so it needs the same target. */
+#pragma comment(linker, "/alternatename:_ActorBase_MarkForDestruction=__ZN7fBase_c18MarkForDestructionEv")
+
+/* G1, the shared-header placeholder, is now inside decl_common.h's extern "C"
+   block, so it arrives as a plain C name rather than ?G1@@3PAHA. Same target
+   as the mangled alias above: SignPost::InitResources loads its KCL through
+   data_ov002_0210e05c and CleanupResources releases G1, so the pair has to
+   land on one object.
+
+   G0/G1 are single global names, so every TU that uses them collapses onto
+   one target, and this alias binds that one target to SignPost's KCL. Only
+   SignPost may spell its files G0/G1 now: MetalNet::CleanupResources was the
+   other user in the port's slices and, before the src-side fix, its G0/G1
+   collapsed here too, so it released SignPost's two file pointers instead of
+   its own (the CannonHatch disease). That is FIXED at the source now --
+   src/game/actors/d_a_obj_mc_metalnet.cpp releases its own
+   data_ov009_02113e90 / data_ov009_02113e88 by name, so it no longer reaches
+   G0/G1 and this alias serves SignPost alone. The alias stays because SignPost
+   still needs it. */
+#pragma comment(linker, "/alternatename:_G1=_SignPost_ClsnFile")
+
+/* ---- gate 40: STAR_DOOR's InitResources data references --------------------
+   _ZN12daStarGate_c13InitResourcesEv.cpp declares its four data symbols with plain
+   `extern` (C++ linkage) and as arrays, so MSVC mangles them to names the C
+   mount and host globals do not carry. Each lands on the same C object every
+   other reader uses: gObjStargateModelFile / _ZN12daStarGate_c7ST_WAITE are the star
+   door's own ov100 records (mount), gLocalPlayerId the local-player index
+   (level_boot), gPlayers the local-player array (cxxname_bridge). Same
+   shape as the ov100 aliases at ~line 1048 above. */
+#pragma comment(linker, "/alternatename:?gObjStargateModelFile@@3USharedFilePtr@@A=?gObjStargateModelFile@@3UStarGateModelFilePtr@@A")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _data_ov100_02148974, and nothing references ?_ZN12daStarGate_c7ST_WAITE@@3PAHA, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN12daStarGate_c7ST_WAITE@@3PAHA=_data_ov100_02148974")
+#pragma comment(linker, "/alternatename:?gLocalPlayerId@@3PAEA=_gLocalPlayerId")
+#pragma comment(linker, "/alternatename:?gPlayers@@3PAHA=_gPlayers")
+/* the star door's eight callbacks reach two more, one per spelling: the
+   camera-relative geometry base (_ZN12daStarGate_c17St_OpenClose_MainEP7daPly_c) and the door's own
+   0x50-tagged CLPS row test (_ZN12daStarGate_c17St_Unlocking_MainEP7daPly_c). data_ov100_02148390 is
+   mounted; data_020a0ebc is auto_bss's. */
+#pragma comment(linker, "/alternatename:?data_020a0ebc@@3DA=_data_020a0ebc")
+#pragma comment(linker, "/alternatename:?data_ov100_02148390@@3PAUE6@@A=?data_ov100_02148390@@3PAUdaStarGateInfo@@A")
+/* _ZN12daStarGate_c17St_OpenClose_MainEP7daPly_c spells _ZN12daStarGate_c7ST_WAITE as a plain char, a third
+   mangling of the callback table the InitResources block spells as int*. */
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _data_ov100_02148974, and nothing references ?_ZN12daStarGate_c7ST_WAITE@@3DA, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN12daStarGate_c7ST_WAITE@@3DA=_data_ov100_02148974")
+
+/* ---- gate 60-61: ov015 platform data references (Whomp's Fortress) ---------
+   MovingBarSmall::InitResources declares three of its ov015 tuning words with
+   plain `extern void*` (C++ linkage: ?..@@3PAXA), so MSVC mangles them to
+   names the ov015 per-symbol mount does not carry. Each lands on the same C
+   object the mount publishes. */
+#pragma comment(linker, "/alternatename:?data_ov015_02114a64@@3PAXA=_data_ov015_02114a64")
+#pragma comment(linker, "/alternatename:?data_ov015_02114a5c@@3PAXA=_data_ov015_02114a5c")
+#pragma comment(linker, "/alternatename:?data_ov015_02113594@@3PAXA=_data_ov015_02113594")
+/* A SECOND SPELLING OF THE SAME THREE WORDS, added at the main -> port sync
+   (lane SYNC7, wave 9). main gave the reading translation units real types, so
+   the same three mount objects are now also named
+   ?...@@3USharedFilePtr@@A and ?...@@3UCLPS_Block@@A. This is the
+   gCamera case again -- one object, four spellings, one definition -- and
+   the size question the struct spelling raises is already answered here: these
+   three are port/ov015_syms.txt mount rows, so their storage is the ROM's own
+   bytes at the ROM's own spacing rather than a hand-sized host global. */
+#pragma comment(linker, "/alternatename:?data_ov015_02114a64@@3USharedFilePtr@@A=_data_ov015_02114a64")
+#pragma comment(linker, "/alternatename:?data_ov015_02114a5c@@3USharedFilePtr@@A=_data_ov015_02114a5c")
+#pragma comment(linker, "/alternatename:?data_ov015_02113594@@3UCLPS_Block@@A=_data_ov015_02113594")
+/* The two platforms' InitResources thread their MovingMeshCollider through
+   MeshColliderBase's two update statics, which src spells at C linkage
+   (_ZN16MeshColliderBase..) but the .cpp defines as real C++ methods (MSVC
+   ?..@@SAX..). Alias the C name onto the method the caller means -- the same
+   shape as the STAR_DOOR method aliases above. */
+#pragma comment(linker, "/alternatename:__ZN4dBgW16UpdatePosAndAngsERS_P8dActor_cR5dBgPiR7Vector3P10Vector3_16S8_=?UpdatePosAndAngs@dBgW@@SAXAAU1@PAUdActor_c@@AAUdBgPi@@AAUVector3@@PAUVector3_16@@4@Z")
+#pragma comment(linker, "/alternatename:__ZN4dBgW21UpdatePosWithVelocityERS_P8dActor_cR5dBgPiR7Vector3P10Vector3_16S8_=?UpdatePosWithVelocity@dBgW@@SAXAAU1@PAUdActor_c@@AAUdBgPi@@AAUVector3@@PAUVector3_16@@4@Z")
+/* gate 63: _ZN17daObjBk_Ukisima_c16CleanupResourcesEv (RotatingPlatformWf's CleanupResources) calls
+   _ZN16daObjKaitendai_c20CleanupResourcesFromEP18ResourceDescriptor by a name the decompiler emitted without the ov002_
+   prefix; the real symbol is the ov002 one, in the slice above. */
+#pragma comment(linker, "/alternatename:_func_020b66a8=__ZN16daObjKaitendai_c20CleanupResourcesFromEP18ResourceDescriptor")
+/* _ZN16daObjKaitendai_c17InitResourcesFromEP18ResourceDescriptors (RotatingPlatformWf's shared Behavior) spells
+   MeshColliderBase::UpdatePosAndAngs as an `extern int` -- a DATA mangling
+   (?..@@3HA) of the same function the MovingBar path spells as a call. Land it
+   on the same MSVC method. */
+#pragma comment(linker, "/alternatename:?_ZN4dBgW16UpdatePosAndAngsERS_P8dActor_cR5dBgPiR7Vector3P10Vector3_16S8_@@3HA=?UpdatePosAndAngs@dBgW@@SAXAAU1@PAUdActor_c@@AAUdBgPi@@AAUVector3@@PAUVector3_16@@4@Z")
+/* gate 72: func_ov091_02133254 (the THWOMP's InitResources helper) spells the
+   same static as an `extern void *` -- the ?..@@3PAXA data mangling of the
+   function whose address it stores through _ZN4dBgW21SetBeforeClsnCallbackEPFvRS_P8dActor_cR5dBgPiR7Vector3P10Vector3_16S8_E. Land it on the same
+   MSVC method as the int form above. */
+#pragma comment(linker, "/alternatename:?_ZN4dBgW16UpdatePosAndAngsERS_P8dActor_cR5dBgPiR7Vector3P10Vector3_16S8_@@3PAXA=?UpdatePosAndAngs@dBgW@@SAXAAU1@PAUdActor_c@@AAUdBgPi@@AAUVector3@@PAUVector3_16@@4@Z")
+/* gate 74: SlidingPlatformWf::InitResources threads its collider through
+   MeshColliderBase::UpdatePosWithTransform, the third of the three update
+   statics; the src spells the C name and the .cpp defines the MSVC method
+   (slice_gate59), the same shape as UpdatePosAndAngs above. */
+#pragma comment(linker, "/alternatename:__ZN4dBgW22UpdatePosWithTransformERS_P8dActor_cR5dBgPiR7Vector3P10Vector3_16S8_=?UpdatePosWithTransform@dBgW@@SAXAAU1@PAUdActor_c@@AAUdBgPi@@AAUVector3@@PAUVector3_16@@4@Z")
+/* gate 74: SlidingPlatformWf::InitResources declares five of its ov091
+   construction-data tables with C++ types (SFP*, char*, u16*), so MSVC mangles
+   the references to names the ov091 per-symbol mount does not carry. Each lands
+   on the same C object the mount publishes -- the ov015 platform-data case. */
+#pragma comment(linker, "/alternatename:?data_ov091_02135024@@3PAUSFP@@A=_data_ov091_02135024")
+#pragma comment(linker, "/alternatename:?data_ov091_02135028@@3PADA=_data_ov091_02135028")
+#pragma comment(linker, "/alternatename:?data_ov091_0213502c@@3PADA=_data_ov091_0213502c")
+#pragma comment(linker, "/alternatename:?data_ov091_02134514@@3PAGA=_data_ov091_02134514")
+#pragma comment(linker, "/alternatename:?data_ov091_02134504@@3PAGA=_data_ov091_02134504")
+/* gate 73: RotatingUpDownPlatformUtm's Init and Clean declare their two SFP
+   tables with C++ types -- void** in Init, SFP* in Clean, two manglings of the
+   same mounted object -- and Behavior spells the arm9 Matrix4x3 scratch
+   data_020a0e68 as char* (a third mangling of the same host array). */
+#pragma comment(linker, "/alternatename:?data_ov091_02134c30@@3PAPAXA=_data_ov091_02134c30")
+#pragma comment(linker, "/alternatename:?data_ov091_02134c30@@3PAUSFP@@A=_data_ov091_02134c30")
+#pragma comment(linker, "/alternatename:?data_ov091_02134c34@@3PAPAXA=_data_ov091_02134c34")
+#pragma comment(linker, "/alternatename:?data_ov091_02134c34@@3PAUSFP@@A=_data_ov091_02134c34")
+#pragma comment(linker, "/alternatename:?data_020a0e68@@3PADA=_data_020a0e68")
+/* gates 70-71: the two piranhas' Init/spit closures declare four ov084 statics
+   with C++ types (SharedFilePtr tables as void**, a byte table, the arm9
+   Matrix4x3 scratch as int*), so MSVC mangles the references to names the ov084
+   mount does not carry. Each lands on the same C object the mount publishes. */
+#pragma comment(linker, "/alternatename:?data_ov084_02130e14@@3PAPAXA=?data_ov084_02130e14@@3UPknAnimFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov084_02130e04@@3PAPAXA=?data_ov084_02130e04@@3UPknAnimFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov084_02130e0c@@3PAPAXA=?data_ov084_02130e0c@@3UPknAnimFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov084_02130294@@3PAEA=_data_ov084_02130294")
+#pragma comment(linker, "/alternatename:?data_020a0e68@@3PAHA=_data_020a0e68")
+/* gate 70: func_ov084_0212fc10 (a piranha state) calls dExtAnmModel_c::SetAnim by
+   its unprefixed C name func_02016748; the real symbol is the arm9 method, in
+   the build since gate 7. */
+#pragma comment(linker, "/alternatename:_func_02016748=__ZN14dExtAnmModel_c7SetAnimEP8BCA_Fileiit")
+/* gate 191: _ZN7SkiLift15OnHitByMegaCharER6Player (SkiLift's own OnHitByMegaChar) declares a
+   LOCAL `struct Platform { void KillByMegaChar(daPly_c &); };` and calls it
+   through a qualified, non-virtual dispatch. Platform::KillByMegaChar is a
+   real method per include/Platform.h, but its matched body
+   (src/runtime/actor/d_bg_actor.cpp, already in the build since
+   gate 64) is plain C linkage -- the flat ROM name, not MSVC's re-mangling
+   of the local declaration.
+
+   The local declaration makes that reference __thiscall while the C body is
+   cdecl, so this takes a real definition and NOT an /alternatename. An alias
+   relabels a symbol; it cannot move the object out of ecx onto the stack.
+   Aliased, the body would have read the caller's Player pointer as its own
+   this and taken whatever sat above it as the Player. Same defect class as
+   dExtBlendAnmModel_c::SetAnim in hal/bob_enemy_bridges.cpp, which is what froze
+   KING_BOB_OMB on level 6. */
+struct daPly_c;
+struct Platform { void KillByMegaChar(daPly_c &player); };
+extern "C" void _ZN10dBgActor_c14KillByMegaCharER7daPly_c(void *self, void *player);
+
+void Platform::KillByMegaChar(daPly_c &player)
+{
+    _ZN10dBgActor_c14KillByMegaCharER7daPly_c(this, &player);
+}
+/* gate 191: src/game/actors/d_a_pg_mthr.cpp (MotherPenguin's own Render, under
+   the SkiLift misnomer) declares a LOCAL `struct dExtSimpleModel_c { void Render(Vector3
+   const *); };` -- non-virtual -- and calls it through a qualified dispatch.
+   The real dExtSimpleModel_c::Render (include/Model.h) IS virtual, so its matched body
+   (src/_ZN5Model6RenderEPK7Vector3.cpp, already in the build since gate 4b/33)
+   mangles as the VIRTUAL-qualifier form (?Render@dExtSimpleModel_c@@UAEX...), while the
+   local non-virtual declaration's call site wants the NON-VIRTUAL-qualifier
+   form (?Render@dExtSimpleModel_c@@QAEX...) -- same method, same body, only the
+   virtual/non-virtual qualifier letter (U vs Q) differs in the mangling.
+   Alias the call site's spelling onto the real one. */
+#pragma comment(linker, "/alternatename:?Render@dExtSimpleModel_c@@QAEXPBUVector3@@@Z=?Render@dExtSimpleModel_c@@UAEXPBUVector3@@@Z")
+/* gate 192: MrBlizzard's InitResources/Behavior (main's carried copies)
+   declare Actor::Spawn under the mangled name
+   _ZN5Actor5SpawnEjjRK7Vector3PK10Vector3_16as (a signed-char/short tail
+   param spelling), extern "C" -- a different FLAT symbol than the one the
+   port already hosts, _ZN8dActor_c5SpawnEjjRK7Vector3PK10Vector3_16as (in the
+   build since gate 10). dActor_c::Spawn is cdecl-static with no `this` to
+   lose, so this is the same real ROM function under a second C-linkage
+   spelling -- the dEnemyBase_c::SpawnCoin/PowerStarCreate precedent applied to a
+   second parameter-type spelling instead of a second declaring TU. */
+#pragma comment(linker, "/alternatename:__ZN5Actor5SpawnEjjRK7Vector3PK10Vector3_16as=__ZN8dActor_c5SpawnEjjRK7Vector3PK10Vector3_16as")
+/* run linkw wave 9, lane w9-harvest: the same shape, arrived by a different
+   road, and the road is the point. src/func_ov071_02120d30.c (harvested from
+   main, port/slice_w9harvest.txt) calls Actor::UntrackAndSpawnStar spelled
+   _ZN5Actor19UntrackAndSpawnStarERajRK7Vector3h -- `h`, unsigned char, for the
+   fifth parameter. The port hosts _..._Vector3j (`j`, unsigned int), from
+   src/_ZN8dActor_c19UntrackAndSpawnStarERajRK7Vector3h.cpp in slice_gate32.
+
+   SAME FUNCTION, and this is checked by ADDRESS, not by eye:
+     config/arm9/symbols.txt (this branch)
+       _ZN8dActor_c19UntrackAndSpawnStarERajRK7Vector3h ... addr:0x0200ff14
+     config/arm9/symbols.txt (origin/main, bc93fa767)
+       _ZN5Actor19UntrackAndSpawnStarERajRK7Vector3h ... addr:0x0200ff14
+   -- one 0x4c-byte body at 0x0200ff14 that main RENAMED after this branch
+   forked. Both spellings are the same flat C-linkage symbol taking `self` as
+   argument 0, and both declaring TUs give the fifth parameter a full 32-bit
+   slot (main's TU declares it `unsigned int how` under the `h` name), so the
+   cdecl surface is identical and the alias moves no register and no stack
+   word.
+
+   THE GENERAL HAZARD, written down here because it will recur: harvesting a
+   TU from a 626-commit-stale fork imports main's CURRENT symbol spellings for
+   everything that TU calls. 496 of the 543 TUs main has that this branch does
+   not are pure renames of bodies this branch already carries (the measurement
+   is in port/slice_w9harvest.txt's header), and any one of them can surface as
+   an unresolved extern in an otherwise clean harvest. It is a one-line alias
+   every time, but only after the address check above says the two names are
+   one body. */
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN8dActor_c19UntrackAndSpawnStarERajRK7Vector3h, and nothing references __ZN5Actor19UntrackAndSpawnStarERajRK7Vector3h, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:__ZN5Actor19UntrackAndSpawnStarERajRK7Vector3h=__ZN8dActor_c19UntrackAndSpawnStarERajRK7Vector3h")
+/* gate 192: several ov081 files declare data_ov081_* externs at file scope
+   OUTSIDE any extern "C" block (MrBlizzard's InitResources/Behavior, and
+   three helper functions), so MSVC C++-mangles the references -- the
+   ov084/piranha treatment. Each mounted symbol (port/ov081_syms.txt, plain
+   C-linkage unsigned char arrays) is aliased under every C++-mangled
+   spelling a caller's local type produces for it. Two different callers
+   spell data_ov081_02128998's tag differently (Vec3 vs Vector3) and
+   gSnowmanWaitAnimationFile's differently (S2 vs void*) -- both spellings alias
+   onto the one real mount. */
+#pragma comment(linker, "/alternatename:?data_ov081_02128d90@@3PAXA=?data_ov081_02128d90@@3UdaSnowmanModelFilePtr@@A")
+#pragma comment(linker, "/alternatename:?gSnowmanWaitAnimationFile@@3PAXA=_gSnowmanWaitAnimationFile")
+#pragma comment(linker, "/alternatename:?gSnowmanWaitAnimationFile@@3US2@@A=_gSnowmanWaitAnimationFile")
+#pragma comment(linker, "/alternatename:?gSnowmanJumpStAnimationFile@@3PAXA=_gSnowmanJumpStAnimationFile")
+#pragma comment(linker, "/alternatename:?gSnowmanJumpEdAnimationFile@@3PAXA=_gSnowmanJumpEdAnimationFile")
+#pragma comment(linker, "/alternatename:?data_ov081_02128998@@3UVec3@@A=_data_ov081_02128998")
+#pragma comment(linker, "/alternatename:?data_ov081_02128998@@3UVector3@@A=_data_ov081_02128998")
+#pragma comment(linker, "/alternatename:?data_ov081_02128e54@@3PAXA=?data_ov081_02128e54@@3UState@daSnowman_c@@A")
+#pragma comment(linker, "/alternatename:?data_ov081_02128e84@@3PAXA=?data_ov081_02128e84@@3UState@daSnowman_c@@A")
+#pragma comment(linker, "/alternatename:?data_ov081_02128e24@@3PAXA=?data_ov081_02128e24@@3UState@daSnowman_c@@A")
+#pragma comment(linker, "/alternatename:?data_ov081_02128db8@@3HA=_data_ov081_02128db8")
+#pragma comment(linker, "/alternatename:?data_ov081_02128e44@@3PADA=?data_ov081_02128e44@@3UState@daSnowman_c@@A")
+#pragma comment(linker, "/alternatename:?data_ov081_02128e64@@3PADA=?data_ov081_02128e64@@3UState@daSnowman_c@@A")
+/* gate 192: MrBlizzard's InitResources declares
+   _ZN10dCcAcPos_c4InitEP8dActor_cRK7Vector3iijj
+   OUTSIDE any extern "C" block (right after the block that closes above
+   its own declaration), so MSVC mangles the call site's reference. The
+   real body (src/..., a plain .c file, C linkage by default, in the
+   build since gate 10) is the flat name. */
+#pragma comment(linker, "/alternatename:?_ZN10dCcAcPos_c4InitEP8dActor_cRK7Vector3iijj@@YAXPAX0PBXHHII@Z=__ZN10dCcAcPos_c4InitEP8dActor_cRK7Vector3iijj")
+/* gate 193: _ZN11daBgSnwmn_c8BehaviorEv.cpp (daBgSnwmn_c::Behavior, matched src)
+   declares data_ov072_02122c70 as `extern const Vector3`, which MSVC
+   mangles WITH the const qualifier; ovdata.py's generated host array is a
+   flat C u8[12] under the plain name. */
+#pragma comment(linker, "/alternatename:?data_ov072_02122c70@@3UVector3@@B=_data_ov072_02122c70")
+/* gate 193: src/_ZN11BabyPenguinD0Ev.cpp spells the class's own table as
+   _ZTV9daPgBby_c (a plain C-linkage name, dsd's RTTI-derived spelling),
+   the same address as hal/actor_classes_ov072.cpp's own host array
+   _ZTV11BabyPenguin. */
+/* PORTSYNC2: both names of this ROM word are one name in main now; the alias would bind a symbol to itself. */ // #pragma comment(linker, "/alternatename:__ZTV9daPgBby_c=__ZTV9daPgBby_c")
+/* gate 193: func_ov072_02120e50.cpp (daBgSnwmn_c's own Behavior-adjacent
+   penguin-catch helper, matched src) calls daPly_c::TryGrab through a
+   LOCAL shadow class declaring it `bool TryGrab(Actor&)` -- MSVC mangles
+   the RETURN TYPE in, producing ?TryGrab@daPly_c@@QAE_NAAUActor@@@Z (_N =
+   bool). The real body (src/_ZN6Player7TryGrabER8dActor_c.cpp, gate 10,
+   already in the build) is extern "C", flat, and returns plain int.
+
+   The return label really is the harmless half. The CALLING CONVENTION is
+   not: the shadow class makes the reference __thiscall, the body is cdecl,
+   and an /alternatename cannot bridge ecx-vs-stack. Aliased, the body read
+   the caller's Actor pointer as its own this and whatever sat above it as
+   the Actor. Same defect class as dExtBlendAnmModel_c::SetAnim in
+   hal/bob_enemy_bridges.cpp, which is what froze KING_BOB_OMB on level 6, so
+   this gets a real definition too. */
+struct dActor_c;
+struct daPly_c { bool TryGrab(dActor_c &actor); };
+extern "C" int _ZN7daPly_c7TryGrabER8dActor_c(void *self, void *actor);
+
+bool daPly_c::TryGrab(dActor_c &actor)
+{
+    return _ZN7daPly_c7TryGrabER8dActor_c(this, &actor) != 0;
+}
+/* gate 193: func_ov072_021218dc.cpp (BabyPenguin's own state-machine
+   body, matched src) declares gPenguinBabySlideAnimationFile/02122ca4 as `extern
+   void*[]` OUTSIDE any extern "C" block, so MSVC mangles them; ovdata.py's
+   generated host arrays are flat C u8[] under the plain names. */
+#pragma comment(linker, "/alternatename:?gPenguinBabySlideAnimationFile@@3PAPAXA=_gPenguinBabySlideAnimationFile")
+#pragma comment(linker, "/alternatename:?gPenguinBabyStandUpAnimationFile@@3PAPAXA=_gPenguinBabyStandUpAnimationFile")
+/* fix round (SIG-RP order): src/_ZN10RockPillar16CleanupResourcesEv.cpp carried wholesale
+   from main (hash-verified), which spells RockPillar's two SharedFilePtrs
+   by their friendly main-side names; this worktree's ov016 mount predates
+   the rename and mounts the raw address names. Mapping verified against
+   main's own config/arm9/overlays/ov016/symbols.txt (ClsnFile=0x02114e1c,
+   ModelFile=0x02114e24). */
+/* gate 194: the ov072_02122cac shape a third time. src/_ZN10HootTheOwl13
+   InitResourcesEv.cpp declares data_ov094_02136b40 as `extern void*`
+   OUTSIDE any extern "C" block; src/func_ov094_021359d8.cpp (a state
+   handler, plain matched src) declares data_ov094_02136ae8/02136af8 as
+   `extern void**` and data_ov094_02136b30 as `extern void*`, also outside
+   extern "C". All four are state cells the ov094 per-symbol mount already
+   publishes as flat C symbols under the plain names. */
+#pragma comment(linker, "/alternatename:?data_ov094_02136b40@@3PAXA=?data_ov094_02136b40@@3UOwlState@@A")
+#pragma comment(linker, "/alternatename:?data_ov094_02136ae8@@3PAPAXA=_data_ov094_02136ae8")
+#pragma comment(linker, "/alternatename:?data_ov094_02136af8@@3PAPAXA=_data_ov094_02136af8")
+#pragma comment(linker, "/alternatename:?data_ov094_02136b30@@3PAXA=?data_ov094_02136b30@@3UOwlState@@A")
+
+/* gate 200 (PUSH_BLOCK 306 + MUGEN_BGM 351, ov002): the same shape.
+   PushBlock::InitResources declares gPFlowerCloseModelFile/0210d9b0 as
+   `extern void**` outside extern "C"; MugenBgm's two real methods declare
+   _Znwm, Fog::Init and the arm9 cells gPlayers/data_020a0ebc the same
+   way. The C-named definitions all exist (the ov002 mount, the hosted arm9
+   data, the operator-new seam, the sliced Fog::Init). */
+#pragma comment(linker, "/alternatename:?gPFlowerCloseModelFile@@3PAPAXA=?gPFlowerCloseModelFile@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?gPFlowerOpenModelFile@@3PAPAXA=?gPFlowerOpenModelFile@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?_Znwm@@YAPAXI@Z=__Znwm")
+#pragma comment(linker, "/alternatename:?_ZN3Fog4InitEtii@@YAXPAXGHH@Z=__ZN3Fog4InitEtii")
+#pragma comment(linker, "/alternatename:?gPlayers@@3PAPADA=_gPlayers")
+#pragma comment(linker, "/alternatename:?data_020a0ebc@@3PAHA=_data_020a0ebc")
+#pragma comment(linker, "/alternatename:?data_ov002_0211028c@@3UState@@A=_data_ov002_0211028c")
+#pragma comment(linker, "/alternatename:?data_ov002_0211004c@@3HA=_data_ov002_0211004c")
+
+// ---- link100 SAVE ----------------------------------------------------------
+//
+// ONE THREAD NODE, and it is storage for a comparison that is never true.
+//
+// port/slice_gate215.txt links the card-backup driver, and two of its TUs are
+// there only because their address is taken: src/func_02060484.c and
+// src/func_02060558.cpp both hand CARDi_SetTask to their asynchronous arm, and
+// both callers in that slice pass 0 for it. CARDi_SetTask -> OS_SetThreadPriority is
+// the driver's thread-priority bump, and src/func_02057e84.c walks the ready
+// list looking for the node it was given, refusing to touch it if it turns out
+// to be OSi_IdleThread -- the idle thread, which must never be re-queued.
+//
+// The port creates no DS threads, so the list is empty and the walk ends on the
+// first compare; the symbol still has to exist for the link. Sized by ROM span,
+// OSi_IdleThread to the next bss symbol OSi_LauncherThread, which is 0x94 bytes --
+// one OSThread, the same shape data_020a81bc has. NOT sized by the two fields
+// src/func_02057e84.c reads (+0x68 next, +0x70 priority): see the undersized-
+// globals rule this file's GX bank block was rewritten under.
+//
+// It is hosted arm9 bss like every other symbol in this file, so it is inside a
+// DSSTATE bracket and the lk6/lk7 dev state capture takes it. dsstate_guard
+// enforces that for every data_020* symbol and there is no case for an
+// exception here.
+DSSTATE_BEGIN
+extern "C" { int OSi_IdleThread[0x94 / 4]; }
+DSSTATE_END
+
+// THREE ALIASES THE SAVE SLICE NEEDS, and each is the same shape this file has
+// carried a dozen times: a matched TU spells a name the C++ way and the
+// definition it wants exists under the ROM's flat C name.
+//
+//   SaveData::ReadDataFromCart   src/_ZN8SaveData16ReadDataFromCartEPcjj.cpp
+//   declares `struct SaveData { static int ReadDataFromCart(...); }` and defines
+//   the method, so its object exports ONLY MSVC's mangling. Every caller in the
+//   ROM -- ReadFileData, ReadMinigameData, and hal/scene_boot.cpp's probe --
+//   spells the Itanium C name. Exactly the trade hal/scene_boot.cpp already
+//   makes for SaveData::SaveFile one screen above its own save block.
+//
+//   IRQ::Disable / IRQ::Restore   src/func_02060558.cpp declares them as free
+//   functions in `namespace IRQ` (`?Disable@IRQ@@YAIXZ`) while line 64 of this
+//   file aliases the STATIC-MEMBER spelling (`?Disable@IRQ@@SAIXZ`). Same two
+//   definitions, a second spelling; the ROM's own bodies still run.
+#pragma comment(linker, "/alternatename:__ZN8SaveData16ReadDataFromCartEPcjj=?ReadDataFromCart@SaveData@@SAHPADII@Z")
+#pragma comment(linker, "/alternatename:?Disable@IRQ@@YAIXZ=_OS_DisableInterrupts")
+#pragma comment(linker, "/alternatename:?Restore@IRQ@@YAXI@Z=_OS_RestoreInterrupts")
+// ---- link100 TAIL ----------------------------------------------------------
+//
+// One alias, the same shape as the gate-200 block above it and for the same
+// reason. src/_ZN14UnchainedChompD1Ev.cpp -- the ROM word at
+// _ZTV14UnchainedChomp+0x40, seated by hal/actor_classes.cpp -- declares the
+// table it stores as
+//
+//     extern int _ZTV14UnchainedChomp;
+//
+// at namespace scope OUTSIDE its own extern "C" block, so MSVC decorates the
+// reference and the port's C-named host array (`void *_ZTV14UnchainedChomp[31]`
+// in hal/actor_classes.cpp) cannot satisfy it. MEASURED, not inferred:
+//
+//     python port/tools/closure.py --root . src/_ZN14UnchainedChompD1Ev.cpp
+//     === UNRESOLVED after this slice: 1 ===
+//         ?_ZTV14UnchainedChomp@@3HA
+//
+// -- one row, and it is that string. The alias runs in the ordinary direction
+// (an UNDEFINED name pointed at a DEFINED one; nothing is redefined), so it
+// cannot be defeated the way port/tools/alternatename_guard.py checks for.
+// The TU that used to hold this slot was a hand transcription of the same body
+// in hal/actor_classes.cpp; with this alias the seat is the matched body
+// itself.
+#pragma comment(linker, "/alternatename:?_ZTV11daWanwan2_c@@3HA=__ZTV11daWanwan2_c")
+// ---- link100 OV ----
+/* dsd gave ov039 0x02111858 TWO names (symbols.txt lines 52 and 53):
+   _ZTV5Cloud, which src/game/actors/d_a_obj_kumo.cpp stores, and _ZTV11daObjKumo_c,
+   which src/game/actors/d_a_obj_kumo.cpp restores by. One table, one host array --
+   hal/actor_classes_ov_link100.cpp defines it as _ZTV5Cloud and this
+   alias carries the other spelling onto it. BOTH names are held out of
+   port/ov039_syms.txt, so this left side is undefined everywhere and the
+   alias cannot be defeated by a definition; the same reasoning and the
+   same shape as hal/actor_classes_ov017.cpp's daObjKsWater_c alias. */
+#pragma comment(linker, "/alternatename:__ZTV11daObjKumo_c=__ZTV5Cloud")
+// ============================================================================
+// ---- link100 GLOBALS -------------------------------------------------------
+// ============================================================================
+//
+// THE ROM's OS THREAD-INFO RECORD, 0x020a6134..0x020a6188, HOSTED AS ONE
+// OBJECT UNDER THE THREE NAMES dsd GAVE IT.
+//
+// WHAT WAS WRONG. hal/boot_os.cpp refuses OS_InitThread (the OS thread system)
+// because "OSi_ThreadInfo is hosted as int[4], 16 bytes, and the body writes
+// bytes 0x14..0x53". That reading of the defect is right and THE REMEDY IT
+// NAMES IS NOT: this port's standing rule is "size a hosted global by its ROM
+// span, the delta to the next symbol in config/arm9/symbols.txt", and applying
+// that rule literally here produces an EIGHT-byte object --
+//
+//     OSi_ThreadInfo  bss   next symbol data_020a613c   delta 8
+//     data_020a613c  bss   next symbol data_020a6148   delta 12
+//     data_020a6148  bss   next symbol OSi_IdleThread   delta 64
+//
+// -- which is smaller than the sixteen bytes that were already there and fixes
+// nothing. The delta rule assumes one dsd name per ROM object and that
+// assumption fails here: dsd emitted a name at every offset some function
+// LDR'd directly, so three of its names cover ONE record and the object's real
+// span is the distance from the first of them to the first name that is not
+// part of it, 0x020a6188 - 0x020a6134 = 0x54 = 84 bytes.
+//
+// THE MEASUREMENT, from extracted/arm9_dec.bin at base 0x02004000 rather than
+// from the decompilation. src/func_02058308.c is the widest writer and its ARM
+// is unambiguous:
+//
+//     02058334  ldr r4, =0x020a6134
+//     0205833c  add r0, r4, r1, lsl #2      \  i = 0..15
+//     02058344  str r5, [r0, #0x14]         /  clears +0x14 .. +0x53
+//     0205837c  str r0, [r4, #0x14]            +0x14  thread table[0]
+//     02058380  str r0, [r4, #0xc]             +0x0c  list head
+//     02058384  str r0, [r4, #8]               +0x08  current thread
+//     020583f4  strh ip, [r1, #2]              +0x02  (r1 = 0x020a6134)
+//     020583f8  strh r0, [r1]                  +0x00
+//     020583fc  strh r0, [r1, #4]              +0x04
+//     02058400  str r1, [r3]                   r3 = 0x027fffa0, the DS's
+//                                              OSThreadInfo pointer word
+//
+// The last byte written is 0x53 and the next dsd name is at +0x54. It is one
+// NitroSDK OSThreadInfo and nothing of it spills into OSi_IdleThread, which is
+// a thread record of its own: dsd gives it 0x94 = 148 bytes, and 0x90 is the
+// last offset OS_CreateThread writes in the object it is handed.
+//
+// AND THE SECOND HALF OF THE DEFECT, which a resize alone does NOT fix:
+// hal/auto_bss.cpp hosted data_020a6148 as its own separate `int[8]`. On the
+// DS that name IS OSi_ThreadInfo + 0x14, and two matched bodies reach the same
+// sixteen table slots through the two different names --
+//
+//     src/func_02058538.c   scans OSi_ThreadInfo.arr[0..15]  (+0x14 + 4i)
+//                           for a free slot and returns the index
+//     src/func_02058200.c   writes data_020a6148[id] = self
+//     src/func_020581a8.cpp writes data_020a6148[o->idx] = 0
+//
+// -- so with two host objects the allocator writes one array and the scanner
+// reads another: OSi_GetUnusedThreadId would hand out slot 0 for every thread, for
+// ever, and nothing would fault. That is the quiet half of this bug class and
+// it is why these three are hosted as a grouped run instead of resized in
+// place.
+//
+// Every one is .bss, so zeroed host storage reads what the DS's cleared BSS
+// reads. align(1) on the members keeps the ROM's own spacing (align(4) would
+// pad the 12-byte middle member and push the table to +0x18), and
+// port_link100_osti_check() reads the layout back at start-up rather than
+// trusting the linker to have honoured it -- the same idiom the GX bank block
+// above and hal/scene_boot.cpp's L2 pack use.
+#define LINK100_BSS(sec, name, size)                              \
+    __pragma(section(sec, read, write))                           \
+    extern "C" __declspec(allocate(sec)) __declspec(align(1))     \
+    unsigned char name[size] = {0}
+
+/* +0x00  u16 needsRescheduling, u16 irqDepth, u16, u16 */
+LINK100_BSS(".dsstate$osti00", OSi_ThreadInfo, 8);
+/* +0x08  OSThread *current, OSThread *list, switch callback.
+   src/func_02058308.c also parks the ADDRESS of this member in OSi_CurrentThreadPtr,
+   which src/func_02057f54.c then dereferences to find the running thread --
+   so this one has to be at +8 of the record and not merely exist. */
+LINK100_BSS(".dsstate$osti01", data_020a613c, 12);
+/* +0x14  OSThread *table[16] -- the sixteen slots OSi_GetUnusedThreadId allocates */
+LINK100_BSS(".dsstate$osti02", data_020a6148, 64);
+
+extern "C" int port_link100_osti_check(void)
+{
+    static const struct { const unsigned char *p; int want; const char *n; } k[] = {
+        { OSi_ThreadInfo,  0x00, "OSi_ThreadInfo" },
+        { data_020a613c,  0x08, "data_020a613c" },
+        { data_020a6148,  0x14, "data_020a6148" },
+    };
+    int bad = 0;
+    for (int i = 0; i < 3; ++i)
+        if (k[i].p - OSi_ThreadInfo != k[i].want) {
+            fprintf(stderr, "  [link100] OSThreadInfo PACK BROKEN: %s at "
+                         "+0x%x, ROM says +0x%x\n", k[i].n,
+                         (unsigned)(k[i].p - OSi_ThreadInfo), k[i].want);
+            bad = 1;
+        }
+    return bad;
+}
+
+namespace {
+struct Link100OstiCheck { Link100OstiCheck() { port_link100_osti_check(); } };
+Link100OstiCheck g_link100_osti_check;
+}  /* anonymous namespace */
+
+// TWO NAME BRIDGES ONTO THE RECORD ABOVE, moved here from hal/boot_hw.cpp by
+// run link100's lane THREAD. Their one consumer is src/func_020581a8.cpp --
+// the exit thunk src/func_02058200.c stores in every context it builds -- and
+// that TU is a .cpp that declares both names at namespace scope OUTSIDE its
+// extern "C" block, so MSVC decorates the references while the definitions
+// eight lines up carry the ROM's flat C names. boot_hw.cpp is walk_window and
+// walk_window_hires only; port/slice_gate223.txt is on all three big targets,
+// and smoke_player failed at link with exactly these two LNK2019s.
+//
+// Both are DATA aliases, so there is no calling convention to disagree about,
+// and each right-hand side is a definition this file carries rather than
+// another alias -- not the chained shape alternatename_guard's header warns
+// about. Neither left-hand spelling is defined anywhere in the tree, so the
+// directives cannot be DEFEATED the way that guard checks for.
+#pragma comment(linker, "/alternatename:?data_020a6148@@3PAHA=_data_020a6148")
+#pragma comment(linker, "/alternatename:?OSi_CurrentThreadPtr@@3PAUObj581@@A=_OSi_CurrentThreadPtr")
+// ---- link100 STAGE ----------------------------------------------------------
+//
+// The OBJECT-OVERLAY WALK, five directives, all of them the C-linkage flip this
+// file exists for. port/slice_gate213.txt enrols the ROM's own three overlay
+// bodies so _ZTV5Stage slot 3 (Stage::CleanupResources) reaches a real
+// UnloadLevelOverlays instead of the empty host body hal/stage_slot0.cpp used
+// to define, and two of the three compile as C++ and therefore publish MSVC
+// manglings that no C caller can spell.
+//
+// EVERY RIGHT-HAND SIDE BELOW WAS READ OUT OF AN OBJECT, not built by hand.
+// The two function names came from dumpbin over the objects
+// port/tools/closure.py compiled with walk_window's own flags:
+//
+//     ?LoadLevelOverlays@@YAXH@Z                    void __cdecl LoadLevelOverlays(int)
+//     ?LoadOrUnloadObjectOverlays@@YAXP6AXH@ZH@Z    void __cdecl LoadOrUnloadObjectOverlays(void (__cdecl*)(int), int)
+//
+// and the three data names came from closure.py's own UNRESOLVED list over the
+// same slice. hal/w8a_stage_faces.cpp's warning is the reason: a mangling one
+// letter wrong is a directive that never fires and never says so.
+//
+// PER-DIRECTIVE ABI CHECK, the hal/method_faces.cpp checklist applied to each:
+//
+//   __Z17LoadLevelOverlaysi = ?LoadLevelOverlays@@YAXH@Z
+//   __Z26LoadOrUnloadObjectOverlaysPFviEi = ?LoadOrUnloadObjectOverlays@@...
+//       Both sides are __cdecl free functions with the same arity, the same
+//       argument widths and void returns; the only difference is which
+//       compiler spelled the name. No receiver anywhere in the pair, so there
+//       is nothing to drop. src/_Z19UnloadLevelOverlaysi.cpp is a .c file and
+//       already defines its C name, so it takes NO directive -- adding one
+//       would be an alternatename_guard defeat over a strong definition.
+//
+//   ?data_020758c8@@3PAHA = _data_020758c8      int[]  -- the level -> overlay
+//       id map, already a romdata.py row and already read as words elsewhere.
+//   ?data_02092130@@3HA   = _data_02092130      int    -- the resident level
+//       overlay's id, a new romdata.py row (4 bytes, delta-to-next-symbol
+//       exact against data_02092134, zero relocations).
+//   ?data_0209f278@@3EA   = _data_0209f278      u8     -- the "already
+//       resident" flag hal/auto_bss.cpp:63 hosts as int[8]. The alias binds the
+//       byte at offset 0, which is the same byte src/func_0202deac.c writes
+//       through the C name, so both spellings reach one storage location.
+//       Three DATA faces, not code ones: an address alias carries no
+//       convention, and each right-hand side is a definition this tree already
+//       carries rather than another alias, so none of the three is the chained
+//       shape alternatename_guard's header warns about.
+#pragma comment(linker, "/alternatename:__Z17LoadLevelOverlaysi=?LoadLevelOverlays@@YAXH@Z")
+#pragma comment(linker, "/alternatename:__Z26LoadOrUnloadObjectOverlaysPFviEi=?LoadOrUnloadObjectOverlays@@YAXP6AXH@ZH@Z")
+#pragma comment(linker, "/alternatename:?data_020758c8@@3PAHA=_data_020758c8")
+#pragma comment(linker, "/alternatename:?data_02092130@@3HA=_data_02092130")
+#pragma comment(linker, "/alternatename:?data_0209f278@@3EA=_data_0209f278")
+// ---- link100 FRAME ----
+//
+// _ZTV5Stage slot 6 seats the ROM's own Stage::Behavior (port/slice_gate220.txt,
+// hal/stage_frame.cpp, port/stage_lifecycle_map.txt section 13). The gate brings
+// fifty-six matched TUs into the link at once -- the pause screen, its five menu
+// arms, the Message::Display* family and the VS-exit pair -- and that set spans
+// BOTH recovery styles: some of those TUs were recovered as flat C and publish
+// _ZN5Stage20PS_UpdateOptionsMenuEv, some as real C++ against a shared header and
+// publish ?PS_UpdateOptionsMenu@Stage@@SAXXZ. One function, two spellings, and
+// which one a caller writes depends only on which style ITS OWN file was
+// recovered in. Every row below binds one such pair.
+//
+// NOTHING HERE CHANGES A BODY. Each left-hand side is a name no object in this
+// tree defines -- that is why it needed an alias -- and each right-hand side is
+// the same function or the same word under its other spelling. The pairs were
+// not typed: they were read out of the gate's own compiled objects with
+// dumpbin, matched by (class, member), and every one was then checked for its
+// CALLING CONVENTION before it was written here. Two pairs failed that check
+// and are NOT below: ?Display@Message@@QAEXI@Z and ?CanPause@daPly_c@@QAEHXZ are
+// __thiscall instance methods whose callers are __cdecl, so an alias would have
+// left the receiver in a register nobody wrote and double-cleaned the stack.
+// Both are faces in hal/stage_frame.cpp instead, with the derivation beside
+// them.
+//
+// THE DATA ROWS, twenty-six of them. A .cpp-recovered TU that declares
+// `extern u8 sMenuWaitTimer;` outside an extern "C" block decorates the
+// reference as ?sMenuWaitTimer@@3EA; the port's host storage is the C name
+// _sMenuWaitTimer. Same word, same address, and the alias runs in the ordinary
+// direction (an UNDEFINED name pointed at a DEFINED one), so none of them can
+// be defeated the way port/tools/alternatename_guard.py checks for.
+#pragma comment(linker, "/alternatename:?data_020755c0@@3PAGA=_data_020755c0")
+#pragma comment(linker, "/alternatename:?data_020755c4@@3PAGA=_data_020755c4")
+#pragma comment(linker, "/alternatename:?data_020755cc@@3PAGA=_data_020755cc")
+#pragma comment(linker, "/alternatename:?data_02075610@@3RCHC=_data_02075610")
+#pragma comment(linker, "/alternatename:?gRaceTimer@@3VTimer@@A=?gRaceTimer@@3UTimer@@A")
+#pragma comment(linker, "/alternatename:?sNextPauseState@@3EA=_sNextPauseState")
+#pragma comment(linker, "/alternatename:?sPauseArrowPressTimer@@3EA=_sPauseArrowPressTimer")
+#pragma comment(linker, "/alternatename:?sPausedWithSelect@@3EA=_sPausedWithSelect")
+#pragma comment(linker, "/alternatename:?sMenuWaitTimer@@3EA=_sMenuWaitTimer")
+#pragma comment(linker, "/alternatename:?data_0209f230@@3EA=_data_0209f230")
+#pragma comment(linker, "/alternatename:?sPressedPauseArrow@@3EA=_sPressedPauseArrow")
+#pragma comment(linker, "/alternatename:?data_0209f23c@@3EA=_data_0209f23c")
+#pragma comment(linker, "/alternatename:?data_0209f240@@3EA=_data_0209f240")
+#pragma comment(linker, "/alternatename:?sMenuHighlightDelay@@3EA=_sMenuHighlightDelay")
+#pragma comment(linker, "/alternatename:?sPauseState@@3EA=_sPauseState")
+#pragma comment(linker, "/alternatename:?data_0209f280@@3EA=_data_0209f280")
+#pragma comment(linker, "/alternatename:?sBackButtonSelected@@3EA=_sBackButtonSelected")
+#pragma comment(linker, "/alternatename:?sNumMenuButtons@@3EA=_sNumMenuButtons")
+#pragma comment(linker, "/alternatename:?sPauseDisplayedCourse@@3EA=_sPauseDisplayedCourse")
+#pragma comment(linker, "/alternatename:?sBacklightFlashTimer@@3EA=_sBacklightFlashTimer")
+#pragma comment(linker, "/alternatename:?sSelectedMenuButton@@3EA=_sSelectedMenuButton")
+#pragma comment(linker, "/alternatename:?sSoundBoxFlashTimer@@3EA=_sSoundBoxFlashTimer")
+#pragma comment(linker, "/alternatename:?sSelectedBacklightButton@@3EA=_sSelectedBacklightButton")
+#pragma comment(linker, "/alternatename:?sCourseArrowsHidden@@3EA=_sCourseArrowsHidden")
+#pragma comment(linker, "/alternatename:?sPauseInputLockout@@3GA=_sPauseInputLockout")
+#pragma comment(linker, "/alternatename:?gSceneFader@@3PAUUnkVis@@A=_gSceneFader")
+/* catchup1 (SYM4, needs rows from MG4 and ENG4): main declares the scene fader
+   as `extern dFdBrightness_c *gSceneFader;` at C++ linkage (d_scene.cpp,
+   d_s_boot_methods.cpp, d_s_entry_methods.cpp; the decorated name read from a
+   compiled KuppaScript.cpp object), and the one save block as
+   `extern SaveBlock data_0209caa0;` (include/SaveBlock.h). Both resolve onto
+   the C-linkage storage the port already hosts. */
+#pragma comment(linker, "/alternatename:?gSceneFader@@3PAUdFdBrightness_c@@A=_gSceneFader")
+#pragma comment(linker, "/alternatename:?data_0209caa0@@3USaveBlock@@A=_data_0209caa0")
+//
+// THE FIVE FUNCTION ROWS, each with where its right-hand side comes from:
+//
+//   ?GetBG1ScrPtr@G2S@@YAPAGXZ            src/_ZN3G2S12GetBG1ScrPtrEv.cpp, on the
+//     gate. The callers spell it as a namespace-scope free function
+//     (`namespace G2S { u16 *GetBG1ScrPtr(); }`) because that is how the
+//     .cpp-recovered menu arms declare it; the flat-C TU publishes the ROM's
+//     own name. hal/scene_mg_slot3.cpp:700 already carries the identical row
+//     for the MAIN-engine twin, ?GetBG1ScrPtr@G2@@SAPAXXZ.
+//   ?PauseMusic@Sound@@SAXXZ              src/_ZN5Sound10PauseMusicEv.cpp, on the
+//     gate. Stage::PS_Init's only unhosted callee.
+//   ?SetBlendBrightness@G2x@@SAXPCGHF@Z   already in walk_window.map as
+//     _G2x_SetBlendBrightness_. PS_Init's other one.
+//   __ZN5Stage20PS_UpdateOptionsMenuEv    the reverse direction, and the pair
+//   __ZN5Stage25PS_UpdateOkAndBackButtonsEb  that shows the split is not about
+//     C++ always losing: here the CALLER (src/_ZN5Stage9PS_UpdateEv.cpp, itself
+//     .cpp-recovered) spells the flat-C name in an extern "C" block while the
+//     two menu arms were recovered as real C++ statics. Both are __cdecl on
+//     both sides -- a static member and a flat C function have the same frame
+//     -- and the second's bool/int parameter is one four-byte stack slot in
+//     either spelling.
+#pragma comment(linker, "/alternatename:?GetBG1ScrPtr@G2S@@YAPAGXZ=?GetBG1ScrPtr@G2S@@YAIXZ")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN5Sound10PauseMusicEv, and nothing references ?PauseMusic@Sound@@SAXXZ, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?PauseMusic@Sound@@SAXXZ=__ZN5Sound10PauseMusicEv")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines _G2x_SetBlendBrightness_, and nothing references ?SetBlendBrightness@G2x@@SAXPCGHF@Z, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?SetBlendBrightness@G2x@@SAXPCGHF@Z=_G2x_SetBlendBrightness_")
+#pragma comment(linker, "/alternatename:__ZN10dScStage_c20PS_UpdateOptionsMenuEv=?PS_UpdateOptionsMenu@dScStage_c@@SAXXZ")
+#pragma comment(linker, "/alternatename:__ZN10dScStage_c25PS_UpdateOkAndBackButtonsEb=?PS_UpdateOkAndBackButtons@dScStage_c@@SAX_N@Z")
+/* ---- link100 TAIL2 ----------------------------------------------------------
+   TWO HOSTED DS SYMBOLS gate 219's translation units need and nothing in this
+   image defined, both read off config/arm9/symbols.txt / the ov002 symbol file
+   rather than sized by what their readers happen to touch.
+
+   data_0209d3ac is arm9 BSS, FOUR bytes (the next symbol is data_0209d3b0), and
+   src/engine/fader/_ZN15FaderBrightness11AdvanceFadeEv.cpp is what wants it:
+   past full black the brightness fade flushes it out of the data cache and
+   reloads it as the backdrop palette on BOTH engines, two bytes each time. It
+   is zero-initialised storage exactly as bss is on the DS.
+
+   data_ov002_0210b97c is a THREE-POINTER table -- 0x0210b97c..0x0210b988, and
+   config/arm9/overlays/ov002/relocs.txt relocates all three words, to
+   0x021001b0, 0x02100200 and 0x02100250. That is why it is HOSTED HERE and not
+   added to port/ov002_syms.txt: the ov002 mount byte-copies, and a byte-copied
+   pointer carries a DS address into a reader (_Z19func_ov002_020f2f9cPvi picks a row
+   set with it and reads twenty bytes through it). The three targets ARE on the
+   mount now, so this array holds the host addresses of the mounted copies --
+   the intro_ov002_seat.cpp treatment written as an initialiser, which is
+   possible here because all three targets are ordinary data symbols. */
+DSSTATE_BEGIN
+extern "C" {
+char data_0209d3ac[4];
+extern unsigned char data_ov002_021001b0[], data_ov002_02100200[],
+    data_ov002_02100250[];
+void *data_ov002_0210b97c[3] = {
+    (void *)data_ov002_021001b0,   /* ROM word +0x00 */
+    (void *)data_ov002_02100200,   /* ROM word +0x04 */
+    (void *)data_ov002_02100250,   /* ROM word +0x08 */
+};
+}
+DSSTATE_END
+/* The reader is plain C -- src/func_ov002_020f2f9c.c spells it
+   `extern int* data_ov002_0210b97c[]` -- so it wants the undecorated C name,
+   which is what the extern "C" definition above gives it, and no
+   /alternatename is needed. The three externs are `unsigned char[]` because
+   that is the shape ovdata.py's generated mount publishes every symbol in; the
+   initialiser casts. */
+
+/* ----------------------------------------------------------------------
+ * Wave 8, lane ALIAS, batch 1: the main->port sync's decorated unresolved
+ * externals, re-derived BY ADDRESS.
+ *
+ * The rule these rows are built on: an /alternatename is admissible only
+ * when the right hand side is ALREADY DEFINED in this link and describes
+ * the SAME CALL as the left hand side, which means the same calling
+ * convention, the same receiver passing and the same argument slots.
+ * The left hand side is lifted verbatim from walk_window's own unresolved
+ * block; the right hand side is read out of the COFF symbol tables of the
+ * 8794 objects that link into walk_window, never guessed from a name.
+ * Where the gap is a class the sync renamed, the new spelling comes from
+ * the by-address rename map and is accepted only when the old class is
+ * gone from the config symbol tables AND this member's own old symbol lands
+ * on that one class, because a class SHIFT leaves the old name alive on a
+ * different body.
+ *
+ * Rows whose fix is a receiver-shape change (a __thiscall member against a
+ * C body that takes the receiver on the stack) are NOT here: those need a
+ * real face, which is the ruling hal/dtor_faces_cpp.cpp already records.
+ * ------------------------------------------------------------------- */
+#pragma comment(linker, "/alternatename:?data_ov070_02123668@@3PAUBrqStateHandlers@@A=?data_ov070_02123668@@3PAUState@daBrq_c@@A")
+#pragma comment(linker, "/alternatename:?data_ov070_0212360c@@3PAHA=?data_ov070_0212360c@@3UBrqAnimationFileResource@@A")
+#pragma comment(linker, "/alternatename:?data_ov070_021235f4@@3UBrqAnimationResource@@A=?data_ov070_021235f4@@3UBrqAnimationFileResource@@A")
+#pragma comment(linker, "/alternatename:?gCurrentSublevel@@3PACA=_gCurrentSublevel")
+#pragma comment(linker, "/alternatename:?data_ov019_021135d8@@3UVector3@@A=_data_ov019_021135d8")
+#pragma comment(linker, "/alternatename:?data_ov036_02114070@@3USharedFilePtr@@A=_data_ov036_02114070")
+#pragma comment(linker, "/alternatename:?_ZTV19daObjKb1Billboard_c@@3PAHA=__ZTV19daObjKb1Billboard_c")
+#pragma comment(linker, "/alternatename:?data_020a6088@@3UVramReg@@A=_data_020a6088")
+#pragma comment(linker, "/alternatename:?GXi_DmaId@@3IA=_GXi_DmaId")
+#pragma comment(linker, "/alternatename:?data_020a60a8@@3IA=_data_020a60a8")
+#pragma comment(linker, "/alternatename:?sMgMenuItem0SpritesByLanguage@@3PAPAHA=_sMgMenuItem0SpritesByLanguage")
+#pragma comment(linker, "/alternatename:?sMgMenuItem1SpritesByLanguage@@3PAPAHA=_sMgMenuItem1SpritesByLanguage")
+#pragma comment(linker, "/alternatename:?sMgMenuItem2SpritesByLanguage@@3PAPAHA=_sMgMenuItem2SpritesByLanguage")
+#pragma comment(linker, "/alternatename:?data_ov006_021346bc@@3HA=_data_ov006_021346bc")
+#pragma comment(linker, "/alternatename:?data_0209f608@@3HA=_data_0209f608")
+#pragma comment(linker, "/alternatename:?data_0209f648@@3PAY0MA@UPx_efdf0@@A=_data_0209f648")
+#pragma comment(linker, "/alternatename:?data_0209f60c@@3HA=_data_0209f60c")
+#pragma comment(linker, "/alternatename:?sLuigiIrisTable@@3PAUEntry_f0044@@A=?sLuigiIrisTable@@3PAP8dScMgLuigi_c@@AEXH@ZA")
+#pragma comment(linker, "/alternatename:?data_0209f608@@3IA=_data_0209f608")
+#pragma comment(linker, "/alternatename:?data_0209d460@@3EA=_data_0209d460")
+#pragma comment(linker, "/alternatename:?sLuigiTextSpritesByLanguage@@3PAPAXA=_sLuigiTextSpritesByLanguage")
+#pragma comment(linker, "/alternatename:?sMgDigitSprites@@3PADA=_sMgDigitSprites")
+#pragma comment(linker, "/alternatename:?sLuigiCurtainSprite@@3PADA=_sLuigiCurtainSprite")
+#pragma comment(linker, "/alternatename:?sLuigiCurtainStateTable@@3PAUEntry_f0ba0@@A=?sLuigiCurtainStateTable@@3PAP8dScMgLuigi_c@@AEXH@ZA")
+#pragma comment(linker, "/alternatename:?sLuigiCurtainX@@3PAHA=_sLuigiCurtainX")
+#pragma comment(linker, "/alternatename:?sLuigiCurtainTable@@3PAUEntry_f0d58@@A=?sLuigiCurtainTable@@3PAP8dScMgLuigi_c@@AEXH@ZA")
+#pragma comment(linker, "/alternatename:?sLuigiTextSpritesByLanguage@@3PAPAHA=_sLuigiTextSpritesByLanguage")
+#pragma comment(linker, "/alternatename:?sLuigiPictureSprites@@3PAHA=_sLuigiPictureSprites")
+#pragma comment(linker, "/alternatename:?sLuigiPictureSprites@@3PAPAXA=_sLuigiPictureSprites")
+#pragma comment(linker, "/alternatename:?sLuigiBounceSpeeds@@3PAHA=_sLuigiBounceSpeeds")
+#pragma comment(linker, "/alternatename:?sLuigiSwaySpeed@@3PAHA=_sLuigiSwaySpeed")
+#pragma comment(linker, "/alternatename:?sLuigiSwayStartVY@@3PAHA=_sLuigiSwayStartVY")
+#pragma comment(linker, "/alternatename:?sLuigiSwayAccel@@3PAHA=_sLuigiSwayAccel")
+#pragma comment(linker, "/alternatename:?sLuigiDriftRandomSpeed@@3PAHA=_sLuigiDriftRandomSpeed")
+#pragma comment(linker, "/alternatename:?sLuigiDriftByRowSpeed@@3PAHA=_sLuigiDriftByRowSpeed")
+#pragma comment(linker, "/alternatename:?sLuigiDriftByColumnSpeed@@3PAHA=_sLuigiDriftByColumnSpeed")
+#pragma comment(linker, "/alternatename:?sLuigiDriftByLevelSpeed@@3PAHA=_sLuigiDriftByLevelSpeed")
+#pragma comment(linker, "/alternatename:?sLuigiDriftFixedSpeed@@3PAHA=_sLuigiDriftFixedSpeed")
+#pragma comment(linker, "/alternatename:?sLuigiBoardMovers@@3PAEA=_sLuigiBoardMovers")
+#pragma comment(linker, "/alternatename:?sLuigiSlotHandlers@@3PAUEntry_f1e90@@A=?sLuigiSlotHandlers@@3PAP8dScMgLuigi_c@@AEXH@ZA")
+#pragma comment(linker, "/alternatename:?data_020a0de8@@3PAY03EA=_data_020a0de8")
+#pragma comment(linker, "/alternatename:?sLuigiTouchSfx@@3PAGA=_sLuigiTouchSfx")
+#pragma comment(linker, "/alternatename:?sLuigiBoardModes@@3PAEA=_sLuigiBoardModes")
+#pragma comment(linker, "/alternatename:?sLuigiBoardFlags@@3PAEA=_sLuigiBoardFlags")
+#pragma comment(linker, "/alternatename:?sLuigiPlaceLimits@@3PAGA=_sLuigiPlaceLimits")
+#pragma comment(linker, "/alternatename:?sLuigiWantedPicks@@3PAEA=_sLuigiWantedPicks")
+#pragma comment(linker, "/alternatename:?sLuigiSlotHandlers@@3PAP8C_f300c@@AEXH@ZA=?sLuigiSlotHandlers@@3PAP8dScMgLuigi_c@@AEXH@ZA")
+#pragma comment(linker, "/alternatename:?gMgScene@@3PAUV@@A=_gMgScene")
+#pragma comment(linker, "/alternatename:?sMemoryRoundTable@@3PAP8dScMgMemory_c@@AEXXZA=_sMemoryRoundTable")
+#pragma comment(linker, "/alternatename:?sMemoryCardTable@@3PAP8dScMgMemory_c@@AEXH@ZA=_sMemoryCardTable")
+#pragma comment(linker, "/alternatename:?data_ov006_0213c85c@@3UMatrix4x3@@A=_data_ov006_0213c85c")
+#pragma comment(linker, "/alternatename:?gEspHamonModelFile@@3PAXA=_gEspHamonModelFile")
+#pragma comment(linker, "/alternatename:?gEspHamonAnimFile@@3PAXA=_gEspHamonAnimFile")
+#pragma comment(linker, "/alternatename:?sBSCStateTable@@3PAP8dScMgBSC_c@@AEXXZA=_sBSCStateTable")
+#pragma comment(linker, "/alternatename:?_ZN13dScMgTeresa_c12ReadRubTouchEv@@YAXPAD@Z=__ZN13dScMgTeresa_c12ReadRubTouchEv")
+#pragma comment(linker, "/alternatename:?_ZN11dScMgBase_c11Mg_DrawLineEiiiiii@@YAHPAXHHHHHH@Z=__ZN11dScMgBase_c11Mg_DrawLineEiiiiii")
+#pragma comment(linker, "/alternatename:?_Z13func_020126e8i@@YAHH@Z=__Z13func_020126e8i")
+#pragma comment(linker, "/alternatename:?_Z13func_02012468iiiiiiis@@YAHHHHHHHHF@Z=__Z13func_02012468iiiiiiis")
+#pragma comment(linker, "/alternatename:?_ZTV19dScMgSingle3DBase_c@@3PAPAXA=__ZTV19dScMgSingle3DBase_c")
+#pragma comment(linker, "/alternatename:?_ZTV12dScMgSound_c@@3PAPAXA=__ZTV12dScMgSound_c")
+#pragma comment(linker, "/alternatename:?sIsDispOn@@3GA=_sIsDispOn")
+#pragma comment(linker, "/alternatename:?sDispMode@@3GA=_sDispMode")
+#pragma comment(linker, "/alternatename:?data_020a60b0@@3IA=_data_020a60b0")
+#pragma comment(linker, "/alternatename:?_ZN5dCc_c8listHeadE@@3PAUdCc_c@@A=__ZN5dCc_c8listHeadE")
+#pragma comment(linker, "/alternatename:?data_0209b468@@3PAHA=?data_0209b468@@3UActorList@@A")
+#pragma comment(linker, "/alternatename:?data_0209f49c@@3PAGA=_data_0209f49c")
+#pragma comment(linker, "/alternatename:?data_ov002_021089e0@@3UVector3@@A=_data_ov002_021089e0")
+#pragma comment(linker, "/alternatename:?data_ov002_02108ab0@@3PAUBigBrickBlockFileRow@@A=_data_ov002_02108ab0")
+#pragma comment(linker, "/alternatename:?data_ov002_02108ab4@@3PAUBigBrickBlockFileRow@@A=_data_ov002_02108ab4")
+#pragma comment(linker, "/alternatename:?data_ov009_02113c20@@3USharedFilePtr@@A=?data_ov009_02113c20@@3USBirdModelFilePtr@@A")
+#pragma comment(linker, "/alternatename:?data_ov009_02113c28@@3USharedFilePtr@@A=?data_ov009_02113c28@@3USBirdAnimationFilePtr@@A")
+#pragma comment(linker, "/alternatename:?data_ov085_02130744@@3DA=_data_ov085_02130744")
+#pragma comment(linker, "/alternatename:?data_ov085_0213073c@@3DA=_data_ov085_0213073c")
+#pragma comment(linker, "/alternatename:?data_ov098_0213c8e8@@3USharedFilePtr@@A=_data_ov098_0213c8e8")
+#pragma comment(linker, "/alternatename:?_ZTV15daObjKm2_Gura_c@@3PAHA=__ZTV15daObjKm2_Gura_c")
+#pragma comment(linker, "/alternatename:?data_ov060_0211b1c4@@3DA=_data_ov060_0211b1c4")
+#pragma comment(linker, "/alternatename:?data_ov060_0211ac78@@3DA=_data_ov060_0211ac78")
+#pragma comment(linker, "/alternatename:?data_ov060_021192dc@@3PAPAUSharedFilePtr@@A=_data_ov060_021192dc")
+#pragma comment(linker, "/alternatename:?data_ov060_0211927c@@3PAPAUSharedFilePtr@@A=_data_ov060_0211927c")
+#pragma comment(linker, "/alternatename:?data_ov060_0211b208@@3DA=_data_ov060_0211b208")
+#pragma comment(linker, "/alternatename:?data_ov089_02132c50@@3DA=_data_ov089_02132c50")
+#pragma comment(linker, "/alternatename:?gCvNewsLiftModelFile@@3UWorkElevatorFile@@A=?gCvNewsLiftModelFile@@3UCvNewsLiftModelFile@@A")
+#pragma comment(linker, "/alternatename:?gCvNewsLiftCollisionFile@@3UWorkElevatorFile@@A=?gCvNewsLiftCollisionFile@@3UCvNewsLiftCollisionFile@@A")
+#pragma comment(linker, "/alternatename:?gCvLiftButtonModelFile@@3UWorkElevatorFile@@A=?gCvLiftButtonModelFile@@3UCvNewsLiftModelFile@@A")
+#pragma comment(linker, "/alternatename:?gCvLiftButtonCollisionFile@@3UWorkElevatorFile@@A=?gCvLiftButtonCollisionFile@@3UCvNewsLiftCollisionFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov021_02113a60@@3UCLPS_Block@@A=_data_ov021_02113a60")
+#pragma comment(linker, "/alternatename:?data_ov021_02113a80@@3UCLPS_Block@@A=_data_ov021_02113a80")
+#pragma comment(linker, "/alternatename:?data_ov063_0211ef80@@3USharedFilePtr@@A=_data_ov063_0211ef80")
+#pragma comment(linker, "/alternatename:?data_ov063_0211ef88@@3USharedFilePtr@@A=_data_ov063_0211ef88")
+#pragma comment(linker, "/alternatename:?data_ov063_0211ef90@@3USharedFilePtr@@A=_data_ov063_0211ef90")
+#pragma comment(linker, "/alternatename:?data_ov063_0211ecb8@@3DA=_data_ov063_0211ecb8")
+#pragma comment(linker, "/alternatename:?data_ov020_02114ab8@@3PAHA=_data_ov020_02114ab8")
+#pragma comment(linker, "/alternatename:?data_ov020_02114aa0@@3PAHA=_data_ov020_02114aa0")
+#pragma comment(linker, "/alternatename:?data_ov071_021230d8@@3PAHA=_data_ov071_021230d8")
+#pragma comment(linker, "/alternatename:?data_ov071_021230d0@@3PAHA=_data_ov071_021230d0")
+#pragma comment(linker, "/alternatename:?data_ov100_02148a54@@3USharedFilePtr@@A=_data_ov100_02148a54")
+#pragma comment(linker, "/alternatename:?data_ov100_02148a5c@@3USharedFilePtr@@A=_data_ov100_02148a5c")
+#pragma comment(linker, "/alternatename:?FX_SinCosTable_@@3PAUSinCosEntry@@A=_data_02082214")
+#pragma comment(linker, "/alternatename:?data_ov064_0211c9c4@@3USharedFilePtr@@A=_data_ov064_0211c9c4")
+#pragma comment(linker, "/alternatename:?data_ov064_0211c9cc@@3USharedFilePtr@@A=_data_ov064_0211c9cc")
+#pragma comment(linker, "/alternatename:?data_ov064_0211c9bc@@3USharedFilePtr@@A=_data_ov064_0211c9bc")
+#pragma comment(linker, "/alternatename:?data_ov074_021230f8@@3PAUPmfEntry@@A=_data_ov074_021230f8")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?data_ov085_0212fe88@@3PAUState@daKinopio_c@@A=_data_ov085_0212fe88")
+#pragma comment(linker, "/alternatename:?data_ov102_0214e7e8@@3DA=_data_ov102_0214e7e8")
+#pragma comment(linker, "/alternatename:?data_ov102_0214e808@@3DA=_data_ov102_0214e808")
+#pragma comment(linker, "/alternatename:?data_ov102_0214e7f8@@3DA=_data_ov102_0214e7f8")
+#pragma comment(linker, "/alternatename:?data_ov002_0210d9e0@@3DA=?data_ov002_0210d9e0@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov102_0214e800@@3DA=_data_ov102_0214e800")
+#pragma comment(linker, "/alternatename:?data_ov102_0214e7f0@@3DA=_data_ov102_0214e7f0")
+#pragma comment(linker, "/alternatename:?data_ov102_0214e7d8@@3DA=_data_ov102_0214e7d8")
+#pragma comment(linker, "/alternatename:?data_ov102_0214e7e0@@3DA=_data_ov102_0214e7e0")
+#pragma comment(linker, "/alternatename:?data_ov102_0214e7d0@@3DA=_data_ov102_0214e7d0")
+#pragma comment(linker, "/alternatename:?data_ov002_0210d954@@3DA=_data_ov002_0210d954")
+#pragma comment(linker, "/alternatename:?data_ov002_0210da58@@3DA=?data_ov002_0210da58@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov002_0210da18@@3DA=?data_ov002_0210da18@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov002_0210d9d8@@3DA=?data_ov002_0210d9d8@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov002_0210da30@@3DA=?data_ov002_0210da30@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?gPFlowerOpenModelFile@@3DA=?gPFlowerOpenModelFile@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?gPFlowerCloseModelFile@@3DA=?gPFlowerCloseModelFile@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?data_020a60a4@@3IA=_data_020a60a4")
+#pragma comment(linker, "/alternatename:?data_ov002_0210da38@@3PADA=?data_ov002_0210da38@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov098_0213c91c@@3PADA=_data_ov098_0213c91c")
+#pragma comment(linker, "/alternatename:?data_0209f3e8@@3PAPAUdActor_c@@A=_data_0209f3e8")
+#pragma comment(linker, "/alternatename:?gCapIconListHeads@@3PAPAUdCapIcon_c@@A=_gCapIconListHeads")
+#pragma comment(linker, "/alternatename:?gCapIconCounts@@3PAEA=_gCapIconCounts")
+#pragma comment(linker, "/alternatename:?data_ov002_020ff090@@3PAHA=_data_ov002_020ff090")
+#pragma comment(linker, "/alternatename:?gRedBombheiModelFile@@3USharedFilePtr@@A=?gRedBombheiModelFile@@3URedBombheiModelFile@@A")
+#pragma comment(linker, "/alternatename:?gRedBombheiWaitAnimFile@@3USharedFilePtr@@A=?gRedBombheiWaitAnimFile@@3URedBombheiAnimFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov015_0211497c@@3HA=_data_ov015_0211497c")
+#pragma comment(linker, "/alternatename:?data_ov015_02114974@@3HA=_data_ov015_02114974")
+#pragma comment(linker, "/alternatename:?data_ov015_02113574@@3HA=_data_ov015_02113574")
+#pragma comment(linker, "/alternatename:?data_ov060_0211b1f8@@3DA=_data_ov060_0211b1f8")
+#pragma comment(linker, "/alternatename:?data_ov060_0211b200@@3DA=_data_ov060_0211b200")
+#pragma comment(linker, "/alternatename:?data_ov002_02110aa4@@3USharedFilePtr@@A=_data_ov002_02110aa4")
+#pragma comment(linker, "/alternatename:?data_ov002_02110a9c@@3USharedFilePtr@@A=_data_ov002_02110a9c")
+#pragma comment(linker, "/alternatename:?gPenguinBabyModelFile@@3USharedFilePtr@@A=_gPenguinBabyModelFile")
+#pragma comment(linker, "/alternatename:?gPenguinBabyAnimationFiles@@3PAPAUSharedFilePtr@@A=_gPenguinBabyAnimationFiles")
+#pragma comment(linker, "/alternatename:?data_ov085_0213074c@@3PADA=_data_ov085_0213074c")
+#pragma comment(linker, "/alternatename:?data_ov085_02130744@@3PADA=_data_ov085_02130744")
+#pragma comment(linker, "/alternatename:?data_ov085_0213073c@@3PADA=_data_ov085_0213073c")
+#pragma comment(linker, "/alternatename:?data_ov077_02127b50@@3USharedFilePtr@@A=_data_ov077_02127b50")
+#pragma comment(linker, "/alternatename:?data_ov077_02127238@@3PAPAUSharedFilePtr@@A=_data_ov077_02127238")
+#pragma comment(linker, "/alternatename:?data_ov077_02127230@@3PAPAUSharedFilePtr@@A=_data_ov077_02127230")
+#pragma comment(linker, "/alternatename:?gOnimasuModelFile@@3USharedFilePtr@@A=_gOnimasuModelFile")
+#pragma comment(linker, "/alternatename:?gOnimasuCollisionFile@@3USharedFilePtr@@A=_gOnimasuCollisionFile")
+#pragma comment(linker, "/alternatename:?data_ov092_02132220@@3DA=_data_ov092_02132220")
+#pragma comment(linker, "/alternatename:?data_ov092_02132294@@3DA=_data_ov092_02132294")
+#pragma comment(linker, "/alternatename:?data_ov026_02113ea0@@3USharedFilePtr@@A=_data_ov026_02113ea0")
+#pragma comment(linker, "/alternatename:?data_ov026_02113a9c@@3UVector3@@A=_data_ov026_02113a9c")
+#pragma comment(linker, "/alternatename:?data_ov002_0210da10@@3DA=?data_ov002_0210da10@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?_ZN8dActor_c19DropShadowRadHeightER17dExtShadowModel_cR9Matrix4x3iih@@YAXPAX00HHI@Z=__ZN8dActor_c19DropShadowRadHeightER17dExtShadowModel_cR9Matrix4x3iih")
+#pragma comment(linker, "/alternatename:?data_ov095_02136f68@@3PAPAUSharedFilePtr@@A=_data_ov095_02136f68")
+#pragma comment(linker, "/alternatename:?data_ov095_02136f74@@3PAPAUSharedFilePtr@@A=_data_ov095_02136f74")
+#pragma comment(linker, "/alternatename:?data_ov095_021375a4@@3PAPAUCLPS_Block@@A=_data_ov095_021375a4")
+#pragma comment(linker, "/alternatename:?data_ov085_02130858@@3DA=_data_ov085_02130858")
+#pragma comment(linker, "/alternatename:?gPeachModelFile@@3DA=?gPeachModelFile@@3UPeachModelFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov085_0212f280@@3PAPAUSharedFilePtr@@A=_data_ov085_0212f280")
+#pragma comment(linker, "/alternatename:?data_ov002_0210d9e0@@3PAHA=?data_ov002_0210d9e0@@3UOv002ModelFile@@A")
+#pragma comment(linker, "/alternatename:?data_ov002_0210dd60@@3USharedFilePtr@@A=?data_ov002_0210dd60@@3UHatenaModelFilePtr@@A")
+#pragma comment(linker, "/alternatename:?data_ov002_0210dd68@@3USharedFilePtr@@A=_data_ov002_0210dd68")
+#pragma comment(linker, "/alternatename:?data_ov002_0210dd58@@3USharedFilePtr@@A=_data_ov002_0210dd58")
+#pragma comment(linker, "/alternatename:?data_ov002_0210dd50@@3USharedFilePtr@@A=_data_ov002_0210dd50")
+#pragma comment(linker, "/alternatename:?data_ov002_0210d8b4@@3UCLPS_Block@@A=_data_ov002_0210d8b4")
+#pragma comment(linker, "/alternatename:?data_ov002_0210d774@@3UCLPS_Block@@A=_data_ov002_0210d774")
+#pragma comment(linker, "/alternatename:?data_ov035_02112b80@@3PAFA=_data_ov035_02112b80")
+/* RETIRED at catchup1 Stage C round 4: no TU declares data_ov035_02112cb0 at C++ linkage any more (main names the object at its address), so the left side is never referenced; port_refcheck hal-links counted it stale. */
+// #pragma comment(linker, "/alternatename:?data_ov035_02112cb0@@3USharedFilePtr@@A=?RotatingClockHand_ModelFile@@3UMecha11ModelFilePtr@@A")
+/* RETIRED at catchup1 Stage C round 4: no TU declares data_ov035_02112cb8 at C++ linkage any more (main names the object at its address), so the left side is never referenced; port_refcheck hal-links counted it stale. */
+// #pragma comment(linker, "/alternatename:?data_ov035_02112cb8@@3USharedFilePtr@@A=?RotatingClockHand_ClsnFile@@3UMecha11ClsnFilePtr@@A")
+#pragma comment(linker, "/alternatename:?data_ov047_02112508@@3PAUdaObjDorifuResources@@A=_data_ov047_02112508")
+/* RETIRED (run linkfull, lane ASMCPORT). The left hand side is DEFINED in this link now: src/_ZN6Memory16operator_delete2EPv.cpp builds on every target that compiles this file, so the row would be defeated. The flat name aliases the other way, onto that body, in hal/cxxname_bridge.cpp. */
+// #pragma comment(linker, "/alternatename:?operator_delete2@Memory@@YAXPAX@Z=__ZdlPv")
+#pragma comment(linker, "/alternatename:?_ZTV16daObjPushblock_c@@3PAPAXA=__ZTV16daObjPushblock_c")
+#pragma comment(linker, "/alternatename:?gMgScene@@3PADA=_gMgScene")
+#pragma comment(linker, "/alternatename:?data_ov060_0211af74@@3PAP8dActor_c@@AEXXZA=_data_ov060_0211af74")
+#pragma comment(linker, "/alternatename:?data_ov079_02128280@@3PAP8dActor_c@@AEHXZA=_data_ov079_02128280")
+#pragma comment(linker, "/alternatename:?data_ov098_0213c8fc@@3PAUCannonStateEntry@@A=_data_ov098_0213c8fc")
+#pragma comment(linker, "/alternatename:?data_ov095_02137910@@3PAP8UpDownLiftBbh@@AEXXZA=_data_ov095_02137910")
+#pragma comment(linker, "/alternatename:?data_ov092_02132568@@3PAUToxBoxStateEntry@@A=?data_ov092_02132568@@3PAUdaOnms_cStateEntry@@A")
+#pragma comment(linker, "/alternatename:?sPanelSceneStateTable@@3PAUEnt_358@@A=?sPanelSceneStateTable@@3PAP8dScMgPanel_c@@AEXXZA")
+#pragma comment(linker, "/alternatename:?_ZTV18dScMgTrampoline2_c@@3PAHA=__ZTV18dScMgTrampoline2_c")
+#pragma comment(linker, "/alternatename:?data_ov002_02110274@@3DA=_data_ov002_02110274")
+#pragma comment(linker, "/alternatename:?data_ov002_021102d4@@3DA=_data_ov002_021102d4")
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c6ST_OWLE@@3DA=?ST_OWL@daPly_c@@2UState@1@A")
+#pragma comment(linker, "/alternatename:?sParticlePalVramLowCursor@@3IA=_sParticlePalVramLowCursor")
+#pragma comment(linker, "/alternatename:?sParticlePalVramHighCursor@@3IA=_sParticlePalVramHighCursor")
+#pragma comment(linker, "/alternatename:?sParticleTex4x4VramCursor@@3IA=_sParticleTex4x4VramCursor")
+#pragma comment(linker, "/alternatename:?_ZN3OAM7NUMBERSE@@3PAPAUOamAttr@@A=__ZN3OAM7NUMBERSE")
+
+/* ----------------------------------------------------------------------
+ * Wave 8, lane ALIAS, batch 2: the main->port sync's decorated unresolved
+ * externals, re-derived BY ADDRESS.
+ *
+ * The rule these rows are built on: an /alternatename is admissible only
+ * when the right hand side is ALREADY DEFINED in this link and describes
+ * the SAME CALL as the left hand side, which means the same calling
+ * convention, the same receiver passing and the same argument slots.
+ * The left hand side is lifted verbatim from walk_window's own unresolved
+ * block; the right hand side is read out of the COFF symbol tables of the
+ * 8794 objects that link into walk_window, never guessed from a name.
+ * Where the gap is a class the sync renamed, the new spelling comes from
+ * the by-address rename map and is accepted only when the old class is
+ * gone from the config symbol tables AND this member's own old symbol lands
+ * on that one class, because a class SHIFT leaves the old name alive on a
+ * different body.
+ *
+ * Rows whose fix is a receiver-shape change (a __thiscall member against a
+ * C body that takes the receiver on the stack) are NOT here: those need a
+ * real face, which is the ruling hal/dtor_faces_cpp.cpp already records.
+ * ------------------------------------------------------------------- */
+#pragma comment(linker, "/alternatename:?VAllocate@ExpHeap_t@mHeap@@QAEPAXIH@Z=?VAllocate@ExpHeap_t@mHeap@@UAEPAXIH@Z")
+#pragma comment(linker, "/alternatename:?VReallocate@ExpHeap_t@mHeap@@QAEPAXPAXI@Z=?VReallocate@ExpHeap_t@mHeap@@UAEIPAXI@Z")
+#pragma comment(linker, "/alternatename:?VSizeof@ExpHeap_t@mHeap@@QAEIPAX@Z=?VSizeof@ExpHeap_t@mHeap@@UAEIPAX@Z")
+#pragma comment(linker, "/alternatename:?VIntact@ExpHeap_t@mHeap@@QAE_NXZ=?VIntact@ExpHeap_t@mHeap@@UAE_NXZ")
+#pragma comment(linker, "/alternatename:?VRescue@ExpHeap_t@mHeap@@QAEXXZ=?VRescue@ExpHeap_t@mHeap@@UAEXXZ")
+#pragma comment(linker, "/alternatename:?VResizeToFit@ExpHeap_t@mHeap@@QAEIXZ=?VResizeToFit@ExpHeap_t@mHeap@@UAEIXZ")
+#pragma comment(linker, "/alternatename:?VGetNodeID@ExpHeap_t@mHeap@@QAEIXZ=?VGetNodeID@ExpHeap_t@mHeap@@UAEIXZ")
+#pragma comment(linker, "/alternatename:?VSetNodeID@ExpHeap_t@mHeap@@QAEXI@Z=?VSetNodeID@ExpHeap_t@mHeap@@UAEII@Z")
+#pragma comment(linker, "/alternatename:?Allocate@Heap_t@mHeap@@QAEHIH@Z=?Allocate@Heap_t@mHeap@@QAEPAXIH@Z")
+#pragma comment(linker, "/alternatename:?VMaxAllocationUnitSize@ExpHeap_t@mHeap@@QAEIXZ=?VMaxAllocationUnitSize@ExpHeap_t@mHeap@@UAEIXZ")
+#pragma comment(linker, "/alternatename:?VMaxAllocatableSize@ExpHeap_t@mHeap@@QAEIXZ=?VMaxAllocatableSize@ExpHeap_t@mHeap@@UAEIXZ")
+#pragma comment(linker, "/alternatename:?Virtual34@fBase_c@@UAEHII@Z=?Virtual34@fBase_c@@QAEHII@Z")
+#pragma comment(linker, "/alternatename:?Virtual38@fBase_c@@UAEHII@Z=?Virtual38@fBase_c@@QAEHII@Z")
+#pragma comment(linker, "/alternatename:?PlayLong@Sound@@YAIIIIABUVector3@@F@Z=?PlayLong@Sound@@YAHIIIABUVector3@@F@Z")
+#pragma comment(linker, "/alternatename:?VDeallocateAll@ExpHeap_t@mHeap@@QAEXXZ=?VDeallocateAll@ExpHeap_t@mHeap@@UAEXXZ")
+#pragma comment(linker, "/alternatename:?VMemoryLeft@ExpHeap_t@mHeap@@QAEIXZ=?VMemoryLeft@ExpHeap_t@mHeap@@UAEIXZ")
+#pragma comment(linker, "/alternatename:?VAllocate@SolidHeap_t@mHeap@@QAEPAXII@Z=?VAllocate@SolidHeap_t@mHeap@@UAEPAXIH@Z")
+#pragma comment(linker, "/alternatename:?VDeallocate@SolidHeap_t@mHeap@@QAEXPAX@Z=?VDeallocate@SolidHeap_t@mHeap@@UAEXPAX@Z")
+#pragma comment(linker, "/alternatename:?VDeallocateAll@SolidHeap_t@mHeap@@QAEXXZ=?VDeallocateAll@SolidHeap_t@mHeap@@UAEXXZ")
+#pragma comment(linker, "/alternatename:?VIntact@SolidHeap_t@mHeap@@QAE_NXZ=?VIntact@SolidHeap_t@mHeap@@UAE_NXZ")
+#pragma comment(linker, "/alternatename:?VRescue@SolidHeap_t@mHeap@@QAEXXZ=?VRescue@SolidHeap_t@mHeap@@UAEXXZ")
+#pragma comment(linker, "/alternatename:?VReallocate@SolidHeap_t@mHeap@@QAEPAXPAXI@Z=?VReallocate@SolidHeap_t@mHeap@@UAEIPAXI@Z")
+#pragma comment(linker, "/alternatename:?VSizeof@SolidHeap_t@mHeap@@QAEHPAX@Z=?VSizeof@SolidHeap_t@mHeap@@UAEIPAX@Z")
+#pragma comment(linker, "/alternatename:?VMaxAllocationUnitSize@SolidHeap_t@mHeap@@QAEIXZ=?VMaxAllocationUnitSize@SolidHeap_t@mHeap@@UAEIXZ")
+#pragma comment(linker, "/alternatename:?VMaxAllocatableSize@SolidHeap_t@mHeap@@QAEIXZ=?VMaxAllocatableSize@SolidHeap_t@mHeap@@UAEIXZ")
+#pragma comment(linker, "/alternatename:?VMemoryLeft@SolidHeap_t@mHeap@@QAEIXZ=?VMemoryLeft@SolidHeap_t@mHeap@@UAEIXZ")
+#pragma comment(linker, "/alternatename:?VSetNodeID@SolidHeap_t@mHeap@@QAEII@Z=?VSetNodeID@SolidHeap_t@mHeap@@UAEII@Z")
+#pragma comment(linker, "/alternatename:?VGetNodeID@SolidHeap_t@mHeap@@QAEIXZ=?VGetNodeID@SolidHeap_t@mHeap@@UAEIXZ")
+#pragma comment(linker, "/alternatename:?SetDefault@Heap_t@mHeap@@QAEHXZ=?SetDefault@Heap_t@mHeap@@QAEPAU12@XZ")
+#pragma comment(linker, "/alternatename:?UpdatePosWithOnlySpeed@Actor@@QAEXPAUdCc_c@@@Z=?UpdatePosWithOnlySpeed@Actor@@QAEXPAX@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?Play2D@Sound@@YAIII@Z=?Play2D@Sound@@SAXII@Z")
+#pragma comment(linker, "/alternatename:?SetFile@dExtModel_c@@QAEXPAUBMD_File@@HH@Z=?SetFile@dExtModel_c@@QAEHPAUBMD_File@@HH@Z")
+#pragma comment(linker, "/alternatename:?SetBlendAlpha@G2x@@YAXPCGGGGI@Z=?SetBlendAlpha@G2x@@SAXPCGGGGI@Z")
+#pragma comment(linker, "/alternatename:?CleanupResources@dMeter_c@@QAEHXZ=?CleanupResources@dMeter_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Render@dMeter_c@@QAEHXZ=?Render@dMeter_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?OnPendingDestroy@dMeter_c@@QAEXXZ=?OnPendingDestroy@dMeter_c@@UAEXXZ")
+#pragma comment(linker, "/alternatename:?InitResources@dMap_c@@QAEHXZ=?InitResources@dMap_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?CleanupResources@dMap_c@@QAEHXZ=?CleanupResources@dMap_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?OnPendingDestroy@dMap_c@@QAEXXZ=?OnPendingDestroy@dMap_c@@UAEXXZ")
+#pragma comment(linker, "/alternatename:?MaxAllocationUnitSize@Heap_t@mHeap@@QAEHXZ=?MaxAllocationUnitSize@Heap_t@mHeap@@QAEIXZ")
+#pragma comment(linker, "/alternatename:?Disable@dBgW@@QAEXXZ=?Disable@dBgW@@QAEHXZ")
+#pragma comment(linker, "/alternatename:?Enable@dBgW@@QAEXPAUdActor_c@@@Z=?Enable@dBgW@@QAEHPAUdActor_c@@@Z")
+#pragma comment(linker, "/alternatename:?InitResources@daObjCtRotateBlock_c@@QAEHXZ=?InitResources@daObjCtRotateBlock_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?CleanupResources@daObjCtRotateBlock_c@@QAEHXZ=?CleanupResources@daObjCtRotateBlock_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Behavior@daObjCtRotateBlock_c@@QAEHXZ=?Behavior@daObjCtRotateBlock_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Render@daObjCtRotateBlock_c@@QAEHXZ=?Render@daObjCtRotateBlock_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?InitResources@daObjCtKaitendai_c@@QAEHXZ=?InitResources@daObjCtKaitendai_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?CleanupResources@daObjCtKaitendai_c@@QAEHXZ=?CleanupResources@daObjCtKaitendai_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Render@daObjCtKaitendai_c@@QAEHXZ=?Render@daObjCtKaitendai_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?InitResources@daObjCtMecha08_c@@QAEHXZ=?InitResources@daObjCtMecha08_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?CleanupResources@daObjCtMecha08_c@@QAEHXZ=?CleanupResources@daObjCtMecha08_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Render@daObjCtMecha08_c@@QAEHXZ=?Render@daObjCtMecha08_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?ReleaseCap@dCapEnemy_c@@QAEXABUVector3@@@Z=?ReleaseCap@dCapEnemy_c@@QAEPAUdActor_c@@ABUVector3@@@Z")
+#pragma comment(linker, "/alternatename:?Behavior@daTBasket_c@@UAEHXZ=?Behavior@daTBasket_c@@QAEHXZ")
+#pragma comment(linker, "/alternatename:?InitResources@daObjTh_Fall_Block_c@@QAEHXZ=?InitResources@daObjTh_Fall_Block_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?CleanupResources@daObjTh_Fall_Block_c@@QAEHXZ=?CleanupResources@daObjTh_Fall_Block_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?InitResources@daPiano_c@@QAEHXZ=?InitResources@daPiano_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Behavior@daPiano_c@@QAEHXZ=?Behavior@daPiano_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Render@daPiano_c@@QAEHXZ=?Render@daPiano_c@@UAEHXZ")
+/* CapEnemy::UpdateCapPos GOES TO THE MATCHED BODY, NOT TO A FACE THAT CALLS IT
+   BACK (run link100, lane LEVELHANG).
+
+   This row used to name hal/bob_enemy_shadow_faces.cpp's Vector3_16_local
+   overload as its target, and that overload's whole body is
+   `UpdateCapPos(pos, *(const Vector3_16 *)&rot)`, a forward to THIS name. So
+   the alias closed a two-symbol cycle: the caller's spelling resolved to the
+   forwarder and the forwarder called the caller's spelling. MSVC turns that
+   self tail-call into a `jmp` to the function's own entry, which is an
+   infinite loop that grows no stack and raises no fault. walk_window.map
+   showed both decorated names sharing one address and the matched TU's own
+   symbol dropped by /OPT:REF, because the cycle left nothing referencing it.
+
+   Measured before the fix: every level carrying a cap enemy wedged on frame 2
+   at 98% of one core with no crash report. Levels 0, 3, 6 and 42 of the boot
+   sweep, reached through daKrb_c::Behavior on three of them and
+   daTrs_c::Behavior on the fourth.
+
+   The body is src/_ZN11dCapEnemy_c12UpdateCapPosERK7Vector3RK10Vector3_16.cpp,
+   arm9 0x020062b8, compiled as the real MSVC method under main's class name.
+   CapEnemy is the port's shadow spelling of the same ROM class and carries no
+   members, so the receiver contract is unchanged: both are __thiscall with
+   `this` in ecx. This is what hal/actor_classes_ov063.cpp's face 3 already says
+   the row was for. */
+#pragma comment(linker, "/alternatename:?UpdateCapPos@CapEnemy@@QAEXABUVector3@@ABUVector3_16@@@Z=?UpdateCapPos@dCapEnemy_c@@QAEXABUVector3@@ABUVector3_16@@@Z")
+#pragma comment(linker, "/alternatename:?InitResources@daBook_c@@QAEHXZ=?InitResources@daBook_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?CleanupResources@daBook_c@@QAEHXZ=?CleanupResources@daBook_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Behavior@daBook_c@@QAEHXZ=?Behavior@daBook_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?InitResources@daBookGen_c@@QAEHXZ=?InitResources@daBookGen_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?CleanupResources@daBookGen_c@@QAEHXZ=?CleanupResources@daBookGen_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?InitResources@daBttBk_c@@QAEHXZ=?InitResources@daBttBk_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Behavior@daBttBk_c@@QAEHXZ=?Behavior@daBttBk_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Render@daBttBk_c@@QAEHXZ=?Render@daBttBk_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?InitResources@daObjCasket_c@@QAEHXZ=?InitResources@daObjCasket_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?CleanupResources@daObjCasket_c@@QAEHXZ=?CleanupResources@daObjCasket_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Behavior@daObjCasket_c@@QAEHXZ=?Behavior@daObjCasket_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Render@daObjCasket_c@@QAEHXZ=?Render@daObjCasket_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:??1dBgCh_Gnd@@QAE@XZ=??1dBgCh_Gnd@@UAE@XZ")
+#pragma comment(linker, "/alternatename:?Spawn@dActor_c@@SAIIIABUVector3@@PBUVector3_16@@CF@Z=?Spawn@dActor_c@@SAPAU1@IIABUVector3@@PBUVector3_16@@CF@Z")
+#pragma comment(linker, "/alternatename:?ClosestPlayer@Actor@@QAEPAU1@XZ=?ClosestPlayer@Actor@@QAEPAUdaPly_c@@XZ")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?InitResources@dScStage_c@@UAEHXZ=?InitResources@dScStage_c@@QAEHXZ")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?Behavior@dScStage_c@@UAEHXZ=?Behavior@dScStage_c@@QAEHXZ")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:?Render@dScStage_c@@UAEHXZ=?Render@dScStage_c@@QAEHXZ")
+#pragma comment(linker, "/alternatename:?Behavior@daDossy_c@@QAEHXZ=?Behavior@daDossy_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Initialise@SysTracker@Particle@@QAEHXZ=?Initialise@SysTracker@Particle@@QAEXXZ")
+#pragma comment(linker, "/alternatename:?Update@SysTracker@Particle@@QAEHXZ=?Update@SysTracker@Particle@@QAEXXZ")
+#pragma comment(linker, "/alternatename:?Render@dView_c@@QAEHXZ=?Render@dView_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?SetSceneToSpawn@dScene_c@@SAXII@Z=?SetSceneToSpawn@dScene_c@@SAHII@Z")
+
+/* ----------------------------------------------------------------------
+ * Wave 8, lane ALIAS, batch 3: the main->port sync's decorated unresolved
+ * externals, re-derived BY ADDRESS.
+ *
+ * The rule these rows are built on: an /alternatename is admissible only
+ * when the right hand side is ALREADY DEFINED in this link and describes
+ * the SAME CALL as the left hand side, which means the same calling
+ * convention, the same receiver passing and the same argument slots.
+ * The left hand side is lifted verbatim from walk_window's own unresolved
+ * block; the right hand side is read out of the COFF symbol tables of the
+ * 8794 objects that link into walk_window, never guessed from a name.
+ * Where the gap is a class the sync renamed, the new spelling comes from
+ * the by-address rename map and is accepted only when the old class is
+ * gone from the config symbol tables AND this member's own old symbol lands
+ * on that one class, because a class SHIFT leaves the old name alive on a
+ * different body.
+ *
+ * Rows whose fix is a receiver-shape change (a __thiscall member against a
+ * C body that takes the receiver on the stack) are NOT here: those need a
+ * real face, which is the ruling hal/dtor_faces_cpp.cpp already records.
+ * ------------------------------------------------------------------- */
+#pragma comment(linker, "/alternatename:?Virtual34@ActorBase@@QAEHII@Z=?Virtual34@fBase_c@@QAEHII@Z")
+#pragma comment(linker, "/alternatename:?Virtual38@ActorBase@@QAEHII@Z=?Virtual38@fBase_c@@QAEHII@Z")
+#pragma comment(linker, "/alternatename:?DetectClsn@RaycastGround@@QAEHXZ=?DetectClsn@dBgCh_Gnd@@QAEHXZ")
+#pragma comment(linker, "/alternatename:?GetClsnID@ClsnResult@@QBEIXZ=?GetClsnID@dBgPi@@QBEIXZ")
+#pragma comment(linker, "/alternatename:?GetWallResult@WithMeshClsn@@QBEHXZ=?GetWallResult@dBgCh_Actr@@QBEHXZ")
+#pragma comment(linker, "/alternatename:?GetFloorResult@WithMeshClsn@@QBEHXZ=?GetFloorResult@dBgCh_Actr@@QBEHXZ")
+#pragma comment(linker, "/alternatename:?UpdateCarry@Actor@@QAEPAUMatrix4x3@@AAUdaPly_c@@ABUVector3@@@Z=?UpdateCarry@dActor_c@@QAEPAUMatrix4x3@@AAUdaPly_c@@ABUVector3@@@Z")
+#pragma comment(linker, "/alternatename:?DetectClsn@SphereClsn@@QAEHXZ=?DetectClsn@dBgCh_SphCrr@@QAEHXZ")
+#pragma comment(linker, "/alternatename:?TrackInDeathTable@Actor@@QAEXXZ=?TrackInDeathTable@dActor_c@@QAEXXZ")
+#pragma comment(linker, "/alternatename:?TouchesWater@WithMeshClsn@@QBEHXZ=?TouchesWater@dBgCh_Actr@@QBEHXZ")
+#pragma comment(linker, "/alternatename:?InitResources@TtcConveyorBeltLarge@@QAEHXZ=?InitResources@daObjCtMecha04_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?CleanupResources@TtcConveyorBeltLarge@@QAEHXZ=?CleanupResources@daObjCtMecha04_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Behavior@TtcConveyorBeltLarge@@QAEHXZ=?Behavior@daObjCtMecha04_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Render@TtcConveyorBeltLarge@@QAEHXZ=?Render@daObjCtMecha04_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?CleanupResources@TtcMovingCubeA@@QAEHXZ=?CleanupResources@daObjCtMecha09_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Render@TtcMovingCubeA@@QAEHXZ=?Render@daObjCtMecha09_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?CleanupResources@Boo@@QAEHXZ=?CleanupResources@daTrs_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?InitResources@BooCage@@QAEHXZ=?InitResources@daTBasket_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Behavior@BooCage@@QAEHXZ=?Behavior@daTBasket_c@@QAEHXZ")
+#pragma comment(linker, "/alternatename:?Render@BooCage@@QAEHXZ=?Render@daTBasket_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?CleanupResources@MansionSteps@@QAEHXZ=?CleanupResources@daTrsTrap_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Render@MansionSteps@@QAEHXZ=?Render@daTrsTrap_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?UpdateClsnPosAndRot@Platform@@QAEXXZ=?UpdateClsnPosAndRot@dBgActor_c@@QAEXXZ")
+#pragma comment(linker, "/alternatename:?SpawnCoin@Enemy@@QAEXXZ=?SpawnCoin@dEnemyBase_c@@QAEXXZ")
+#pragma comment(linker, "/alternatename:?GetCapState@CapEnemy@@QAEHXZ=?GetCapState@dCapEnemy_c@@QAEHXZ")
+#pragma comment(linker, "/alternatename:?Unk_0203589c@WithMeshClsn@@QAEXXZ=?Unk_0203589c@dBgCh_Actr@@QAEXXZ")
+#pragma comment(linker, "/alternatename:?UntrackInDeathTable@Actor@@QAEXXZ=?UntrackInDeathTable@dActor_c@@QAEXXZ")
+#pragma comment(linker, "/alternatename:?UpdateKillByMegaChar@Platform@@QAEHFFFU?$Fix12@H@@@Z=?UpdateKillByMegaChar@dBgActor_c@@QAEHFFFU?$Fix12@H@@@Z")
+#pragma comment(linker, "/alternatename:?FindWithID@Actor@@SAPAU1@I@Z=?FindWithID@dActor_c@@SAPAU1@I@Z")
+#pragma comment(linker, "/alternatename:?InitResources@FloatOnWaterPlatformWdwSquare@@QAEHXZ=?InitResources@daObjWc_Obj02_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?CleanupResources@FloatOnWaterPlatformWdwSquare@@QAEHXZ=?CleanupResources@daObjWc_Obj02_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Behavior@FloatOnWaterPlatformWdwSquare@@QAEHXZ=?Behavior@daObjWc_Obj02_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Render@FloatOnWaterPlatformWdwSquare@@QAEHXZ=?Render@daObjWc_Obj02_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?InitResources@ArrowLift@@QAEHXZ=?InitResources@daObjWc_Obj03_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Behavior@ArrowLift@@QAEHXZ=?Behavior@daObjWc_Obj03_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Render@ArrowLift@@QAEHXZ=?Render@daObjWc_Obj03_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?InitResources@SwitchActivatedPlank@@QAEHXZ=?InitResources@daObjWc_Obj04_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?CleanupResources@SwitchActivatedPlank@@QAEHXZ=?CleanupResources@daObjWc_Obj04_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Render@SwitchActivatedPlank@@QAEHXZ=?Render@daObjWc_Obj04_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?InitResources@RotatingPlatformWdw@@QAEHXZ=?InitResources@daObjWc_Mizu_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?CleanupResources@RotatingPlatformWdw@@QAEHXZ=?CleanupResources@daObjWc_Mizu_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Behavior@RotatingPlatformWdw@@QAEHXZ=?Behavior@daObjWc_Mizu_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Render@RotatingPlatformWdw@@QAEHXZ=?Render@daObjWc_Mizu_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?InitResources@CameraTag@@QAEHXZ=?InitResources@daChRoom_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Behavior@CameraTag@@QAEHXZ=?Behavior@daChRoom_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?InitResources@Cloud@@QAEHXZ=?InitResources@daObjKumo_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:?Render@Cloud@@QAEHXZ=?Render@daObjKumo_c@@UAEHXZ")
+
+/* ----------------------------------------------------------------------
+ * Wave 8, lane ALIAS2: the FLAT direction of the main -> port sync's link
+ * wall. Lane ALIAS re-derived the 688 MSVC-DECORATED unresolved externals;
+ * these are rows in the other direction, the ROM's own flat Itanium names
+ * that the port's tables and host faces reference and that a translation
+ * unit the build already compiles now defines under an MSVC-decorated
+ * name, because main's langmode migration turned those bodies into real
+ * C++ members and free functions.
+ *
+ * THE RULE, and it is the reason this block is 179 rows and not 1731. A
+ * flat reference is an `extern "C"` declaration, so the call is __cdecl
+ * and the receiver, where there is one, is the first stack argument. An
+ * /alternatename is a NAME bridge and never an ABI bridge. So a row is
+ * admissible only when the definition is __cdecl too: a FREE function
+ * (@@Y, convention letter A) or a STATIC member (access letter S/T/C/D/K/L,
+ * convention letter A). A non-static member is __thiscall -- receiver in
+ * ECX, callee pops its own arguments -- and aliasing a flat reference onto
+ * one silently misplaces `this`, which is hal/method_faces.cpp's failure
+ * class 3 spelled as a linker directive and hal/lk4_solidheap_seat.cpp's
+ * measured fault. Those rows need a real face and are listed in
+ * lane ALIAS2's report (run link100) instead of being written here.
+ *
+ * Every left hand side below is lifted verbatim from walk_window's own
+ * unresolved block. Every right hand side is read out of the COFF symbol
+ * table of the object that defines it, never guessed from a name, and is
+ * checked to agree on the convention letter, the receiver, the argument
+ * slot count and whether a struct comes back by value. Rows whose left
+ * hand side already carries a live directive are not written twice, and
+ * rows where the defining object also REFERENCES the flat name (which
+ * would alias a body onto itself) are refused.
+ * ------------------------------------------------------------------- */
+#pragma comment(linker, "/alternatename:__ZN8dScene_c20SetAndStopColorFaderEv=?SetAndStopColorFader@dScene_c@@SAXXZ")
+#pragma comment(linker, "/alternatename:__ZN8dActor_c15FindWithActorIDEjPS_=?FindWithActorID@dActor_c@@SAPAU1@IPAU1@@Z")
+#pragma comment(linker, "/alternatename:__ZN5Sound8PlayLongEjjjRK7Vector3s=?PlayLong@Sound@@YAHIIIABUVector3@@F@Z")
+#pragma comment(linker, "/alternatename:__ZN5Sound9PlayBank3EjRK7Vector3=?PlayBank3@Sound@@YAXIABUVector3@@@Z")
+#pragma comment(linker, "/alternatename:__ZN8dActor_c5SpawnEjjRK7Vector3PK10Vector3_16as=?Spawn@dActor_c@@SAPAU1@IIABUVector3@@PBUVector3_16@@CF@Z")
+#pragma comment(linker, "/alternatename:__ZN5Sound17InfoSequenceEntry9GetWithIDEj=?GetWithID@InfoSequenceEntry@Sound@@SAPAU12@I@Z")
+#pragma comment(linker, "/alternatename:__ZN5Sound6Play2DEjj=?Play2D@Sound@@YAIII@Z")
+#pragma comment(linker, "/alternatename:__ZN5Sound22LoadAndSetMusic_Layer1Ei=?LoadAndSetMusic_Layer1@Sound@@YAXH@Z")
+/* RETIRED at catchup1 Stage C round 2. DEFEATED: src/engine/gx/G2x.cpp defines _G2x_SetBlendBrightness_ itself now. */
+// #pragma comment(linker, "/alternatename:_G2x_SetBlendBrightness_=?SetBlendBrightness@G2x@@SAXPCGGF@Z")
+#pragma comment(linker, "/alternatename:__Z19LoadStandardObjectsRN11LVL_Overlay11ObjSubTableEaj=?LoadStandardObjects@@YAXAAUObjSubTable@LVL_Overlay@@CI@Z")
+#pragma comment(linker, "/alternatename:__Z19LoadEntranceObjectsRN11LVL_Overlay11ObjSubTableEaj=?LoadEntranceObjects@@YAXAAUObjSubTable@LVL_Overlay@@CI@Z")
+#pragma comment(linker, "/alternatename:__Z19LoadPathNodeObjectsRN11LVL_Overlay11ObjSubTableEaj=?LoadPathNodeObjects@@YAXAAUObjSubTable@LVL_Overlay@@CI@Z")
+#pragma comment(linker, "/alternatename:__Z15LoadPathObjectsRN11LVL_Overlay11ObjSubTableEaj=?LoadPathObjects@@YAXAAUObjSubTable@LVL_Overlay@@CI@Z")
+#pragma comment(linker, "/alternatename:__Z15LoadViewObjectsRN11LVL_Overlay11ObjSubTableEaj=?LoadViewObjects@@YAXAAUObjSubTable@LVL_Overlay@@CI@Z")
+#pragma comment(linker, "/alternatename:__Z17LoadSimpleObjectsRN11LVL_Overlay11ObjSubTableEaj=?LoadSimpleObjects@@YAXAAUObjSubTable@LVL_Overlay@@CI@Z")
+#pragma comment(linker, "/alternatename:__Z25LoadTeleportSourceObjectsRN11LVL_Overlay11ObjSubTableEaj=?LoadTeleportSourceObjects@@YAXAAUObjSubTable@LVL_Overlay@@CI@Z")
+#pragma comment(linker, "/alternatename:__Z23LoadTeleportDestObjectsRN11LVL_Overlay11ObjSubTableEaj=?LoadTeleportDestObjects@@YAXAAUObjSubTable@LVL_Overlay@@CI@Z")
+#pragma comment(linker, "/alternatename:__Z14LoadFogObjectsRN11LVL_Overlay11ObjSubTableEaj=?LoadFogObjects@@YAXAAUObjSubTable@LVL_Overlay@@CI@Z")
+#pragma comment(linker, "/alternatename:__Z15LoadExitObjectsRN11LVL_Overlay11ObjSubTableEaj=?LoadExitObjects@@YAXAAUObjSubTable@LVL_Overlay@@CI@Z")
+#pragma comment(linker, "/alternatename:__Z22LoadMinimapTileObjectsRN11LVL_Overlay11ObjSubTableEaj=?LoadMinimapTileObjects@@YAXAAUObjSubTable@LVL_Overlay@@CI@Z")
+#pragma comment(linker, "/alternatename:__Z23LoadMinimapScaleObjectsRN11LVL_Overlay11ObjSubTableEaj=?LoadMinimapScaleObjects@@YAXAAUObjSubTable@LVL_Overlay@@CI@Z")
+#pragma comment(linker, "/alternatename:__Z23LoadUnusedType13ObjectsRN11LVL_Overlay11ObjSubTableEaj=?LoadUnusedType13Objects@@YAXAAUObjSubTable@LVL_Overlay@@CI@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_G2_GetBG2ScrPtr=?GetBG2ScrPtr@G2@@YAPAXXZ")
+#pragma comment(linker, "/alternatename:__ZN10dScStage_c18LoadClsnAndObjectsER11LVL_OverlayjR7dBgW_Kc=?LoadClsnAndObjects@dScStage_c@@SAXAAULVL_Overlay@@IAAUdBgW_Kc@@@Z")
+#pragma comment(linker, "/alternatename:__ZN10dScStage_c18ResetMeshCollidersEv=?ResetMeshColliders@dScStage_c@@SAXXZ")
+#pragma comment(linker, "/alternatename:__ZN2GX15DisableAllBanksEv=?DisableAllBanks@GX@@YAXXZ")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GX_SetGraphicsMode=?SetGraphicsMode@GX@@YAXHHH@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GX_SetBankForTexPltt=?SetBankForTexPltt@GX@@YAXG@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GX_SetBankForSubOBJExtPltt=?SetBankForSubOBJExtPltt@GX@@YAXG@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GX_DispOn=?DispOn@GX@@YAXXZ")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GXS_LoadOBJExtPltt=?LoadOBJExtPltt@GXS@@YAXPBXII@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GXS_SetGraphicsMode=?SetGraphicsMode@GXS@@YAXH@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GXS_EndLoadOBJExtPltt=?EndLoadOBJExtPltt@GXS@@YAXXZ")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GXS_BeginLoadOBJExtPltt=?BeginLoadOBJExtPltt@GXS@@YAXXZ")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GX_SetBankForSubBG=?SetBankForSubBG@GX@@YAXG@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GX_SetBankForSubOBJ=?SetBankForSubOBJ@GX@@YAXG@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_G2_GetBG2CharPtr=?GetBG2CharPtr@G2@@YAPAXXZ")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GX_LoadBGPltt=?LoadBGPltt@GX@@YAXPBXII@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GXS_LoadBGPltt=?LoadBGPltt@GXS@@YAXPBXII@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GX_LoadOBJPltt=?LoadOBJPltt@GX@@YAXPBXII@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GXS_LoadOBJPltt=?LoadOBJPltt@GXS@@YAXPBXII@Z")
+#pragma comment(linker, "/alternatename:__ZN8SaveData19IsCharacterUnlockedEj=?IsCharacterUnlocked@SaveData@@SAHI@Z")
+#pragma comment(linker, "/alternatename:__ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2=?Render@OAM@@SAX_NPAUOamAttr@@HHHHPAUMatrix2x2@@@Z")
+#pragma comment(linker, "/alternatename:__ZN3OAM9RenderSubEP7OamAttrii=?RenderSub@OAM@@SAXPAUOamAttr@@HH@Z")
+#pragma comment(linker, "/alternatename:__Z13CopyToViewMatPK9Matrix4x3=?CopyToViewMat@@YAXPBUMatrix4x3@@@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_G2_GetBG0ScrPtr=?GetBG0ScrPtr@G2@@YAPAXXZ")
+/* run rel042, lane NARROWRET1: the flat names of five NARROW static members
+   (SaveData::GetCoinRecord, SaveData::CountStarsCollectedInLevel, OAM::GetObjWidth,
+   OAM::GetObjHeight: u8; dBgCh::ShouldPassThroughImpl: bool) are bound below to the
+   widening wrappers tools/hostgen.py's NARROW_RETURN table appends to each definition
+   TU, not to the member itself: the cdecl ABI agrees either way, but this alias is a
+   NAME bridge, it cannot see the return type, and the flat callers that declare the
+   name `int` read EAX, whose upper bytes the member never writes. The ROM body
+   extends its result into r0; the wrapper extends it into EAX. */
+#pragma comment(linker, "/alternatename:__ZN8SaveData13GetCoinRecordEj=_hostgen_nrwide__ZN8SaveData13GetCoinRecordEj")
+#pragma comment(linker, "/alternatename:_strlen=?strlen@cstd@@YAIPBD@Z")
+#pragma comment(linker, "/alternatename:__ZN8SaveData26CountStarsCollectedInLevelEj=_hostgen_nrwide__ZN8SaveData26CountStarsCollectedInLevelEj")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_G2_GetBG3ScrPtr=?GetBG3ScrPtr@G2@@YAPAXXZ")
+#pragma comment(linker, "/alternatename:__ZN5Sound21UnsetPlayerVoiceGroupEv=?UnsetPlayerVoiceGroup@Sound@@YAXXZ")
+#pragma comment(linker, "/alternatename:__ZN8dScene_c14StartSceneFadeEjjt=?StartSceneFade@dScene_c@@SAXIIG@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_FX_DivS32=?div@cstd@@YAHHH@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_FX_ModS32=?mod@cstd@@YAHHH@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_G2S_GetBG1CharPtr=?GetBG1CharPtr@G2S@@YAIXZ")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GX_LoadOBJ=?LoadOBJ@GX@@YAXPBXII@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_G2x_SetBlendAlpha_=?SetBlendAlpha@G2x@@SAXPCGGGGI@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_FX_DivFx64c=?ldiv@cstd@@YA_JHH@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GX_LoadTexPltt=?LoadTexPltt@GX@@YAXPBXII@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GX_LoadBG0Char=?LoadBG0Char@GX@@YAXPBXII@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GX_LoadBG1Char=?LoadBG1Char@GX@@YAXPBXII@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GXS_LoadBG0Char=?LoadBG0Char@GXS@@YAXPBXII@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GXS_LoadBG1Char=?LoadBG1Char@GXS@@YAXPBXII@Z")
+#pragma comment(linker, "/alternatename:__ZN8SaveData13EraseSaveFileEjPc=?EraseSaveFile@SaveData@@SAHIPAD@Z")
+#pragma comment(linker, "/alternatename:__ZN8SaveData12ReadFileDataEjP12FileSaveData=?ReadFileData@SaveData@@SAHIPAUFileSaveData@@@Z")
+#pragma comment(linker, "/alternatename:__ZN8SaveData16ReadMinigameDataEP16MinigameSaveData=?ReadMinigameData@SaveData@@SAHPAUMinigameSaveData@@@Z")
+#pragma comment(linker, "/alternatename:__ZN8SaveData13SaveMinigamesEP16MinigameSaveData=?SaveMinigames@SaveData@@SAHPAUMinigameSaveData@@@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_G2S_GetBG0CharPtr=?GetBG0CharPtr@G2S@@YAIXZ")
+#pragma comment(linker, "/alternatename:__ZN5mHeap6Heap_t14CreateRootHeapEPvj=?CreateRootHeap@Heap_t@mHeap@@SAPAU12@PAXI@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_G2S_GetBG3CharPtr=?GetBG3CharPtr@G2S@@YAIXZ")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_G2S_GetBG2CharPtr=?GetBG2CharPtr@G2S@@YAIXZ")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_G2S_GetBG3ScrPtr=?GetBG3ScrPtr@G2S@@YAIXZ")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_G2S_GetBG2ScrPtr=?GetBG2ScrPtr@G2S@@YAIXZ")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_G2S_GetBG1ScrPtr=?GetBG1ScrPtr@G2S@@YAIXZ")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_G2_GetBG1ScrPtr=?GetBG1ScrPtr@G2@@YAPAXXZ")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_G2S_GetBG0ScrPtr=?GetBG0ScrPtr@G2S@@YAIXZ")
+#pragma comment(linker, "/alternatename:__ZN5Sound12PlayBank2_2DEj=?PlayBank2_2D@Sound@@YAII@Z")
+#pragma comment(linker, "/alternatename:__ZN4cstd4sqrtEy=?sqrt@cstd@@YAH_K@Z")
+#pragma comment(linker, "/alternatename:__ZN3OAM9RenderSubEP7OamAttriiii=?RenderSub@OAM@@SAXPAUOamAttr@@HHHH@Z")
+#pragma comment(linker, "/alternatename:__ZN8Particle6System12FromUniqueIDEj=?FromUniqueID@System@Particle@@SAPAU12@I@Z")
+#pragma comment(linker, "/alternatename:__ZN8Particle9RenderAllEv=?RenderAll@Particle@@YAXXZ")
+#pragma comment(linker, "/alternatename:__ZN5Scene9SetFadersEP15FaderBrightness=?SetFaders@Scene@@SAXPAUFaderBrightness@@@Z")
+#pragma comment(linker, "/alternatename:__ZN5Scene14StartSceneFadeEjjt=?StartSceneFade@Scene@@SAXIIG@Z")
+#pragma comment(linker, "/alternatename:__ZN7Message17DisplayVsExitTextEt=?DisplayVsExitText@Message@@SAXG@Z")
+#pragma comment(linker, "/alternatename:__ZN7Message10LoadTextVSEv=?LoadTextVS@Message@@SAXXZ")
+#pragma comment(linker, "/alternatename:__ZN8dActor_c4NextEPKS_=?Next@dActor_c@@SAPAU1@PBU1@@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_G2x_SetBGyAffine_=?SetBGyAffine@G2x@@SAXPCGPAUMatrix2x2@@HHHH@Z")
+#pragma comment(linker, "/alternatename:__ZN10dScStage_c20RenderBouncingArrowsEv=?RenderBouncingArrows@dScStage_c@@SAXXZ")
+#pragma comment(linker, "/alternatename:__ZN5Event6GetBitEj=?GetBit@Event@@YAHI@Z")
+#pragma comment(linker, "/alternatename:__ZN5Event6SetBitEj=?SetBit@Event@@YAXI@Z")
+#pragma comment(linker, "/alternatename:__ZN5Event8ClearBitEj=?ClearBit@Event@@YAHI@Z")
+#pragma comment(linker, "/alternatename:__ZN10dScStage_c21RenderVsModeCountdownEv=?RenderVsModeCountdown@dScStage_c@@SAXXZ")
+#pragma comment(linker, "/alternatename:__ZN8dScene_c20Initialise3dGraphicsEv=?Initialise3dGraphics@dScene_c@@SAXXZ")
+#pragma comment(linker, "/alternatename:__ZN10dScStage_c12SetVramBanksEv=?SetVramBanks@dScStage_c@@SAXXZ")
+#pragma comment(linker, "/alternatename:__ZN5Sound8SetMusicEjj=?SetMusic@Sound@@YAXII@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GX_SetBankForSubBGExtPltt=?SetBankForSubBGExtPltt@GX@@YAXG@Z")
+#pragma comment(linker, "/alternatename:_RemoveMBlock=?UnlinkNode@ExpandingHeapAllocator@@SAPAXPAUMemoryNode@@0@Z")
+#pragma comment(linker, "/alternatename:_InitMBlock=?CreateNode@ExpandingHeapAllocator@@SAPAXPAUTarget@MemoryNode@@G@Z")
+#pragma comment(linker, "/alternatename:_InsertMBlock=?LinkNode@ExpandingHeapAllocator@@SAPAXPAUMemoryNode@@00@Z")
+#pragma comment(linker, "/alternatename:__ZN5dBgCh21ShouldPassThroughImplEPvRK4CLPSRKS_b=_hostgen_nrwide__ZN5dBgCh21ShouldPassThroughImplEPvRK4CLPSRKS_b")
+#pragma comment(linker, "/alternatename:__ZN6Memory8AllocateEjiPN5mHeap6Heap_tE=?Allocate@Memory@@YAPAXIHPAUHeap_t@mHeap@@@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_FX_GetDivResult=?fdiv_result@cstd@@YAHXZ")
+#pragma comment(linker, "/alternatename:__ZN5Sound13PlayCharVoiceEjjRK7Vector3=?PlayCharVoice@Sound@@YAIIIABUVector3@@@Z")
+#pragma comment(linker, "/alternatename:__ZN5Sound9PlayBank0EjRK7Vector3=?PlayBank0@Sound@@YAXIABUVector3@@@Z")
+#pragma comment(linker, "/alternatename:__ZN8SaveData16CanPlayerHaveCapEv=?CanPlayerHaveCap@SaveData@@SAHXZ")
+#pragma comment(linker, "/alternatename:__ZN5Sound23InfoInstrumentBankEntry9GetWithIDEj=?GetWithID@InfoInstrumentBankEntry@Sound@@SAPAU12@I@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_strncpy=?strncpy@cstd@@YAPADPADPBDI@Z")
+#pragma comment(linker, "/alternatename:__ZN8SaveData22NumGlowingRabbitsFoundEv=?NumGlowingRabbitsFound@SaveData@@SAHXZ")
+#pragma comment(linker, "/alternatename:__ZN8SaveData16HasPlayerLostCapEv=?HasPlayerLostCap@SaveData@@SAHXZ")
+#pragma comment(linker, "/alternatename:__Z11LoadObjectsRN11LVL_Overlay8ObjTableEaj=?LoadObjects@@YAXAAUObjTable@LVL_Overlay@@CI@Z")
+#pragma comment(linker, "/alternatename:_FindListContainHeap=?FindNested@NestedHeapIterator@@SAPAU1@PAX@Z")
+#pragma comment(linker, "/alternatename:__ZN5mHeap6Heap_t28InitializeSolidHeapAsDefaultEjPS0_i=?InitializeSolidHeapAsDefault@Heap_t@mHeap@@SAPAXIPAU12@H@Z")
+#pragma comment(linker, "/alternatename:__ZN5mHeap6Heap_t20RestoreFromTemporaryEv=?RestoreFromTemporary@Heap_t@mHeap@@SAXXZ")
+#pragma comment(linker, "/alternatename:__ZN7Message7EndTalkEv=?EndTalk@Message@@SAXXZ")
+#pragma comment(linker, "/alternatename:__ZN7Message13DisplaySavingEt=?DisplaySaving@Message@@SAXG@Z")
+#pragma comment(linker, "/alternatename:__ZN7Message11PrepareTalkEv=?PrepareTalk@Message@@SAXXZ")
+#pragma comment(linker, "/alternatename:__ZN8Particle19SetSelfDestructFlagEj=?SetSelfDestructFlag@Particle@@YAXI@Z")
+#pragma comment(linker, "/alternatename:__ZN5Sound22StopLoadedMusic_Layer3Ev=?StopLoadedMusic_Layer3@Sound@@YAXXZ")
+#pragma comment(linker, "/alternatename:__ZN5Sound15PlaySecretSoundEP8dActor_cPt=?PlaySecretSound@Sound@@YAHPAUdActor_c@@PAG@Z")
+#pragma comment(linker, "/alternatename:__ZN8SaveData17SetCharacterIntroEi=?SetCharacterIntro@SaveData@@SAXH@Z")
+#pragma comment(linker, "/alternatename:__ZN3OAM11GetObjWidthEii=_hostgen_nrwide__ZN3OAM11GetObjWidthEii")
+#pragma comment(linker, "/alternatename:__ZN3OAM12GetObjHeightEii=_hostgen_nrwide__ZN3OAM12GetObjHeightEii")
+#pragma comment(linker, "/alternatename:__ZN3OAM16LoadAffineParamsEP7OamAttrPiP9Matrix2x2=?LoadAffineParams@OAM@@SAHPAUOamAttr@@PAHPAUMatrix2x2@@@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GXS_BeginLoadBGExtPltt=?BeginLoadBGExtPltt@GXS@@YAXXZ")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GXS_LoadBGExtPltt=?LoadBGExtPltt@GXS@@YAXPBXII@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_GXS_EndLoadBGExtPltt=?EndLoadBGExtPltt@GXS@@YAXXZ")
+#pragma comment(linker, "/alternatename:__ZN6dMap_c21FixTHIPaintingRoomPosER7Vector3=?FixTHIPaintingRoomPos@dMap_c@@SAXAAUVector3@@@Z")
+#pragma comment(linker, "/alternatename:__ZN5Sound22StopLoadedMusic_Layer2Ev=?StopLoadedMusic_Layer2@Sound@@YAXXZ")
+#pragma comment(linker, "/alternatename:__ZN5Sound22LoadAndSetMusic_Layer2Ej=?LoadAndSetMusic_Layer2@Sound@@YAXI@Z")
+#pragma comment(linker, "/alternatename:__ZN5Sound20PlaySmallSecretSoundEP8dActor_cPt=?PlaySmallSecretSound@Sound@@YAHPAUdActor_c@@PAG@Z")
+#pragma comment(linker, "/alternatename:__ZN8SaveData13PlayerLoseCapEv=?PlayerLoseCap@SaveData@@SAXXZ")
+#pragma comment(linker, "/alternatename:__ZN8SaveData21SetCoinRecordIfHigherEih=?SetCoinRecordIfHigher@SaveData@@SAXCE@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_PXIi_HandlerRecvFifoNotEmpty=?IPCRxFifoNotEmptyHandler@IRQ@@YAXXZ")
+#pragma comment(linker, "/alternatename:__ZN5Sound21ResetPlayerVoiceGroupEv=?ResetPlayerVoiceGroup@Sound@@YAXXZ")
+#pragma comment(linker, "/alternatename:__Z19UnloadLevelOverlaysi=?UnloadLevelOverlays@@YAXH@Z")
+#pragma comment(linker, "/alternatename:__ZN7Message15ResetAllGlobalsEv=?ResetAllGlobals@Message@@SAXXZ")
+#pragma comment(linker, "/alternatename:__ZN7Message21DisplaySaveStatusTextEt=?DisplaySaveStatusText@Message@@SAXG@Z")
+#pragma comment(linker, "/alternatename:__ZN8SaveData16EraseAllSaveDataEv=?EraseAllSaveData@SaveData@@SAIXZ")
+#pragma comment(linker, "/alternatename:__ZN3OAM5FlushEv=?Flush@OAM@@SAXXZ")
+#pragma comment(linker, "/alternatename:__ZN3OAM4LoadEv=?Load@OAM@@SAXXZ")
+#pragma comment(linker, "/alternatename:_OS_IrqDummy=?EmptyHandler@IRQ@@YAXXZ")
+#pragma comment(linker, "/alternatename:_OSi_IrqTimer0=?Tim0OverflowHandler@IRQ@@YAXXZ")
+#pragma comment(linker, "/alternatename:_OSi_IrqTimer1=?Tim1OverflowHandler@IRQ@@YAXXZ")
+#pragma comment(linker, "/alternatename:_OSi_IrqTimer2=?Tim2OverflowHandler@IRQ@@YAXXZ")
+#pragma comment(linker, "/alternatename:_OSi_IrqTimer3=?Tim3OverflowHandler@IRQ@@YAXXZ")
+#pragma comment(linker, "/alternatename:_OSi_IrqDma0=?Dma0Handler@IRQ@@YAXXZ")
+#pragma comment(linker, "/alternatename:_OSi_IrqDma1=?Dma1Handler@IRQ@@YAXXZ")
+#pragma comment(linker, "/alternatename:_OSi_IrqDma2=?Dma2Handler@IRQ@@YAXXZ")
+#pragma comment(linker, "/alternatename:_OSi_IrqDma3=?Dma3Handler@IRQ@@YAXXZ")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_FX_GetDivResultFx64c=?ldiv_result@cstd@@YA_JXZ")
+#pragma comment(linker, "/alternatename:__ZN5mHeap6Heap_t18InitializeGameHeapEjPS0_=?InitializeGameHeap@Heap_t@mHeap@@SAXIPAU12@@Z")
+#pragma comment(linker, "/alternatename:__ZN10dScStage_c10CheckInputEv=?CheckInput@dScStage_c@@SAXXZ")
+#pragma comment(linker, "/alternatename:__ZN3IRQ13VBlankHandlerEv=?VBlankHandler@IRQ@@YAXXZ")
+#pragma comment(linker, "/alternatename:__ZN4cstd8__assertEPKciS1_i=?__assert@cstd@@YAXPBD00H@Z")
+#pragma comment(linker, "/alternatename:__ZN8SaveData15SaveCurrentFileEv=?SaveCurrentFile@SaveData@@SAHXZ")
+#pragma comment(linker, "/alternatename:__ZN8dScene_c15SetSceneToSpawnEjj=?SetSceneToSpawn@dScene_c@@SAHII@Z")
+#pragma comment(linker, "/alternatename:__ZN8dScene_c16SpawnIfNecessaryEv=?SpawnIfNecessary@dScene_c@@SAHXZ")
+#pragma comment(linker, "/alternatename:__ZN13dScMgMCarlo_c10BoardReadyEv=?BoardReady@dScMgMCarlo_c@@SAHXZ")
+#pragma comment(linker, "/alternatename:__ZN13dScMgMCarlo_c16HasRemovablePairEv=?HasRemovablePair@dScMgMCarlo_c@@SAHXZ")
+#pragma comment(linker, "/alternatename:__ZN14dScMgMCarlo2_c10BoardReadyEv=?BoardReady@dScMgMCarlo2_c@@SAHXZ")
+#pragma comment(linker, "/alternatename:__ZN14dScMgMCarlo2_c16HasRemovablePairEv=?HasRemovablePair@dScMgMCarlo2_c@@SAHXZ")
+#pragma comment(linker, "/alternatename:__ZN3OAM12EnableSubOAMEP6OamTmp=?EnableSubOAM@OAM@@SAIPAUOamTmp@@@Z")
+#pragma comment(linker, "/alternatename:__ZN5Sound12UnpauseMusicEv=?UnpauseMusic@Sound@@YAXXZ")
+#pragma comment(linker, "/alternatename:__ZN5Sound10PauseMusicEv=?PauseMusic@Sound@@YAXXZ")
+#pragma comment(linker, "/alternatename:__ZN10dScStage_c17UpdateMenuButtonsEb=?UpdateMenuButtons@dScStage_c@@SAX_N@Z")
+#pragma comment(linker, "/alternatename:__ZN7Message21DisplayLevelClearTextEth=?DisplayLevelClearText@Message@@SAXGC@Z")
+#pragma comment(linker, "/alternatename:__ZN5Sound12PlayBank3_2DEj=?PlayBank3_2D@Sound@@YAII@Z")
+#pragma comment(linker, "/alternatename:__ZN10dScStage_c17PS_UpdateSaveMenuEb=?PS_UpdateSaveMenu@dScStage_c@@SAX_N@Z")
+#pragma comment(linker, "/alternatename:__ZN10dScStage_c10PS_CleanupEv=?PS_Cleanup@dScStage_c@@SAXXZ")
+#pragma comment(linker, "/alternatename:__ZN7Message11DisplayTextEi=?DisplayText@Message@@SAXG@Z")
+#pragma comment(linker, "/alternatename:__ZN7Message16DisplayPauseTextEth=?DisplayPauseText@Message@@SAXGE@Z")
+#pragma comment(linker, "/alternatename:__ZN7Message18DisplayPauseTextVSEt=?DisplayPauseTextVS@Message@@SAXG@Z")
+#pragma comment(linker, "/alternatename:__ZN7Message22DisplayOptionsMenuTextEs=?DisplayOptionsMenuText@Message@@SAXG@Z")
+#pragma comment(linker, "/alternatename:__ZN7Message19DisplaySaveMenuTextEt=?DisplaySaveMenuText@Message@@SAXG@Z")
+#pragma comment(linker, "/alternatename:__ZN7Message19DisplayDontSaveTextEt=?DisplayDontSaveText@Message@@SAXG@Z")
+#pragma comment(linker, "/alternatename:__ZN7Message25DisplayControllerModeTextEt=?DisplayControllerModeText@Message@@SAXG@Z")
+/* RETIRED at catchup1 Stage C round 2 (alternatename_guard on the probe map). DEFEATED: the left hand side is defined in the link now. */
+// #pragma comment(linker, "/alternatename:_NNS_FndCreateFrmHeapEx=?CreateSolidHeapAllocator@Heap_t@mHeap@@SAPAUSolidHeapAllocator@@PAXII@Z")
+
+/* -------------------------------------------------------------------
+ * Wave 8, lane FACES2: the DATA rows the sync wall kept, and only data.
+ *
+ * A face is what closes a CODE row on this wall, because a flat reference
+ * is __cdecl and the body the synced tree compiles is __thiscall, and an
+ * /alternatename is a name bridge and never an ABI bridge. A DATA row has
+ * no convention to get wrong: there is one object at one ROM address and
+ * the two names are two spellings of it. That is the whole of this block.
+ *
+ * THE RULE EACH ROW BELOW MEETS, checked and not assumed:
+ *   1. the left hand side is lifted verbatim from walk_window's own
+ *      unresolved block, and nothing in this link defines it;
+ *   2. both names carry a symbols.txt record under config/ at the SAME ROM
+ *      address, of kind data or bss -- the binding is the address, never
+ *      the spelling, and a name that merely looks related is not used;
+ *   3. the right hand side is DEFINED in this link, by the object named
+ *      in the comment, read out of that object's COFF symbol table.
+ * A row whose target is itself an /alternatename left hand side is not
+ * written: MSVC does not chain them, and the second hop resolves to
+ * nothing. GAME_HEAP_PTR is the one such row and it points at the real
+ * storage instead.
+ * ------------------------------------------------------------------- */
+#pragma comment(linker, "/alternatename:_BowserShutter_ModelFile=?BowserShutter_ModelFile@@3UKoopaShutterModelFilePtr@@A")   /* 0x02113ebc, ov026_syms.c */
+#pragma comment(linker, "/alternatename:_PARTICLE_RNG_STATE=_data_020a4d30")   /* 0x020a4d30, auto_bss.cpp */
+#pragma comment(linker, "/alternatename:_ROOT_HEAP_ARENA_ID=_data_020a0ea4")   /* 0x020a0ea4, os_arena.cpp */
+#pragma comment(linker, "/alternatename:_Submarine_ModelFile=?Submarine_ModelFile@@3USubmarineModelFilePtr@@A")   /* 0x02113ee4, ov026_syms.c */
+#pragma comment(linker, "/alternatename:_TTC_MovingBar_ClsnFile=?TTC_MovingBar_ClsnFile@@3UMecha05CollisionFilePtr@@A")   /* 0x0211d90c, ov065_syms.c */
+#pragma comment(linker, "/alternatename:_TTC_MovingBar_ModelFile=?TTC_MovingBar_ModelFile@@3UMecha05ModelFile@@A")   /* 0x0211d904, ov065_syms.c */
+#pragma comment(linker, "/alternatename:_daObjIceBoard_c_ClsnFile=?daObjIceBoard_c_ClsnFile@@3UIceBoardCollisionFilePtr@@A")   /* 0x02113c7c, ov018_syms.c */
+#pragma comment(linker, "/alternatename:_daObjIceBoard_c_ModelFile=?daObjIceBoard_c_ModelFile@@3UIceBoardModelFile@@A")   /* 0x02113c84, ov018_syms.c */
+
+/* THE GAME HEAP POINTER. 0x020a0eac carries two ROM names, GAME_HEAP_PTR
+ * and data_020a0eac, and the port's storage for it is data_020a0eac_c in
+ * hal/cxxname_bridge.cpp, which that file already aliases data_020a0eac
+ * onto. So this row points at the STORAGE and not at the other alias:
+ * /alternatename does not chain. Every D0 face generated from
+ * port/faces_sync.txt hands Memory::Deallocate the word at this address,
+ * which is what the ROM's own D0 bodies read out of their literal pools. */
+#pragma comment(linker, "/alternatename:_GAME_HEAP_PTR=_data_020a0eac_c")
+
+/* The fifteen DECORATED data rows lane FACES1 measured and could not
+ * write (lane FACES1): a caller TU spells one of these
+ * globals with a C++ type and the port's mount emits it with C linkage,
+ * so the two names differ only in decoration. Two of them are the same
+ * object under two caller spellings (PAPAD and PAPAX of 0x0213b098),
+ * which is one storage and two references, not two objects. */
+#pragma comment(linker, "/alternatename:?sJump3DBounceVy@@3HA=_sJump3DBounceVy")
+#pragma comment(linker, "/alternatename:?sJump3DRiseVy@@3HA=_sJump3DRiseVy")
+#pragma comment(linker, "/alternatename:?sJump3DMoveSpeed@@3HA=_sJump3DMoveSpeed")
+#pragma comment(linker, "/alternatename:?sJump3DAnimTable@@3PAPADA=_sJump3DAnimTable")
+#pragma comment(linker, "/alternatename:?sJump3DAnimTable@@3PAPAXA=_sJump3DAnimTable")
+#pragma comment(linker, "/alternatename:?sJump3DAnimSdown@@3PAHA=_sJump3DAnimSdown")
+#pragma comment(linker, "/alternatename:?sJump3DAnimRollJump@@3HA=_sJump3DAnimRollJump")
+#pragma comment(linker, "/alternatename:?sJump3DAnimRollJump@@3PAXA=_sJump3DAnimRollJump")
+#pragma comment(linker, "/alternatename:?sJump3DAnimWallJump@@3PAHA=_sJump3DAnimWallJump")
+#pragma comment(linker, "/alternatename:?sJump3DAnimWallJump@@3PAXA=_sJump3DAnimWallJump")
+#pragma comment(linker, "/alternatename:?sJump3DMariosLeft@@3HA=_sJump3DMariosLeft")
+#pragma comment(linker, "/alternatename:?sJump3DMariosLeft@@3PAHA=_sJump3DMariosLeft")
+#pragma comment(linker, "/alternatename:?sJump3DAnimStruggle@@3PAHA=_sJump3DAnimStruggle")
+#pragma comment(linker, "/alternatename:?sJump3DRisenOutCount@@3HA=_sJump3DRisenOutCount")
+#pragma comment(linker, "/alternatename:?data_ov064_0211c728@@3PAHA=_data_ov064_0211c728")
+
+/* ONE MORE ADDRESS, TWO ROM NAMES: TTC_MovingBeam and daObjCtMecha09_c
+ * are the same 32-word table at ov065 0x0211d568, and the port hosts it
+ * once, as _ZTV16daObjCtMecha09_c[32] in hal/actor_classes_ov065.cpp,
+ * which the registry fills. That file already aliases a THIRD name of
+ * the same table onto it (__ZTV14TtcMovingCubeA, line 950); this is the
+ * fourth, in the same shape, and it is storage rather than dispatch: the
+ * table is filled by the same registry pass either way. */
+/* PORTSYNC2: both names of this ROM word are one name in main now; the alias would bind a symbol to itself. */ // #pragma comment(linker, "/alternatename:__ZTV16daObjCtMecha09_c=__ZTV16daObjCtMecha09_c")
+/* Wave 8, lane SYNC6: the compressed-texture loader, flat -> decorated.
+ * main's #2528 matched dExtSimpleModel_c::LoadCompressedTextureToVram and
+ * src/_ZN5Model27LoadCompressedTextureToVramEPcjS0_.cpp spells the body as the
+ * static member, so the flat ROM name it used to carry has no definition and
+ * two ROM callers still reference it flat (src/func_ov075_0211aa94.c:16 and
+ * src/func_ov080_02125630.cpp:26). The RHS is DEFINED in this link and it is a
+ * STATIC member: __cdecl, no receiver, three arguments, scalar return on both
+ * sides, which is the admissibility rule met on every clause. The host bridge
+ * that used to supply the return is retired in hal/gx_upload_bridge.cpp. */
+#pragma comment(linker, "/alternatename:__ZN17dExtSimpleModel_c27LoadCompressedTextureToVramEPcjS0_=?LoadCompressedTextureToVram@dExtSimpleModel_c@@SAIPADI0@Z")
+
+
+/* ======================================================================
+ * Wave 9b, lane HALROWS. Three kinds of row, all of them one rule: a NAME
+ * the link needs, bridged onto a DEFINITION the link already has at the
+ * SAME ROM ADDRESS. Nothing below adds storage, changes a width, changes
+ * who fills a table, or changes what any object dispatches.
+ *
+ * THE ADMISSIBILITY RULE, met clause by clause on every row: the right
+ * hand side is already DEFINED in this link (checked against the 48406
+ * defined externals of walk_window's own 8663 link objects, read out of
+ * their COFF symbol tables, never guessed from a name), and it describes
+ * the same thing as the left hand side -- for a function the same calling
+ * convention, receiver passing and argument slots; for data the same
+ * object at the same address. Every left hand side is lifted verbatim from
+ * walk_window's own unresolved block and none of them is defined anywhere
+ * in this link, so no row can defeat itself the way alternatename_guard
+ * refuses.
+ * ====================================================================== */
+
+/* ---- 1. THE NINETEEN _ZTV ROWS OF THE SYNC WALL ----------------------
+ *
+ * The brief's first answer was to seat each of these as a fresh ROM-shaped
+ * word array in hal/actor_vtables.cpp, and NONE of the nineteen qualifies
+ * for that. Re-derived against this link's own defined-external set, every
+ * one still has words nothing in the build defines: the dActor_c and
+ * fBase_c lifecycle virtuals, and each class's own D1/D0, which are the
+ * 192 inline-in-header rows lanes DTORS-A and DTORS-B hold. A table seated
+ * with an undefined word is one new unresolved external per word, so
+ * seating them would raise the wall rather than lower it.
+ * lane HALROWS's report has every word of every table with the
+ * undefined ones named.
+ *
+ * The answer the ROM supports is that NONE of these tables is missing from
+ * the port. Every one is a table the port ALREADY hosts under a DIFFERENT
+ * NAME, because the main to port sync renamed the class: config records two
+ * _ZTV names at one ROM address and the port's host array was written under
+ * the older one. So each row is a name bridge onto storage that is already
+ * there. This is the shape the tree already uses for exactly this case:
+ * __ZTV14TTC_MovingBeam onto __ZTV16daObjCtMecha09_c above, and the nine
+ * standing rows in hal/actor_classes_*.cpp that this block cites.
+ *
+ * DERIVED BY ADDRESS, NEVER BY NAME (the clinkage-flip ruling: a class
+ * shift leaves the old name alive on a different body). Per row: the left
+ * hand side's address out of config symbols.txt; the table's span as the run
+ * of words whose relocation IN THAT MODULE'S OWN relocs.txt lands on a
+ * function symbol, keeping the ROM's own null slots (daOts_c words 0 and 6
+ * are a literal zero in extracted/overlays/overlay_0064.bin); and a right
+ * hand side that is a real DEFINITION, never another alias, because
+ * /alternatename does not chain.
+ *
+ * WHAT REFERENCES THEM: the ROM's own factory for each class, spelled
+ * `p[0] = (int)_ZTV10SlidingBox;` in src/d_a_slide_box.c and the like. So
+ * the count these close is the ROM's own reference graph reaching the
+ * port's table. Those factories spell the table with NO addend, which is
+ * the port's vptr address point (table + 0, the VPTR ruling);
+ * vptr_addend_guard checks that on every build.
+ */
+
+/* ov002 0x0210c2c8, 18 words. hal/sub_actors.cpp defines the storage as
+   _ZTV8dMeter_c and says so itself ("vtspan: _ZTV3HUD"): dMeter_c is the
+   name the matched constructor writes and _ZTV3HUD the config name.
+   src/d_meter.cpp stores it as the HUD's vptr. */
+/* PORTSYNC2: both names of this ROM word are one name in main now; the alias would bind a symbol to itself. */ // #pragma comment(linker, "/alternatename:__ZTV8dMeter_c=__ZTV8dMeter_c")
+/* ov002 0x0210c1c0, 18 words. Same file, same statement ("vtspan:
+   _ZTV7Minimap"); src/d_map.cpp stores it as the Minimap's vptr. */
+/* PORTSYNC2: both names of this ROM word are one name in main now; the alias would bind a symbol to itself. */ // #pragma comment(linker, "/alternatename:__ZTV6dMap_c=__ZTV6dMap_c")
+/* ov002 0x0210b0ec, 31 words. The address's other ROM name is
+   _ZTV13daObjNumber_c, which hal/actor_classes_vspopup.cpp:307 already
+   aliases onto the host array _ZTV15InvisibleSecret[31]. */
+#pragma comment(linker, "/alternatename:__ZTV13daObjNumber_c=__ZTV15InvisibleSecret")
+
+/* ov002 0x02109c74, 31 words. Other ROM name _ZTV12daObjHeart_c, aliased
+   onto _ZTV7Seaweed[31] at hal/actor_classes_bob_world.cpp:1166. */
+#pragma comment(linker, "/alternatename:__ZTV12daObjHeart_c=__ZTV7Seaweed")
+
+/* ov002 0x02109800. THE ONE INVERTED ROW. _ZTV9PushBlock is not a config
+   symbol any more: the sync renamed that table to _ZTV11PowerFlower (and
+   _ZTV18daObjPowerUpItem_c), port/ov002_syms.txt mounts it under the new
+   name, and hal/actor_classes_ov002g200.cpp's standing row
+   (__ZTV18daObjPowerUpItem_c onto __ZTV9PushBlock) therefore points at the
+   undefined side now. This is that alias turned the way the current config
+   spells it. The old row is left exactly as it is: its own left hand side
+   is unreferenced in this link, so it is inert either way. The address is
+   the port's own record in three places (ov002_syms.txt:534,
+   actor_classes_bob_world.cpp:2050, slice_gate204.txt:28). */
+#pragma comment(linker, "/alternatename:__ZTV9PushBlock=__ZTV18daObjPowerUpItem_c")
+
+/* ov010 0x02112ba8, 31 words. Three names for one table, read off the ROM
+   by lane ALIASCHK (hal/actor_classes.cpp:2366): config's _ZTV4Trap, which
+   is the host array, LIGHT_BEAM's _ZTV15daObjC1Hikari_c and TRAP's
+   _ZTV14daObjC1_Trap_c. Config puts _ZTV9LightBeam and
+   _ZTV15daObjC1Hikari_c at that same address. */
+#pragma comment(linker, "/alternatename:__ZTV15daObjC1Hikari_c=__ZTV4Trap")
+
+/* ov012 0x02112408, 32 words. Other ROM name _ZTV14daObjC0Water_c, aliased
+   onto _ZTV12SwitchPillar[32] at hal/actor_classes_ov012.cpp:107. */
+#pragma comment(linker, "/alternatename:__ZTV14daObjC0Water_c=__ZTV12SwitchPillar")
+
+/* ov015 0x02114420. Other ROM name _ZTV17daObjBk_Botaosi_c, aliased onto
+   _ZTV13PoleBillboard[32] at hal/actor_classes_wf.cpp:483. */
+#pragma comment(linker, "/alternatename:__ZTV17daObjBk_Botaosi_c=__ZTV13PoleBillboard")
+
+/* ov015 0x02114650, 32 words. Other ROM name _ZTV14daObjBk_Lift_c, aliased
+   onto _ZTV14MovingBarSmall[32] at hal/actor_classes_wf.cpp:294. */
+#pragma comment(linker, "/alternatename:__ZTV14daObjBk_Lift_c=__ZTV14MovingBarSmall")
+
+/* ov016 0x02114c8c, 32 words. Other ROM name _ZTV13daSlide_Box_c, aliased
+   onto _ZTV23FloatOnWaterPlatformJrb[37] at hal/actor_classes_jrb.cpp:223. */
+#pragma comment(linker, "/alternatename:__ZTV13daSlide_Box_c=__ZTV23FloatOnWaterPlatformJrb")
+
+/* ov026 0x02113d54. Other ROM name _ZTV18daWater_Tatumaki_c, which is the
+   host array itself (hal/actor_classes_ov026.cpp:228, "vtspan:
+   _ZTV18daWater_Tatumaki_c"), so this row needs no second hop. */
+/* PORTSYNC2: both names of this ROM word are one name in main now; the alias would bind a symbol to itself. */ // #pragma comment(linker, "/alternatename:__ZTV18daWater_Tatumaki_c=__ZTV18daWater_Tatumaki_c")
+/* ov035 0x02112bcc, 32 words. Other ROM name _ZTV16daObjCtMecha11_c,
+   aliased onto _ZTV17RotatingClockHand[32] at
+   hal/actor_classes_ov035.cpp:149, whose own comment carries the address. */
+#pragma comment(linker, "/alternatename:__ZTV16daObjCtMecha11_c=__ZTV17RotatingClockHand")
+
+/* ov036 0x02113cf8, 32 words. Other ROM name _ZTV16daObjRc_Tikuwa_c; the
+   port hosts the table as _ZTV8ShipWing[32] and records the join in two
+   places (hal/actor_classes_ov036.cpp:26 and ov036_syms.txt:135, both
+   "126 DONUT_BLOCK  16daObjRc_Tikuwa_c  _ZTV8ShipWing  0x02113cf8"). */
+#pragma comment(linker, "/alternatename:__ZTV16daObjRc_Tikuwa_c=__ZTV8ShipWing")
+
+/* ov064 0x0211b768, 37 words, two of them (0 and 6) the ROM's own null
+   slots. The table is left out of the ov064 mount on purpose, because its
+   typeinfo word relocates into the shared level window, and is hosted as
+   data_ov064_0211b768[37] in hal/actor_classes_ov027.cpp:340, which is the
+   address's other config name. */
+#pragma comment(linker, "/alternatename:__ZTV7daOts_c=_data_ov064_0211b768")
+
+/* ov064 0x0211bc68, 32 words. hal/actor_classes_ov064_gate178.cpp:172
+   defines the storage as _ZTV17daObjFl_Amilift_c[32] and names this very
+   symbol as the span it stands for ("vtspan: _ZTV12MetalNetLift"). */
+/* PORTSYNC2: both names of this ROM word are one name in main now; the alias would bind a symbol to itself. */ // #pragma comment(linker, "/alternatename:__ZTV17daObjFl_Amilift_c=__ZTV17daObjFl_Amilift_c")
+/* ov064 0x0211c334 is hosted under its own config name, _ZTV9JetStream[31] in
+   hal/actor_classes_bowserpuzzle.cpp, and its other ROM name
+   _ZTV18daWater_Hakidasi_c is aliased onto it there. No row is needed here.
+   The row that used to stand here joined __ZTV9JetStream to
+   __ZTV17BowserPuzzlePiece, which config puts on 0x0211c25c: a different table
+   and a different class. See that file's alias block for the cartridge
+   evidence. */
+
+/* ov091 0x021353ac is hosted under its own config name, _ZTV6Fwoosh[31] in
+   hal/actor_classes_ov091.cpp, and its other ROM name _ZTV10daHyuhyu_c is
+   aliased onto it there. No row is needed here. The row that used to stand here
+   joined __ZTV6Fwoosh to __ZTV5Stump, which config puts on 0x021352bc: the
+   stump, a different class, hosted as _ZTV11daObjPile_c[32] in
+   hal/actor_classes_bob_enemy.cpp. See ov091.cpp for the cartridge
+   evidence. */
+
+/* ov075 0x0211d304. The address's other config name is the mount symbol
+   data_ov075_0211d304, which port/ov075_syms.txt publishes and
+   hal/scene_vs_menu.cpp:79 already treats as this scene's vtable. */
+#pragma comment(linker, "/alternatename:__ZTV10dScEntry_c=_data_ov075_0211d304")
+
+/* ov006 0x0213eb40. Same shape: the mount symbol data_ov006_0213eb40, which
+   port/ov006_syms.txt publishes and hal/scene_boot.cpp names as
+   dScMgSlot1_c's vtable. */
+#pragma comment(linker, "/alternatename:__ZTV12dScMgSlot1_c=_data_ov006_0213eb40")
+
+/* ---- 2. THE FOUR STATIC ROWS AND THE GLOBAL DEALLOCATOR --------------
+ *
+ * A flat reference is an extern "C" declaration, so the call is __cdecl
+ * with no receiver, and an /alternatename is a NAME bridge and never an ABI
+ * bridge. These are the only members on this wall that pass that test:
+ * three STATIC members of dBgW (include/dBgW.h:124,127,130 declare all
+ * three `static`; decorated S = static, A = __cdecl) and one NAMESPACE free
+ * function (src/_ZN5Sound8EndMusicEjj.cpp defines
+ * `namespace Sound { void EndMusic(unsigned, unsigned); }`; decorated
+ * Y = free, A = __cdecl). Each right hand side was read out of the COFF
+ * symbol table of the object built from the matched TU that OWNS THAT ROM
+ * ADDRESS, so the join is the address and not the name.
+ */
+/* THE THREE dBgW STATICS WERE ALREADY BRIDGED, ONTO A NAME THE SYNC RETIRED.
+   Gate 1 wrote three fresh rows for them and closed nothing, because MSVC
+   takes the FIRST /alternatename for a symbol and ignores every later one,
+   and this file has carried rows for all three since gate 59 pointing at
+   ?...@@SAXAAU1@PAUActor@@AAUClsnResult@@... -- the PRE-SYNC decoration,
+   which appears zero times among this link's 48406 defined externals. The
+   fix is at those rows, not here: their right hand sides are repointed in
+   place at the class names the sync gave them (Actor -> dActor_c,
+   ClsnResult -> dBgPi), which is the only edit this lane made to a line it
+   did not add. Nothing else about them changed, including their comments,
+   which are still correct about the shape.
+
+   THE SAME THREE STATICS, SPELLED AS DATA, SEVEN MORE TIMES. Several src
+   TUs declare one of these statics `extern char`, `extern int`,
+   `extern int *` or `extern void *` at C++ linkage rather than calling it,
+   so MSVC mangles the reference as a VARIABLE whose identifier is the flat
+   ROM name: ?<flat name>@@3DA, @@3HA, @@3PAHA, @@3PAXA. Two of those seven
+   already had rows (gate 63 and gate 72, repointed with the rest); the five
+   below are the ones that never did. Each takes the same function's
+   address, which is what the declaring TU stores, and each right hand side
+   is the same static this file now names in the rows above. */
+#pragma comment(linker, "/alternatename:?_ZN4dBgW16UpdatePosAndAngsERS_P8dActor_cR5dBgPiR7Vector3P10Vector3_16S8_@@3DA=?UpdatePosAndAngs@dBgW@@SAXAAU1@PAUdActor_c@@AAUdBgPi@@AAUVector3@@PAUVector3_16@@4@Z")
+#pragma comment(linker, "/alternatename:?_ZN4dBgW22UpdatePosWithTransformERS_P8dActor_cR5dBgPiR7Vector3P10Vector3_16S8_@@3DA=?UpdatePosWithTransform@dBgW@@SAXAAU1@PAUdActor_c@@AAUdBgPi@@AAUVector3@@PAUVector3_16@@4@Z")
+#pragma comment(linker, "/alternatename:?_ZN4dBgW22UpdatePosWithTransformERS_P8dActor_cR5dBgPiR7Vector3P10Vector3_16S8_@@3HA=?UpdatePosWithTransform@dBgW@@SAXAAU1@PAUdActor_c@@AAUdBgPi@@AAUVector3@@PAUVector3_16@@4@Z")
+#pragma comment(linker, "/alternatename:?_ZN4dBgW22UpdatePosWithTransformERS_P8dActor_cR5dBgPiR7Vector3P10Vector3_16S8_@@3PAHA=?UpdatePosWithTransform@dBgW@@SAXAAU1@PAUdActor_c@@AAUdBgPi@@AAUVector3@@PAUVector3_16@@4@Z")
+#pragma comment(linker, "/alternatename:?_ZN4dBgW22UpdatePosWithTransformERS_P8dActor_cR5dBgPiR7Vector3P10Vector3_16S8_@@3PAXA=?UpdatePosWithTransform@dBgW@@SAXAAU1@PAUdActor_c@@AAUdBgPi@@AAUVector3@@PAUVector3_16@@4@Z")
+#pragma comment(linker, "/alternatename:__ZN5Sound8EndMusicEj=?EndMusic@Sound@@YAXI@Z")
+
+/* THE GLOBAL DEALLOCATOR. _Z13func_0203cbf0Pv is `operator delete(void *)` at ROM
+   0x0203cbf0, a FREE function, and src/_ZdlPv.cpp compiles to ??3@YAXPAX@Z
+   in this link: Y free, A __cdecl, one pointer argument, void return on
+   both sides. The Itanium spelling is what the ROM's own callers reference. */
+#pragma comment(linker, "/alternatename:__ZdlPv=??3@YAXPAX@Z")
+
+/* ---- 3. THREE FLAT DATA NAMES ----------------------------------------
+ *
+ * IDENTITY_MATRIX4X3 is config's name for arm9 0x02082128 and romdata.c
+ * defines the port's one copy as data_02082128. Eight DECORATED spellings
+ * of it are already bridged onto that name (hal/actor_classes_bbh.cpp:268,
+ * ov070.cpp:281 and 282, ov096.cpp:206, bob_enemy_bridges.cpp:65 and 428,
+ * and more); the FLAT spelling had no row, and a src TU that declares it
+ * extern "C" wants exactly that. Same object, same address, same eight
+ * precedents. */
+#pragma comment(linker, "/alternatename:_IDENTITY_MATRIX4X3=_data_02082128")
+
+/* data_0208e87c is the port's OLD name for arm9 0x0208e87c, which config
+   now calls _ZTV11dExtModel_c. hal/model_host.cpp:296 defines the storage as
+   _ZTV11dExtModel_c[8] and hal/model_dtor_seat.cpp:107-111 records the address
+   ("ROM from:0x0208e87c -> 0x02017120 is ModelBase's D1"). The one
+   reference left is port/unmatched/ModelFamily_Dtors_HostCopy.c inside
+   _ZN11CommonModelD0Ev, which still spells the pre-sync name. */
+
+/* port_trap36_states is the port's own five-entry pointer-to-member table
+   (hal/actor_classes_ov010.cpp:185), defined at C++ LINKAGE, while the TU
+   that reads it is a C file reached through the CMake rename
+   data_ov010_02112d28=port_trap36_states (CMakeLists.txt:16642) and so
+   spells the plain C name. One object, two spellings. The tidier fix is to
+   give the definition extern "C" linkage, which is the standing ruling for
+   this shape; that file is not this lane's, so the row goes here and the
+   preferred fix is written up in the lane report. */
+#pragma comment(linker, "/alternatename:_port_trap36_states=?port_trap36_states@@3PAP8C@@AEXXZA")
+
+/* ---- 4. THREE PRE-SYNC SPELLINGS OF THREE LIVE NAMES ------------------
+ *
+ * Lane FACES3 filed these under "rule 1: no ROM address for this name in
+ * config symbols.txt, so it is not a ROM function and no face can be
+ * derived". That reading is right about the name and wrong about the
+ * function: the name is a PRE-SYNC spelling, from before main renamed the
+ * class `Actor` to `dActor_c`, and the function is very much in this link.
+ *
+ * All three are referenced by ONE translation unit,
+ * src/_ZN3MrI13InitResourcesEv.cpp, whose ROM body is ov071 0x02121734
+ * size 0x298. The join below is that body's OWN arm_call relocations out of
+ * config/arm9/overlays/ov071/relocs.txt, so nothing here is a name match:
+ *
+ *   ROM call -> 0x020148c8   _ZN10dCcAcPos_c4InitEP8dActor_cRK7Vector3iijj
+ *   ROM call -> 0x0200ff94   _ZN8dActor_c9TrackStarEjj
+ *   ROM call -> 0x0203748c   _ZN9dBgCh_Gnd12SetObjAndPosERK7Vector3P8dActor_c
+ *
+ * and each of those three current spellings is DEFINED in this link under
+ * its flat C name. The old spellings are absent from config entirely, under
+ * every address, so this is not the hazard the clinkage-flip ruling warns
+ * about (an old name left alive on a DIFFERENT body): there is no other
+ * body for them to be alive on.
+ *
+ * Both sides of every row are flat ROM names, so both are extern "C",
+ * __cdecl, with the receiver (where there is one) as the first stack
+ * argument and the same argument slots after it. The rename changes the
+ * class name inside the mangled string and nothing about the call.
+ */
+#pragma comment(linker, "/alternatename:__ZN10dCcAcPos_c4InitEP5ActorRK7Vector35Fix12IiES6_jj=__ZN10dCcAcPos_c4InitEP8dActor_cRK7Vector3iijj")
+#pragma comment(linker, "/alternatename:__ZN5Actor9TrackStarEjj=__ZN8dActor_c9TrackStarEjj")
+#pragma comment(linker, "/alternatename:__ZN9dBgCh_Gnd12SetObjAndPosERK7Vector3P5Actor=__ZN9dBgCh_Gnd12SetObjAndPosERK7Vector3P8dActor_c")
+
+/* ---- 5. SEVENTEEN MORE DECORATED DATA SPELLINGS ----------------------
+ *
+ * The same shape as the fifteen rows lane FACES1 measured above and the
+ * hundred-odd rows lane ALIAS wrote before them: a caller translation unit
+ * declares one of the ROM's globals with a C++ TYPE at C++ linkage, so MSVC
+ * mangles the reference as ?<name>@@3<type>A, while the port's mount or host
+ * copy defines the same address under the plain C name. One object, two
+ * spellings, and the row is a pure name bridge.
+ *
+ * Found by sweeping every row left on the wall after this lane's gate 2 for
+ * the one question an /alternatename can answer -- is this same identifier
+ * already defined under its other spelling -- against the 48406 defined
+ * externals of walk_window's own link objects. Seventeen of the 542 were,
+ * and all seventeen are data. The sweep and its answers are in
+ * lane HALROWS's report.
+ *
+ * Three of these (data_ov015_02113594, 02114a5c, 02114a64) already have rows
+ * further up for their ?..@@3PAXA spelling, from the MovingBarSmall platform
+ * data block. These are DIFFERENT type spellings of the same three globals
+ * by different callers, which is why they are separate rows rather than
+ * duplicates: the left hand sides differ.
+ */
+#pragma comment(linker, "/alternatename:?data_0209cef4@@3PAUShadowModel@@A=_data_0209cef4")
+#pragma comment(linker, "/alternatename:?gPlayers@@3PAPAUdaPly_c@@A=_gPlayers")
+#pragma comment(linker, "/alternatename:?data_020a0ebc@@3PADA=_data_020a0ebc")
+#pragma comment(linker, "/alternatename:?data_ov002_0210dc00@@3PAP8C@@AEXXZA=?data_ov002_0210dc00@@3PAP8da1up_c@@AEXXZA")
+#pragma comment(linker, "/alternatename:?pmf_dMgJump3DMario_c_StateMove@@3UPmfRecord@@A=_pmf_dMgJump3DMario_c_StateMove")
+#pragma comment(linker, "/alternatename:?pmf_dMgJump3DMario_c_StateHold@@3UPmfRecord@@A=_pmf_dMgJump3DMario_c_StateHold")
+#pragma comment(linker, "/alternatename:?pmf_dMgJump3DMario_c_StateDamp@@3UPmfRecord@@A=_pmf_dMgJump3DMario_c_StateDamp")
+#pragma comment(linker, "/alternatename:?pmf_dMgJump3DMario_c_StateRespawn@@3UPmfRecord@@A=_pmf_dMgJump3DMario_c_StateRespawn")
+#pragma comment(linker, "/alternatename:?pmf_dMgJump3DMario_c_StateIdle_3@@3UPair@@A=_pmf_dMgJump3DMario_c_StateIdle_3")
+#pragma comment(linker, "/alternatename:?pmf_dMgJump3DMario_c_StateBounce@@3UPmfRecord@@A=_pmf_dMgJump3DMario_c_StateBounce")
+#pragma comment(linker, "/alternatename:?pmf_dMgJump3DMario_c_StateWindUp_2@@3UPair@@A=_pmf_dMgJump3DMario_c_StateWindUp_2")
+#pragma comment(linker, "/alternatename:?pmf_dMgJump3DMario_c_StateWindUp_3@@3UPair@@A=_pmf_dMgJump3DMario_c_StateWindUp_3")
+#pragma comment(linker, "/alternatename:?pmf_dMgJump3DMario_c_StateBounce_2@@3UPair@@A=_pmf_dMgJump3DMario_c_StateBounce_2")
+#pragma comment(linker, "/alternatename:?data_ov015_02113594@@3UCLPS_Block@@A=_data_ov015_02113594")
+#pragma comment(linker, "/alternatename:?data_ov015_02114a5c@@3USharedFilePtr@@A=_data_ov015_02114a5c")
+#pragma comment(linker, "/alternatename:?data_ov015_02114a64@@3USharedFilePtr@@A=_data_ov015_02114a64")
+#pragma comment(linker, "/alternatename:?data_ov022_021145a0@@3PAHA=_data_ov022_021145a0")
+
+/* ---- 6. THE TWENTY-ONE DECORATED DATA ROWS LANE DTORS2 MEASURED --------
+ *
+ * Staged by lane INT4 at the wave-9c fold, on the coordinator's word, from
+ * lane DTORS2's report part 1. Same shape as section 5 and the rows above
+ * it: a //cpp src translation unit declares one of the ROM's globals with a
+ * C++ TYPE at C++ linkage, so MSVC asks the linker for ?<name>@@3<type>A,
+ * while the same storage is already mounted at that address under its plain
+ * C address-name and is CONSTRUCTED under that name by the overlay's own
+ * static initialiser. Two spellings, one ROM address. A second mount would
+ * fork the storage, which is the failure port/hal/heap_globals.cpp's header
+ * paragraph describes (the constructor registers into one list while
+ * FindNested searches the other), so every row here is a bridge and none is
+ * a mount.
+ *
+ * Each right-hand side was re-checked here with a WORD match against the
+ * named port/ovNNN_syms.txt mount, not a line match: those files list
+ * several names per line and a line-anchored grep reads every one of them as
+ * absent, which is the trap DTORS2 recorded.
+ *
+ * Two of these names already carry a FLAT alias further up the tree
+ * (_RotatingClockHand_ModelFile and _RockPillar_ClsnFile). These are the
+ * DECORATED spelling of the same globals asked for by a different caller, so
+ * the left-hand sides differ and the rows are not duplicates.
+ */
+#pragma comment(linker, "/alternatename:?BowserShutter_ClsnFile@@3PAHA=?BowserShutter_ClsnFile@@3UKoopaShutterCollisionFilePtr@@A")
+#pragma comment(linker, "/alternatename:?MadPiano_AnimFile@@3USharedFilePtr@@A=_data_ov063_0211ef90")
+#pragma comment(linker, "/alternatename:?MadPiano_ClsnFile@@3USharedFilePtr@@A=_data_ov063_0211ef88")
+#pragma comment(linker, "/alternatename:?MadPiano_ModelFile@@3USharedFilePtr@@A=_data_ov063_0211ef80")
+#pragma comment(linker, "/alternatename:?MovingBarSmall_ClsnFile@@3PAHA=_data_ov015_02114a5c")
+#pragma comment(linker, "/alternatename:?MovingBarSmall_ModelFile@@3PAHA=_data_ov015_02114a64")
+#pragma comment(linker, "/alternatename:?PoleBillboard_ClsnFile@@3PAHA=_data_ov015_02114974")
+#pragma comment(linker, "/alternatename:?PoleBillboard_ModelFile@@3PAHA=_data_ov015_0211497c")
+#pragma comment(linker, "/alternatename:?PoleLift_ClsnFile@@3USharedFilePtr@@A=?PoleLift_ClsnFile@@3UNobiruClsnFileHandle@@A")
+#pragma comment(linker, "/alternatename:?PoleLift_ModelFile@@3USharedFilePtr@@A=?PoleLift_ModelFile@@3UNobiruModelFileHandle@@A")
+#pragma comment(linker, "/alternatename:?RockPillar_ClsnFile@@3PAHA=?RockPillar_ClsnFile@@3UHasiraCollisionFile@@A")
+#pragma comment(linker, "/alternatename:?RotatingClockHand_ClsnFile@@3USharedFilePtr@@A=?RotatingClockHand_ClsnFile@@3UMecha11ClsnFilePtr@@A")
+#pragma comment(linker, "/alternatename:?RotatingClockHand_ModelFile@@3USharedFilePtr@@A=?RotatingClockHand_ModelFile@@3UMecha11ModelFilePtr@@A")
+#pragma comment(linker, "/alternatename:?Submarine_ClsnFile@@3PAHA=?Submarine_ClsnFile@@3USubmarineCollisionFilePtr@@A")
+#pragma comment(linker, "/alternatename:?gCtMechaObj08aCollisionFile@@3PAHA=?gCtMechaObj08aCollisionFile@@3UMecha08CollisionFilePtr@@A")
+#pragma comment(linker, "/alternatename:?gCtMechaObj08aModelFile@@3PAHA=?gCtMechaObj08aModelFile@@3UMecha08ModelFile@@A")
+#pragma comment(linker, "/alternatename:?daKpa2Bg_c_ClsnFile@@3PAHA=?daKpa2Bg_c_ClsnFile@@3UKpa2BgCollisionFilePtr@@A")
+#pragma comment(linker, "/alternatename:?daKpa2Bg_c_ModelFile@@3PAHA=?daKpa2Bg_c_ModelFile@@3UKpa2BgModelFilePtr@@A")
+
+/* The two heap rows of the same twenty-one. Their storage is not an overlay
+ * mount but port/hal/heap_globals.cpp's own, which already aliases the FLAT
+ * spelling of the iterator onto it; these are the decorated spelling that
+ * src/func_0204df54.cpp asks for.
+ *
+ * ?sRootListInitialized@@3HA IS AN INFERENCE AND IS WRITTEN AS ONE. config carries no
+ * second name at 0x020a4d34 (config/arm9/symbols.txt:5118 has the address-name
+ * alone), so the identification rests on the pairing DTORS2 measured:
+ * heap_globals.cpp hosts int _ZN6Memory25isRootHeapIterInitializedE beside the
+ * iterator, and NNSi_FndInitHeapHead reads sRootListInitialized as the guard flag immediately
+ * before constructing sRootList and sets it to 1 after, which is that
+ * flag's whole job. If the owner of heap_globals.cpp reads it differently, this
+ * row is the one to pull.
+ */
+#pragma comment(linker, "/alternatename:?sRootList@@3UNestedHeapIterator@@A=__ZN6Memory16rootHeapIteratorE")
+#pragma comment(linker, "/alternatename:?sRootListInitialized@@3HA=__ZN6Memory25isRootHeapIterInitializedE")
+
+/* catchup1 Stage C round 2 (FACE4 row): fBase_c::operator new is a static
+   class operator, cdecl on both sides; MSVC defines ??2fBase_c@@SAPAXI@Z. The
+   flat spelling the port and host copies call is bound onto it here. */
+#pragma comment(linker, "/alternatename:__ZN7fBase_cnwEm=??2fBase_c@@SAPAXI@Z")
+
+/* ---- catchup1 Stage C round 3: C++ references to C storage (INTEG4 round 2,
+ * "C/C++ linkage mismatch"). Each decomp TU names the object with C++ linkage;
+ * the one host definition is C. The left hand side is the same identifier as the
+ * right, so the pair is one ROM object by construction. The pointer-to-member
+ * records are {code, this-delta} eight-byte pairs on both sides (/vmg /vmm, see
+ * port/CMakeLists.txt), so the C record and the C++ reader agree on layout. */
+/* defined in Vec3_VertAngle.cpp.obj */
+#pragma comment(linker, "/alternatename:?Vec3_VertAngle@@YAFPBUVector3@@0@Z=_Vec3_VertAngle")
+/* defined in ctor_runner.cpp.obj */
+#pragma comment(linker, "/alternatename:?data_02086bc8@@3P8CamPmfHost@@AEHXZQ1@=_data_02086bc8")
+#pragma comment(linker, "/alternatename:?data_02086bd0@@3P8CamPmfHost@@AEHXZQ1@=_data_02086bd0")
+#pragma comment(linker, "/alternatename:?data_02086be0@@3P8CamPmfHost@@AEHXZQ1@=_data_02086be0")
+#pragma comment(linker, "/alternatename:?data_02086be8@@3P8CamPmfHost@@AEHXZQ1@=_data_02086be8")
+#pragma comment(linker, "/alternatename:?data_02086bf0@@3P8CamPmfHost@@AEHXZQ1@=_data_02086bf0")
+#pragma comment(linker, "/alternatename:?data_02086bf8@@3P8CamPmfHost@@AEHXZQ1@=_data_02086bf8")
+#pragma comment(linker, "/alternatename:?data_02086c00@@3P8CamPmfHost@@AEHXZQ1@=_data_02086c00")
+#pragma comment(linker, "/alternatename:?data_02086c08@@3P8CamPmfHost@@AEHXZQ1@=_data_02086c08")
+#pragma comment(linker, "/alternatename:?data_02086c10@@3P8CamPmfHost@@AEHXZQ1@=_data_02086c10")
+#pragma comment(linker, "/alternatename:?data_02086c18@@3P8CamPmfHost@@AEHXZQ1@=_data_02086c18")
+#pragma comment(linker, "/alternatename:?data_02086c28@@3P8CamPmfHost@@AEHXZQ1@=_data_02086c28")
+#pragma comment(linker, "/alternatename:?data_02086c30@@3P8CamPmfHost@@AEHXZQ1@=_data_02086c30")
+#pragma comment(linker, "/alternatename:?data_02086c40@@3P8CamPmfHost@@AEHXZQ1@=_data_02086c40")
+#pragma comment(linker, "/alternatename:?data_02086c48@@3P8CamPmfHost@@AEHXZQ1@=_data_02086c48")
+#pragma comment(linker, "/alternatename:?data_02086c58@@3P8CamPmfHost@@AEHXZQ1@=_data_02086c58")
+#pragma comment(linker, "/alternatename:?data_02086c68@@3P8CamPmfHost@@AEHXZQ1@=_data_02086c68")
+#pragma comment(linker, "/alternatename:?data_02086c70@@3P8CamPmfHost@@AEHXZQ1@=_data_02086c70")
+#pragma comment(linker, "/alternatename:?data_02086c98@@3P8CamPmfHost@@AEHXZQ1@=_data_02086c98")
+#pragma comment(linker, "/alternatename:?data_02086ce0@@3P8CamPmfHost@@AEHXZQ1@=_data_02086ce0")
+#pragma comment(linker, "/alternatename:?data_02086d10@@3P8CamPmfHost@@AEHXZQ1@=_data_02086d10")
+#pragma comment(linker, "/alternatename:?data_02086d28@@3P8CamPmfHost@@AEHXZQ1@=_data_02086d28")
+#pragma comment(linker, "/alternatename:?data_02086d30@@3P8CamPmfHost@@AEHXZQ1@=_data_02086d30")
+#pragma comment(linker, "/alternatename:?data_02086d48@@3P8CamPmfHost@@AEHXZQ1@=_data_02086d48")
+#pragma comment(linker, "/alternatename:?data_02086d58@@3P8CamPmfHost@@AEHXZQ1@=_data_02086d58")
+#pragma comment(linker, "/alternatename:?data_02086d90@@3P8CamPmfHost@@AEHXZQ1@=_data_02086d90")
+#pragma comment(linker, "/alternatename:?data_02086da8@@3P8CamPmfHost@@AEHXZQ1@=_data_02086da8")
+#pragma comment(linker, "/alternatename:?data_02086db0@@3P8CamPmfHost@@AEHXZQ1@=_data_02086db0")
+#pragma comment(linker, "/alternatename:?data_02086db8@@3P8CamPmfHost@@AEHXZQ1@=_data_02086db8")
+#pragma comment(linker, "/alternatename:?data_02086dc8@@3P8CamPmfHost@@AEHXZQ1@=_data_02086dc8")
+#pragma comment(linker, "/alternatename:?data_02086dd0@@3P8CamPmfHost@@AEHXZQ1@=_data_02086dd0")
+#pragma comment(linker, "/alternatename:?data_02086de0@@3P8CamPmfHost@@AEHXZQ1@=_data_02086de0")
+#pragma comment(linker, "/alternatename:?data_02086de8@@3P8CamPmfHost@@AEHXZQ1@=_data_02086de8")
+#pragma comment(linker, "/alternatename:?data_02086df8@@3P8CamPmfHost@@AEHXZQ1@=_data_02086df8")
+#pragma comment(linker, "/alternatename:?data_02086e00@@3P8CamPmfHost@@AEHXZQ1@=_data_02086e00")
+#pragma comment(linker, "/alternatename:?data_02086e10@@3P8CamPmfHost@@AEHXZQ1@=_data_02086e10")
+#pragma comment(linker, "/alternatename:?data_02086e18@@3P8CamPmfHost@@AEHXZQ1@=_data_02086e18")
+#pragma comment(linker, "/alternatename:?data_02086e28@@3P8CamPmfHost@@AEHXZQ1@=_data_02086e28")
+#pragma comment(linker, "/alternatename:?data_02086e40@@3P8CamPmfHost@@AEHXZQ1@=_data_02086e40")
+/* defined in fader_wipes.cpp.obj */
+#pragma comment(linker, "/alternatename:?gSceneColorFader@@3UdFdColor_c@@A=_gSceneColorFader")
+/* defined in func_02043fdc_hostcopy.cpp.obj */
+#pragma comment(linker, "/alternatename:?data_02099f60@@3P8Obj@ProcessTree@@AEXXZQ12@=_data_02099f60")
+#pragma comment(linker, "/alternatename:?port_actor_interaction_begin@@YAPAXPAX@Z=_port_actor_interaction_begin")
+#pragma comment(linker, "/alternatename:?port_actor_interaction_end@@YAXPAX@Z=_port_actor_interaction_end")
+/* defined in ov074_syms.c.obj */
+#pragma comment(linker, "/alternatename:?data_ov074_0212290c@@3PAHA=_data_ov074_0212290c")
+#pragma comment(linker, "/alternatename:?data_ov074_0212291c@@3PAHA=_data_ov074_0212291c")
+#pragma comment(linker, "/alternatename:?data_ov074_02122e24@@3PAHA=_data_ov074_02122e24")
+#pragma comment(linker, "/alternatename:?data_ov074_02122e4c@@3PAMA=_data_ov074_02122e4c")
+#pragma comment(linker, "/alternatename:?data_ov074_02122e5c@@3PAPAXA=_data_ov074_02122e5c")
+/* defined in ov075_syms.c.obj */
+#pragma comment(linker, "/alternatename:?data_ov075_0211d920@@3P8dScEntry_c@@AEXXZQ1@=_data_ov075_0211d920")
+/* defined in ov098_syms.c.obj */
+#pragma comment(linker, "/alternatename:?data_ov098_0213c380@@3PAUArrowSignAssets@@A=_data_ov098_0213c380")
+/* defined in pmf3_cells.cpp.obj */
+#pragma comment(linker, "/alternatename:?data_02099e74@@3P8fBase_c@@AE_NXZQ1@=_data_02099e74")
+#pragma comment(linker, "/alternatename:?data_02099e7c@@3P8fBase_c@@AE_NXZQ1@=_data_02099e7c")
+#pragma comment(linker, "/alternatename:?data_02099e84@@3P8fBase_c@@AEXI@ZQ1@=_data_02099e84")
+#pragma comment(linker, "/alternatename:?data_02099e8c@@3P8fBase_c@@AEHXZQ1@=_data_02099e8c")
+#pragma comment(linker, "/alternatename:?data_02099e94@@3P8fBase_c@@AEXI@ZQ1@=_data_02099e94")
+#pragma comment(linker, "/alternatename:?data_02099e9c@@3P8fBase_c@@AEXI@ZQ1@=_data_02099e9c")
+#pragma comment(linker, "/alternatename:?data_02099ea4@@3P8fBase_c@@AEHXZQ1@=_data_02099ea4")
+#pragma comment(linker, "/alternatename:?data_02099eac@@3P8fBase_c@@AE_NXZQ1@=_data_02099eac")
+#pragma comment(linker, "/alternatename:?data_02099eb4@@3P8fBase_c@@AEXI@ZQ1@=_data_02099eb4")
+#pragma comment(linker, "/alternatename:?data_02099ebc@@3P8fBase_c@@AEHXZQ1@=_data_02099ebc")
+#pragma comment(linker, "/alternatename:?data_02099ec4@@3P8fBase_c@@AE_NXZQ1@=_data_02099ec4")
+#pragma comment(linker, "/alternatename:?data_02099ecc@@3P8fBase_c@@AEHXZQ1@=_data_02099ecc")
+/* defined in ptr_tables.cpp.obj */
+#pragma comment(linker, "/alternatename:?data_02086bc0@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086bc0")
+#pragma comment(linker, "/alternatename:?data_02086bd8@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086bd8")
+#pragma comment(linker, "/alternatename:?data_02086c20@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086c20")
+#pragma comment(linker, "/alternatename:?data_02086c38@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086c38")
+#pragma comment(linker, "/alternatename:?data_02086c50@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086c50")
+#pragma comment(linker, "/alternatename:?data_02086c60@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086c60")
+#pragma comment(linker, "/alternatename:?data_02086c78@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086c78")
+#pragma comment(linker, "/alternatename:?data_02086c80@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086c80")
+#pragma comment(linker, "/alternatename:?data_02086c88@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086c88")
+#pragma comment(linker, "/alternatename:?data_02086c90@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086c90")
+#pragma comment(linker, "/alternatename:?data_02086ca0@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086ca0")
+#pragma comment(linker, "/alternatename:?data_02086ca8@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086ca8")
+#pragma comment(linker, "/alternatename:?data_02086cb0@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086cb0")
+#pragma comment(linker, "/alternatename:?data_02086cb8@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086cb8")
+#pragma comment(linker, "/alternatename:?data_02086cc0@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086cc0")
+#pragma comment(linker, "/alternatename:?data_02086cd0@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086cd0")
+#pragma comment(linker, "/alternatename:?data_02086cd8@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086cd8")
+#pragma comment(linker, "/alternatename:?data_02086ce8@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086ce8")
+#pragma comment(linker, "/alternatename:?data_02086cf0@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086cf0")
+#pragma comment(linker, "/alternatename:?data_02086cf8@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086cf8")
+#pragma comment(linker, "/alternatename:?data_02086d00@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086d00")
+#pragma comment(linker, "/alternatename:?data_02086d08@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086d08")
+#pragma comment(linker, "/alternatename:?data_02086d18@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086d18")
+#pragma comment(linker, "/alternatename:?data_02086d20@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086d20")
+#pragma comment(linker, "/alternatename:?data_02086d38@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086d38")
+#pragma comment(linker, "/alternatename:?data_02086d40@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086d40")
+#pragma comment(linker, "/alternatename:?data_02086d60@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086d60")
+#pragma comment(linker, "/alternatename:?data_02086d68@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086d68")
+#pragma comment(linker, "/alternatename:?data_02086d80@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086d80")
+#pragma comment(linker, "/alternatename:?data_02086d88@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086d88")
+#pragma comment(linker, "/alternatename:?data_02086d98@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086d98")
+#pragma comment(linker, "/alternatename:?data_02086da0@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086da0")
+#pragma comment(linker, "/alternatename:?data_02086dc0@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086dc0")
+#pragma comment(linker, "/alternatename:?data_02086dd8@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086dd8")
+#pragma comment(linker, "/alternatename:?data_02086df0@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086df0")
+#pragma comment(linker, "/alternatename:?data_02086e08@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086e08")
+#pragma comment(linker, "/alternatename:?data_02086e20@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086e20")
+#pragma comment(linker, "/alternatename:?data_02086e30@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086e30")
+#pragma comment(linker, "/alternatename:?data_02086e38@@3P8CamPmfHost@@AEHPAEHH@ZQ1@=_data_02086e38")
+/* defined in scene_vs_menu.cpp.obj */
+#pragma comment(linker, "/alternatename:?port_vs_data_0211c800@@3P8dScEntry_c@@AEXXZQ1@=_port_vs_data_0211c800")

@@ -1,0 +1,43 @@
+# Run link60 Stage 4, lane NFS: the NitroSDK open-BY-NAME file system.
+#
+# THIS IS A SHORT SLICE ON PURPOSE. Nearly the whole of NitroSDK's FS is
+# already in walk_window -- the command sender, the executor, the queue, the
+# nine-entry default command table and every handler in it including the path
+# walker FSi_FindPathCommand, plus FS_OpenFileFast, FSi_ReadFileCore, FS_CloseFile,
+# myFS_ReadFile and func_0201834c. What was missing was that no port code ever
+# REGISTERED AN ARCHIVE, so the current-directory record at current_dir_pos
+# stayed zero and FSi_SendCommand faulted reading `list + 0x10` off it.
+#
+# hal/fs_names.cpp calls the ROM's own registration. Doing that pulls back in
+# the four registration TUs that slice_scene1.txt already lists and /OPT:REF
+# had dropped for want of a caller (FS_InitArchive, FS_RegisterArchiveName, FS_LoadArchive
+# and their two default read/write stubs FSi_ReadMemCallback / FSi_WriteMemCallback, plus
+# FS_FindArchive and FSi_GetPackedName). Those need no line here -- they are already
+# in a slice, they were only unreferenced.
+#
+# These three are the ones no slice carried.
+
+# FS_SetArchiveProc. Two stores into the archive's +0x48 proc and +0x4c command
+# bitmask, with the ROM's own "either both or neither" normalisation. The port
+# sets the proc for the same reason the cartridge does, and one it does not:
+# with no proc, a command 9 or 10 would index the hosted nine-entry
+# fsi_default_command off the end. Nothing sends those today.
+src/engine/fs/FS_Archive.cpp
+
+# The ROM's once-guard around FS_Init: `if (!is_init) { is_init = 1;
+# FSi_InitRom(x); }`. hal/fs_names.cpp's static initialiser calls THIS rather
+# than the face directly, with the argument -1. The ROM has TWO call sites and
+# they disagree: func_02040c34, the system init, passes -1, and func_02018aa4,
+# the file loader's lazy bring-up, passes 2. The guard means the first wins and
+# the loader cannot run before the init that gives it a heap, so -1 is what the
+# DS ends up with. The full derivation sits beside the boot object in
+# hal/fs_names.cpp. FSi_InitRom itself is a host face (the DS
+# cartridge-header mirror at 0x027FFE40 is unmapped), so it is deliberately
+# NOT listed here.
+src/engine/fs/FS_File.c
+
+# The archive WRITE function, and it is the ROM's real body rather than a face:
+# `return 1`. NitroSDK's rom archive is read-only and this is how it says so.
+# Faced it would be four lines of host code standing in for four lines of
+# matched src, which is the wrong trade in this repo.
+src/engine/fs/FS_Rom.cpp

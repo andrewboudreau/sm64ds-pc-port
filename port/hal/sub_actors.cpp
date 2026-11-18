@@ -1,0 +1,1165 @@
+// The bottom screen's own actors, and the vtables their constructors install.
+//
+// HUD (334) and Minimap (335) are the two ids the castle-grounds census has
+// been printing as "not registered, skipped" since the level boot started
+// spawning. Both are arm9 classes whose every method is matched; both are
+// spawned by Stage::LoadClsnAndObjects like everything else; and both draw
+// exclusively onto the sub screen, which is why they waited for gate 25.
+//
+// ---- the vtable -------------------------------------------------------------
+//
+// EIGHTEEN SLOTS, not the twenty the Player and the ov002 actor classes carry.
+// The ROM settles it: _ZTV8dMeter_c is ov002 0x0210c2c0 (found by the word
+// that points at its typeinfo, 0x0210c224, which sits right after the class
+// name string "8dMeter_c"), and reading forward from the vptr at +8 gives
+//
+//     0  020fda04  HUD::InitResources             9  020fd5e0  HUD::Render
+//     1  02043c78  ActorBase::BeforeInitResources 10 02043ac8  ActorBase::BeforeRender
+//     2  02013ef4  ActorDerived::AfterInitRes.    11 02043ac4  ActorBase::AfterRender
+//     3  020fd5d4  HUD::CleanupResources          12 020fd5dc  HUD::OnPendingDestroy
+//     4  02043bac  ActorBase::BeforeCleanupRes.   13 0204357c  ActorBase::Virtual34
+//     5  02043b2c  ActorBase::AfterCleanupRes.    14 0204349c  ActorBase::Virtual38
+//     6  020fd7a4  HUD::Behavior                  15 02043494  ActorBase::OnHeapCreated
+//     7  02043afc  ActorBase::BeforeBehavior      16 020fb8f8  ~HUD (D1)
+//     8  02043af8  ActorBase::AfterBehavior       17 020fb928  ~HUD (D0)
+//
+// and slot 18 is not a function pointer at all. Every one of those addresses
+// resolves to the name above in config/arm9/symbols.txt, so this is read out of
+// the ROM rather than inferred from the header -- which matters twice over.
+//
+// FIRST: filling slots 18 and 19 the way the twenty-slot classes do would write
+// past the table.
+//
+// SECOND, and this one crashed the port: EVERY shared slot here is ActorBase's
+// own, not Actor's. The twenty-slot classes in hal/actor_classes.cpp share ten
+// slots that resolve to Actor::, and copying that fill to an eighteen-slot
+// class is a heap corruption with a fifty-frame fuse. Actor::AfterInitResources
+// ends on
+//
+//     *(u32 *)(long long)(int)&mFlags |= 0x38;      /* Actor + 0xb0 */
+//
+// and dMeter_c is 124 bytes -- ActorBase::operator new(124) in the HUD's own
+// constructor. 0xb0 is 0x34 past the end of it, so that read-modify-write lands
+// in whatever the game heap handed out next. On the castle grounds that is the
+// BUTTERFLY spawned immediately before, and 0xb0 falls exactly on its
+// SceneNode's owner back-pointer: the OR turned a valid actor pointer into
+// pointer|0x38, and the next scene-tree walk dereferenced it.
+//
+// Slot 2 is the one genuine override of the three: ActorDerived::, not
+// ActorBase:: and not Actor::. The other nine are ActorBase's throughout.
+//
+// Otherwise the law is hal/actor_classes.cpp's: MSVC slot order, every entry a
+// __fastcall thunk so ecx carries `this`, every thunk calls QUALIFIED, and
+// slots the port cannot service trap by name.
+//
+// ---- _ZTV7dBase_c -----------------------------------------------------------
+//
+// Both constructors write the base vtable first and their own over it
+// (`p[0] = _ZTV7dBase_c; p[0] = _ZTV8dMeter_c;` -- the ROM's own two stores,
+// which is what the decomp recovered). Nothing dispatches through the base
+// one, so it is storage and no more.
+#include "port_d16.h"
+
+#include <cstdio>
+#include <cstdlib>
+
+#include "dActor_c.h"
+#include "fBase_c.h"
+#include "dBase_c.h"
+#include "dsstate_seg.h"
+
+extern "C" {
+/* HUD's own C-named halves: the two destructors */
+void *_ZN8dMeter_cD1Ev(void *self);
+void *_ZN8dMeter_cD0Ev(void *self);
+
+/* Minimap's own C-named halves: the two destructors and Behavior */
+void *_ZN6dMap_cD1Ev(void *self);
+void *_ZN6dMap_cD0Ev(void *self);
+int _ZN6dMap_c8BehaviorEv(void *self);
+
+/* vtable storage the constructors install by name (declared in
+   include/decl_common.h, defined nowhere until now). dMeter_c is the HUD's --
+   the ROM class name, which is what the matched constructor writes, rather
+   than the config name _ZTV8dMeter_c sits under. */
+void *_ZTV7dBase_c[18];
+void *_ZTV8dMeter_c[18];   /* vtspan: _ZTV3HUD */
+
+const char *port_actor_class_name(unsigned id);
+void port_scene_canary(const char *where);
+extern int data_0209caa0[];
+extern unsigned char gGameMode, gGamePaused, data_0209f20c, gVsExitScreenActive;
+static int port_sub_oam_nonzero(void)
+{
+    const unsigned char *p = (const unsigned char *)0x07000400;
+    int n = 0;
+    for (int i = 0; i < 1024; ++i) n += p[i] != 0;
+    return n;
+}
+extern unsigned short *gMinimapTileObjs; extern unsigned char gNumMinimapTileObjs;
+extern unsigned short *data_0209f340;
+extern char _ZN3OAM8MM_ARROWE[];
+extern signed char data_ov002_02111148; extern unsigned char gSubScreenLayers;
+extern void *gPlayers[];   /* per-player Actor* */
+extern unsigned char gLocalPlayerId;   /* local player index */
+
+/* the ov001 sprite-template mount (see port/ov001_syms.txt) */
+void port_ov001_syms_patch(void);
+void port_ov001_pack_check(void);
+}
+
+/* HUD's other five slots are real MSVC members in their own TUs, each of
+   which declares its own `struct HUD` with just the methods it defines. The
+   mangled name of a member does not depend on the class layout, so one
+   declaration here reaches all of them. include/HUD.h is deliberately NOT
+   included: it declares the same class without InitResources or Behavior. */
+struct dMeter_c {
+    int InitResources();
+    int CleanupResources();
+    int Behavior();
+    int Render();
+    void OnPendingDestroy();
+    void CalculateDigits(unsigned short n);
+    void RenderCoinCount();
+    void RenderLifeCount();
+    void RenderTimeTimer();
+    void RenderHealthMeter();
+    void UpdateHealthMeter();
+    void RenderCameraButtons();   /* PORTSYNC3: a plain member in main's include/dMeter_c.h */
+};
+
+/* Same story for the Minimap, and the same reason include/Minimap.h is not
+   included: it declares three of the four members and Render's own TU declares
+   a fourth against a struct of its own. Behavior is the odd one -- its TU
+   defines the C name taking the object as an argument, so it needs no face. */
+struct dMap_c {
+    int InitResources();
+    int CleanupResources();
+    int Render();
+    void OnPendingDestroy();
+    /* STATIC on the ROM -- it takes no `this` at all, and InitResources calls
+       it with no argument. Declaring it a member would ask the linker for
+       ?UpdateLevelSpecific@Minimap@@QAEXXZ and get the S-form's nothing. */
+    static void UpdateLevelSpecific();
+};
+
+/* UpdateLevelSpecific is the reverse shape: its own TU defines a real MSVC
+   member and InitResources calls it by the Itanium C name, so it needs a face
+   the way HUD::RenderCoinCount and friends do. */
+extern "C" void _ZN6dMap_c19UpdateLevelSpecificEv(void)
+{ dMap_c::UpdateLevelSpecific(); }
+
+// ---- the arm9 bss the Minimap reads ----------------------------------------
+//
+// Four of these are ONE STRUCT the delink split at the boundaries code happened
+// to touch, and separate host arrays would put the pieces on whatever the
+// linker chose. _Z13UpdateMinimapP11MinimapDescjjjj settles it: it writes a 16-byte descriptor to
+// data_0209f3c8 and four words to sStageGraphCallback + 0x14..0x20 -- addresses that
+// land INSIDE data_0209f3c8's own 0x20 bytes. So f3c4 and f3c8 are one object
+// and the run has to be contiguous, the mechanism hal/level_boot.cpp uses for
+// the save block. Sizes are each symbol's own delta in config/arm9/symbols.txt:
+// f3a4 +0x20, f3c4 +4, f3c8 +0x20, f3e8 +0x24.
+#define MMBLK(sec, name, size)                                    \
+    __pragma(section(sec, read, write))                           \
+    extern "C" __declspec(allocate(sec)) __declspec(align(4))     \
+    unsigned char name[size] = {0}
+
+/* data_0209f3a4 (8 Obj*, the red-coin markers) and data_0209f3e8 (9 Obj*, the
+   star markers) are src/game/stages/d_s_stage_methods.cpp's own arrays now; the f3c4/f3c8 run
+   below stays one contiguous block. */
+/* sStageGraphCallback is d_s_stage_methods.cpp's graphCallback_c now. */
+MMBLK(".dsstate$mmblk0002", data_0209f3c8, 0x20);
+
+#undef MMBLK
+
+// ---- THE MINIMAP'S AFFINE, per frame: THE ROM'S OWN BODY NOW ----------------
+//
+// BG3-sub in BG mode 3 is an EXTENDED AFFINE layer and the minimap is drawn on
+// it, so every one of its pixels goes through BG3PA..BG3PD and the BG3X/BG3Y
+// reference point. Minimap::Behavior ends in _Z13UpdateMinimapP11MinimapDescjjjj(&self->f50, ...),
+// which copies the 2x2 matrix to data_0209f3c8 and the four scalars to
+// sStageGraphCallback + 0x14..0x20 (inside data_0209f3c8's bytes, which is why the
+// run above is contiguous): +0x00 the matrix, four 20.12 words; +0x10 x, y,
+// the map-space point to put under the reference; +0x18 cx, cy, that point
+// less (128, 96).
+//
+// THE BEAT THAT SPENDS THEM IS THE ROM'S. Stage::InitResources makes
+// &sStageGraphCallback the current graphics block (gGraphCallback; the port's copy of
+// that statement is in hal/level_boot.cpp since lane K7GC2), whose vptr is
+// _ZTVN10dScStage_c15graphCallback_cE (__sinit_d_s_stage_methods.cpp), and _Z13func_02019144v's head calls that
+// block's slot 2: Stage::GraphCallback2, G2x::SetBGyAffine(REG_DB_BG3PA,
+// self + 4, the four scalars). The port stood a hand copy of that body in
+// here, port_minimap_affine_update, called from hal/sub_screen.cpp, because
+// the old src took the address of an extern register MSVC could not place at
+// 0x04001030. RETIRED (run linkfull lanes SEATS3, K7GC2): main spells it as
+// the literal pointer now, so the matched TU runs from the Stage table's slot
+// 2 (hal/arm9_tables_link100.cpp) through the port's frame beat, and the hand
+// copy, its call and its SM64DS_MINIMAP_TRACE instrument went together.
+//
+// ONE THING THE HAND COPY DID THAT THE ROM DOES NOT: it skipped the write while
+// the matrix was still all zero, before the minimap's first _Z13UpdateMinimapP11MinimapDescjjjj, to
+// keep hal/sub_screen.cpp's identity seed on screen. The ROM's body writes
+// whatever the block holds, and so does the port now.
+
+extern "C" {
+DSSTATE_BEGIN
+/* Standalone, and zero on this boot -- nothing on the castle grounds writes
+   them, so the branches they gate stay off and say nothing. */
+/* gShowRedCoinMarkers and gMapCapIconCharacters[9] are src/game/stages/d_s_stage_methods.cpp's own. */
+unsigned data_020a60a4;               /* GXS ext-palette: the saved VRAM bank */
+
+unsigned char data_0209f4a8[0x18 * 4];
+unsigned char data_0209f4a9[0x18 * 4];
+DSSTATE_END
+}
+
+// ---- the faces --------------------------------------------------------------
+//
+// HUD::Render calls its own leaves by their ITANIUM C name with `this` spelled
+// out as an argument -- `_ZN3HUD17RenderHealthMeterEv((void *)this)` -- while
+// every one of those leaves is defined in its own TU as a real MSVC
+// __thiscall member. A linker alias would hand a __thiscall body an ecx that
+// never held `this`, so each needs a real face. Same mechanism as
+// hal/method_faces.cpp.
+#define HUD_FACE(sym, meth)                                                   \
+    extern "C" void sym(void *s) { ((dMeter_c *)s)->dMeter_c::meth(); }
+
+/* Only the leaves whose own TU defines a __thiscall MEMBER. The other four --
+   RenderStarCount, RenderSilverStars, RenderRedCoins, RenderVsTimer -- define
+   the C name themselves, so a face here would be a duplicate symbol. Which of
+   the two shapes a leaf has is not a pattern to guess at: it is whichever the
+   decomp recovered, and the linker names the ones that disagree. */
+HUD_FACE(_ZN8dMeter_c15RenderCoinCountEv, RenderCoinCount)
+HUD_FACE(_ZN8dMeter_c15RenderTimeTimerEv, RenderTimeTimer)
+HUD_FACE(_ZN8dMeter_c17RenderHealthMeterEv, RenderHealthMeter)
+HUD_FACE(_ZN8dMeter_c17UpdateHealthMeterEv, UpdateHealthMeter)
+
+#undef HUD_FACE
+
+/* RenderCameraButtons is a STATIC member (no `this` at all -- it draws the two
+   arrows and the zoom button from OAM's own templates), so its face takes and
+   passes nothing. */
+extern "C" void _ZN8dMeter_c19RenderCameraButtonsEv(void *s) { ((dMeter_c *)s)->dMeter_c::RenderCameraButtons(); }
+
+/* daPly_c::IsInsideOfCannon is a real MSVC member, and HUD::RenderHealthMeter
+   reaches it as a free function taking void*. That was a C++ free function
+   when this face was written; main's mangled-declaration sweep moved
+   include/decl_Player.h into an extern "C" block, so the call is now the plain
+   name and the face follows it. The alias keeps the older C++ spelling
+   resolvable, the same shape as the other faces in this family. */
+struct daPly_c { int IsInsideOfCannon(); int Unk_020ca8f8(); };
+extern "C" int _ZN7daPly_c16IsInsideOfCannonEv(void *s)
+{ return ((daPly_c *)s)->daPly_c::IsInsideOfCannon(); }
+#pragma comment(linker, "/alternatename:?_ZN7daPly_c16IsInsideOfCannonEv@@YAHPAX@Z=__ZN7daPly_c16IsInsideOfCannonEv")
+
+/* Minimap::Behavior reaches the same class the same way: it calls
+   daPly_c::Unk_020ca8f8 -- "is he in a state that hides the minimap" -- as a
+   free C function while its own TU defines a real MSVC member. */
+extern "C" int _ZN7daPly_c12Unk_020ca8f8Ev(void *s)
+{ return ((daPly_c *)s)->daPly_c::Unk_020ca8f8(); }
+
+/* Stage::RenderBouncingArrows draws from an OamAttr template at ov001
+   0x020abd88. HUD::Render reaches it only when gShowTouchScreenArrows is set, which is
+   zeroed bss on the port's boot, so the stub below has never actually fired.
+   It says so if that ever changes.
+
+   THE OLD REASON HERE WAS WRONG, and slice_gate27.txt repeats it. This comment
+   used to say the template is one "config does not name", and concluded that
+   "naming it is a config change, not a port change". Config names it already --
+   config/arm9/overlays/ov001/symbols.txt:111 reads
+
+       _ZN3OAM14BOUNCING_ARROWE kind:data(any) addr:0x020abd88 ambiguous
+
+   -- the same `ambiguous` shape as the five HUD tables aliased at the bottom of
+   this file, and for the same reason: ov000 and ov001 share base 0x020aa420, so
+   dsd could not attribute the address. config/arm9/overlays/ov000/symbols.txt
+   :282 carries the ov000 misattribution. So this is a PORT change, and a small
+   one. The rest of the old comment does survive checking: the only two relocs
+   to 0x020abd88 are from:0x02023db4, inside Stage::RenderBouncingArrows itself
+   (its own literal pool), and ov075 from:0x02117058, the literal pool at the
+   tail of _ZN10dScEntry_c19RenderSoundSettingsEv -- both CODE, so nothing in emitted DATA points
+   at it and ovdata's pointer pass genuinely cannot pull it in.
+
+   THE SEAT LANDED (w6-c, run linkw). The four steps the paragraph below used
+   to list are all in: the template is mounted (w4-e put _ZN3OAM14BOUNCING_ARROWE
+   in port/ov001_syms.txt with the derivation), the alternatename binding the
+   matched body's func_020abd88 spelling to the mounted template sits with the
+   five HUD tables at the bottom of this file, the matched TU rides
+   port/slice_w1l5.txt, and the stub that used to sit right here is gone --
+   src/_ZN5Stage20RenderBouncingArrowsEv.cpp owns the symbol now. HUD::Render
+   is the call edge that keeps it live (gShowTouchScreenArrows-gated, zeroed bss on this
+   boot, so the arrows draw only on a level that sets it).
+
+   GUARD NOTE, because the wave-5 R1/R2 class makes this worth spelling out:
+   the alternatename below is the healthy weak-alias shape, not a defeat
+   waiting to happen. The matched TU DECLARES func_020abd88 (`extern void
+   func_020abd88(void);`) and never defines it -- the LHS stays undefined in
+   the link, the alias fires, and both names resolve to the ov001 mount's
+   template bytes. alternatename_guard sees LHS and RHS at one address: OK.
+
+   Checked rather than assumed at seat time: the matched body's six data
+   references (data_0208ee44, data_020a0db0, gGamePaused, gShowTouchScreenArrows,
+   gGameMode, sPauseState) are all in walk_window.map (most in
+   hal/auto_bss.cpp; data_0208ee44 in romdata, gGameMode in
+   Player_InitResources.cpp -- w3-c review attribution), and the
+   ten-argument OAM::Render it calls is in walk_window.map from its own
+   matched TU (_ZN3OAM6RenderEbP7OamAttriiiiiiii.cpp.obj). */
+
+/* ...and the reverse. CalculateDigits' TU is a .c file, so it defines the C
+   name, while RenderCoinCount and RenderLifeCount call it as a member. */
+extern "C" void _ZN8dMeter_c15CalculateDigitsEt(void *self, unsigned short n);
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync): src/_ZN3HUD15CalculateDigitsEt.cpp is a real HUD member since main langmode migration and emits ?CalculateDigits@HUD@@QAEXG@Z itself, so this face was the second definition (LNK2005).
+   The body is kept below under #if 0 rather than deleted, so the
+   evidence in it stays readable. */
+#if 0
+void dMeter_c::CalculateDigits(unsigned short n)
+{
+    _ZN8dMeter_c15CalculateDigitsEt(this, n);
+}
+#endif
+
+namespace {
+
+/* -1, not 0, and for the reason this whole lane exists: 0 is a VALID slot
+   index, so an unwritten slot variable reads as "slot 0 (InitResources)" --
+   exactly the false report that sent the 2026-08-16 exit-course crash to the
+   wrong slot for a session. Every trap below records its own index before
+   reporting, so this value should be unreachable; -1 makes it say so out loud
+   instead of naming an innocent slot if it ever is not. */
+int g_trap_slot = -1;
+const char *const kSlotName[18] = {
+    "InitResources", "BeforeInitResources", "AfterInitResources",
+    "CleanupResources", "BeforeCleanupResources", "AfterCleanupResources",
+    "Behavior", "BeforeBehavior", "AfterBehavior",
+    "Render", "BeforeRender", "AfterRender",
+    "OnPendingDestroy", "Virtual34", "Virtual38", "OnHeapCreated",
+    "~D1", "~D0"};
+
+/* THE SLOT NUMBER AND THE SLOT NAME WERE BOTH WRONG, and this file had the
+   right idea in only two of eighteen places. sa_fill_shared installed a bare
+   sa_trap in every slot and then overwrote 13 and 14 with thunks that record
+   their index, so the other sixteen reported whatever g_trap_slot last held --
+   its .bss zero, i.e. "slot 0 (InitResources)". On the Stage's copy of this
+   same bug that misdirection cost the 2026-08-16 exit-course report a whole
+   session (hal/stage_bridges.cpp carries the full account).
+
+   `kSlotName[g_trap_slot & 17]` is the second half of it: 17 is 0b10001, a
+   bitmask standing in for a bounds clamp, so it keeps bits 0 and 4 only. It
+   mis-named even the two slots that DID record themselves -- 13 came out as
+   kSlotName[1] "BeforeInitResources" and 14 as kSlotName[0] "InitResources".
+
+   Both fixed: a thunk per slot below, and a real range test here. */
+int __fastcall sa_trap(void *s, void *)
+{
+    const char *name = "the trap did not record its slot -- fix the thunk";
+    if (g_trap_slot >= 0 && g_trap_slot < 18)
+        name = kSlotName[g_trap_slot];
+    std::fprintf(stderr, "FATAL: %s vtable slot %d (%s) is not hosted\n",
+                 port_actor_class_name(
+                     s ? *(unsigned short *)((char *)s + 0xc) : 0u),
+                 g_trap_slot, name);
+    std::abort();
+    return 0;
+}
+
+/* The ten shared slots, every one of them reached QUALIFIED so the call cannot
+   re-dispatch through the vtable it is filling. ActorBase throughout, except
+   slot 2. */
+int __fastcall sa_binit(void *s, void *)
+{ return ((fBase_c *)s)->fBase_c::BeforeInitResources(); }
+void __fastcall sa_ainit(void *s, void *, unsigned a)
+{ ((dBase_c *)s)->dBase_c::AfterInitResources(a); }
+int __fastcall sa_bclean(void *s, void *)
+{ return ((fBase_c *)s)->fBase_c::BeforeCleanupResources(); }
+void __fastcall sa_aclean(void *s, void *, unsigned a)
+{ ((fBase_c *)s)->fBase_c::AfterCleanupResources(a); }
+int __fastcall sa_bbeh(void *s, void *)
+{ return ((fBase_c *)s)->fBase_c::BeforeBehavior(); }
+void __fastcall sa_abeh(void *s, void *, unsigned a)
+{ ((fBase_c *)s)->fBase_c::AfterBehavior(a); }
+int __fastcall sa_bren(void *s, void *)
+{ return ((fBase_c *)s)->fBase_c::BeforeRender(); }
+void __fastcall sa_aren(void *s, void *, unsigned a)
+{ ((fBase_c *)s)->fBase_c::AfterRender(a); }
+int __fastcall sa_heap(void *s, void *)
+{ return ((fBase_c *)s)->fBase_c::OnHeapCreated(); }
+#define SA_TRAP(n)                                                           \
+    int __fastcall sa_trap##n(void *s, void *) { g_trap_slot = (n); return sa_trap(s, 0); }
+SA_TRAP(0)  SA_TRAP(1)  SA_TRAP(2)  SA_TRAP(3)  SA_TRAP(4)  SA_TRAP(5)
+SA_TRAP(6)  SA_TRAP(7)  SA_TRAP(8)  SA_TRAP(9)  SA_TRAP(10) SA_TRAP(11)
+SA_TRAP(12) SA_TRAP(13) SA_TRAP(14) SA_TRAP(15) SA_TRAP(16) SA_TRAP(17)
+#undef SA_TRAP
+
+void *const sa_trap_thunk[18] = {
+    (void *)sa_trap0,  (void *)sa_trap1,  (void *)sa_trap2,  (void *)sa_trap3,
+    (void *)sa_trap4,  (void *)sa_trap5,  (void *)sa_trap6,  (void *)sa_trap7,
+    (void *)sa_trap8,  (void *)sa_trap9,  (void *)sa_trap10, (void *)sa_trap11,
+    (void *)sa_trap12, (void *)sa_trap13, (void *)sa_trap14, (void *)sa_trap15,
+    (void *)sa_trap16, (void *)sa_trap17};
+
+void sa_fill_shared(void **vt)
+{
+    for (int i = 0; i < 18; ++i) vt[i] = sa_trap_thunk[i];
+    vt[1] = (void *)sa_binit;
+    vt[2] = (void *)sa_ainit;
+    vt[4] = (void *)sa_bclean;
+    vt[5] = (void *)sa_aclean;
+    vt[7] = (void *)sa_bbeh;
+    vt[8] = (void *)sa_abeh;
+    vt[10] = (void *)sa_bren;
+    vt[11] = (void *)sa_aren;
+    /* 13 and 14 used to be re-written here with the only two self-recording
+       thunks this file had. The fill loop above now installs a self-recording
+       thunk in every slot, so those two lines said nothing the loop had not
+       already said and are gone. */
+    vt[15] = (void *)sa_heap;
+}
+
+// ---- AND THAT ALONE IS INVISIBLE, BECAUSE THE SPOT IS TAKEN -----------------
+//
+// Measured, and it is the whole reason this function has a Y offset. In VS the
+// ROM draws the STAR count on the TOP screen and the COIN count on the BOTTOM
+// screen AT THE SAME COORDINATES. Both are three sprites at y=2, x 240 / 223 /
+// 207, and they differ only in the third glyph. The engine OAM census
+// (the VS HUD probe) with the move off:
+//
+//     A OAM[3] y=2 x=240 tile=192 pal=1     A OAM[5] y=2 x=207 tile=158 pal=6
+//     B OAM[0] y=2 x=240 tile=192 pal=1     B OAM[2] y=2 x=207 tile=154 pal=0
+//
+// -- engine A is the star count, engine B is the coin count, same three slots.
+// So flipping the boolean and nothing else lands the coins on top of the star
+// count: engine A went from 6 placed sprites to 9, every one with real tile
+// data.
+//
+// AN EARLIER REVISION SAID THE TOP SCREEN CAME OUT "BYTE-IDENTICAL" AND READ
+// THAT AS THE COINS HIDING BEHIND THE STARS. The observation was real and the
+// explanation was wrong, and the difference matters now that it is fixed. That
+// capture was taken BEFORE the BG0CNT priority seat existed, when NO
+// priority-1 sprite rendered at all -- neither the coins nor the star count
+// they were supposedly hiding behind. The screen was identical because nothing
+// at that priority reached it, not because three sprites lined up.
+//
+// RE-MEASURED with the priority seat in, an offset of 0 against the
+// ROM's bottom-screen draw: 268 px on the top screen (p1), 220 px (p2), in the
+// coin block's own rows. The two triples share their coordinates but not their
+// pixels -- the third glyph differs (tile 154 pal 0 against tile 158 pal 6),
+// and the digits differ whenever the two counts do. So a dy of 0 does not hide
+// the coins, it draws them ON the star count, which is worse than either.
+//
+// The coins therefore go to the top screen at the ROM's own x and one sprite
+// row DOWN, stacked under the star count on the same right edge, which is the
+// only free slot that keeps "where they are on the bottom screen" true
+// horizontally.
+// An environment variable sets the offset; 18 is the default and the number is
+// the one thing here that is a judgement rather than a measurement, so it is a
+// variable and it is going to the owner with a capture rather than being
+// asserted.
+//
+// WHY IT IS HOSTED HERE RATHER THAN PATCHED. RenderCoinCount is not a vtable
+// slot; it is a direct call from inside HUD::Render, which is matched src this
+// lane may not touch. So the port stands in for HUD::Render's VS ARM ONLY --
+// the ROM's own four leaves in the ROM's own order behind the ROM's own two
+// guards -- and substitutes a copy of the coin leaf. RenderVsTimer,
+// RenderStarCount and RenderCameraButtons are the ROM's, called unchanged.
+// Anything that is not the VS arm (adventure, the paused branch, the
+// data_0209fc9c early-out) falls through to HUD::Render untouched.
+//
+// THE ROM'S BOTTOM-SCREEN DRAW IS SUPPRESSED, and that is not an overreach: the
+// ask is a MOVE, and leaving the sub-screen copy standing would be a duplicate
+// rather than a move.
+//
+// Its off switch puts the coins back on the bottom screen on the same
+// binary, which is also how the before/after capture pair is taken.
+// The offset variable moves the stack; 0 puts the coins back on the star
+// count's own coordinates, which is how the 268 px overlap above is reproduced.
+extern "C" {
+void _ZN8dMeter_c13RenderVsTimerEv(void *self);
+void _ZN8dMeter_c15RenderStarCountEv(void *self);
+void _ZN8dMeter_c19RenderCameraButtonsEv(void *self);
+void _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(int sub, void *attr, int x, int y,
+                                              int a, int b, void *m);
+extern void *func_020aba70[];    /* the ten digit sprites          */
+extern char func_020ab9c8;       /* the glyph at the running x     */
+extern char func_020abad8;       /* the coin glyph, x - 0x10       */
+extern unsigned short gNumCoins[];   /* per-player coin counts */
+extern unsigned char data_0209fc9c;      /* HUD::Render's VS early-out */
+}
+
+
+// ---- THE ADVENTURE STAR AND LIFE COUNTS, MOVED TO THE TOP SCREEN -----------
+//
+// The mirror image of the VS coin move above, and Tango's ask on the round-2
+// HUD captures: in adventure the WHOLE HUD -- meter, coins, stars, lives --
+// belongs on the TOP screen, and the bottom screen keeps only the minimap.
+//
+// WHERE THE ROM DRAWS THEM TODAY, all four measured in adventure play:
+//
+//     RenderHealthMeter   OAM::Render(0, ...)   engine A / TOP    (unchanged)
+//     RenderCoinCount     OAM::Render(0, ...)   engine A / TOP    (else-arm; unchanged)
+//     RenderStarCount     OAM::Render(1, ...)   engine B / BOTTOM (default arm)
+//     RenderLifeCount     RenderSub / (1, ...)  engine B / BOTTOM (else arm)
+//
+// So meter and coins are already up top; only the star count and the life count
+// are still on the sub screen. This moves those two, and only in adventure.
+//
+// WHY THE WHOLE ARM IS REPRODUCED RATHER THAN THE TWO LEAVES. RenderStarCount
+// owns its own C symbol in src/ (a free function taking HUD*), so a host face
+// for it would be a duplicate definition -- unlike RenderCoinCount, which the
+// VS move above never had to touch. And the two leaves are reached from inside
+// HUD::Render, which is matched src this lane may not edit. So the port stands
+// in for HUD::Render's ADVENTURE arm the same way the block above stands in for
+// its VS arm: the ROM's own leaves in the ROM's own order behind the ROM's own
+// guards, calling the ROM's RenderHealthMeter / RenderCoinCount / RenderRedCoins
+// / RenderSilverStars / RenderTimeTimer / RenderCameraButtons UNCHANGED, and
+// substituting a top-screen copy of the star and life leaves. Anything that is
+// not the adventure arm -- VS (gGameMode == 1), and want=0 -- falls straight
+// through to HUD::Render untouched, so VS placement is byte-for-byte the ROM's.
+//
+// THE ROM'S BOTTOM-SCREEN DRAW IS SUPPRESSED because returning 1 skips
+// HUD::Render entirely; leaving it standing would be a duplicate rather than a
+// move, the same reasoning as the coin block.
+//
+// ---- THE COORDINATES, and the one judgement in here --------------------------
+//
+// The star and life copies keep the ROM's own x, digit sprites and suppression;
+// only the target engine (and, for the star, a y offset) changes.
+//
+//   LIFE: the ROM's own TOP form already exists -- RenderLifeCount's
+//   state-3..6 arm draws the icon with the ten-argument OAM::Render(0, ...) at
+//   scale 0x1000 and the glyph/digits at sub=0. This copy is that arm verbatim,
+//   run unconditionally. In normal play xBase (unk6E) is 0x10, so life lands at
+//   the TOP-LEFT corner -- clear of the meter (x=0x80) and the coins (x~0xcf+).
+//   life_dy defaults to 0 (SM64DS_ADV_LIFE_TOP_Y).
+//
+//   STAR: the ROM's default arm draws the count at x=unk70 (0xF0 in normal
+//   play), digits at y=2 -- the top-right corner. Tango's round-3 pick puts the
+//   star on that top row and the coin one row below it (the swap of the 0.3.4
+//   layout, which had the coin on top and star below at +18). So the star draws
+//   at the ROM's y with no offset: star_dy defaults to 0 (SM64DS_ADV_STAR_TOP_Y),
+//   and the coin leaf below carries the +18 instead. The star's own
+//   special-state arm (already sub=0 / TOP in the ROM) is reproduced unchanged,
+//   no offset: those are cutscene states where the ROM itself puts the star on
+//   top and the coins are not in the corner.
+//
+//   COIN: the ROM's adventure arm already draws the coin count on the TOP screen
+//   (engine A) at the same top-right y=2 the star now holds. port_adv_coin_count_top
+//   is a copy of that arm carrying coin_dy so the coin sits one sprite row DOWN,
+//   under the star on the same right edge. coin_dy defaults to 18
+//   (SM64DS_ADV_COIN_TOP_Y); it is the judgement number now, and it goes to the
+//   owner with a capture.
+//
+// SM64DS_ADV_HUD_TOP=0 leaves the ROM alone (star+life back on the bottom) on
+// the same binary, which is how the before/after capture pair is taken.
+extern "C" {
+void _ZN8dMeter_c17RenderHealthMeterEv(void *self);
+void _ZN8dMeter_c15RenderCoinCountEv(void *self);
+void _ZN8dMeter_c14RenderRedCoinsEv(void *self);
+void _ZN8dMeter_c17RenderSilverStarsEv(void *self);
+void _ZN8dMeter_c15RenderTimeTimerEv(void *self);
+void _ZN10dScStage_c20RenderBouncingArrowsEv(void);
+int _ZN5Event6GetBitEj(unsigned int);
+void port_sa_oam_render10(int sub, void *attr, int x,
+                                                 int y, int e, int f, int g,
+                                                 int h, int i, int j);
+#pragma comment(linker, "/alternatename:_port_sa_oam_render10=?Render@OAM@@SAX_NPAUOamAttr@@HHHHHHHH@Z")  /* catchup1 round 2 (moved out of an #if 0 block in round 3): the ROM name _ZN3OAM6RenderEbP7OamAttriiiiiiii is the C++ overload in src */
+extern char func_020abad0;                 /* OAM::POWER_STAR icon           */
+extern void *func_020ab948[];              /* OAM::LIFE_ICONS, per-health    */
+extern signed char gNumStageStars[];        /* per-player collectible counts  */
+extern unsigned char gPrevReturnState;        /* the star arm's mode `m`        */
+extern unsigned char gMeterCounterSlideState;  /* the star/life sub-state        */
+extern unsigned char gNewStarCollected;
+extern unsigned char gLevelClearStep;
+extern int data_020a0db0;
+extern signed char gNumLives;          /* the life count value           */
+extern unsigned char gShowTouchScreenArrows;        /* the bouncing-arrow gate        */
+extern unsigned char _Z8NumStarsv(void);
+}
+
+/* src/_ZN3HUD15RenderStarCountEv.cpp's adventure (gGameMode != 1) arm,
+   verbatim except the default block's OAM::Render leading argument is 0 (engine
+   A) instead of 1 and its y carries dy. The special-state block is already
+   sub=0 in the ROM and is copied unchanged. digits[3] is at HUD+0x74, x at
+   HUD+0x70. */
+/* FIELDUI1 (U7): the ROM slides the life and star counters on and off the top screen around a death, a level clear and a level start
+   (gMeterCounterSlideState states 3..6; the counters then settle on the DS bottom screen). The port draws both on the one picture, so the slide
+   reads as the HUD flying away and back for nothing. In a single-screen layout the counters are drawn at their resting x for the whole slide
+   (the ROM's fields and its state machine are untouched: only the drawn x is held); the stacked two-screen layout keeps the ROM's slide. */
+extern "C" int port_hud_slide_pinned(void);
+static inline int hud_slide_state(void)
+{
+    /* HUDMENU2 (H2, Tango 10-20): slide IN like the DS (state 3), never back OUT: the slide-out (5) and the bottom screen's own
+       slide-in (6) are drawn at rest. The ROM's fields and state machine are untouched. */
+    return gMeterCounterSlideState >= 5 && gMeterCounterSlideState <= 6 && port_hud_slide_pinned();
+}
+/* HUDMENU2 (H11): how far the ROM moved each counter this tick (DS pixels, the raw field before the one-screen pin), for the pictures between two
+   ticks (message_compositor.cpp's slide note, walk_window.cpp's ip_build): while the counters slide in they glide at the display rate. */
+extern "C" int g_port_hud_dlx = 0, g_port_hud_dsx = 0;
+static int g_hud_lx_prev = -30000, g_hud_sx_prev = -30000;
+static void port_adv_star_count_top(dMeter_c *self, int dy)
+{
+    {
+        const int sxr = *(short *)((char *)self + 0x70);
+        g_port_hud_dsx = g_hud_sx_prev == -30000 ? 0 : sxr - g_hud_sx_prev;
+        g_hud_sx_prev = sxr;
+    }
+#ifndef PORT_ROM_CLEAN
+    {   /* HUDMENU2 proof arm: SM64DS_HUD_SLIDE_IN=<n> puts the counters where a course start leaves them on the n-th HUD frame (state 2, both counters off screen,
+           star mode 1), so the ROM's own slide in (state 3, 4 pixels a tick) runs and a picture series can show it */
+        static int at = -2, cnt = 0;
+        if (at == -2) { const char *e = std::getenv("SM64DS_HUD_SLIDE_IN"); at = e ? std::atoi(e) : -1; }
+        if (at >= 0 && ++cnt == at) {
+            gPrevReturnState = 1;
+            gMeterCounterSlideState = 2;
+            *(short *)((char *)self + 0x6e) = -0x3A;
+            *(short *)((char *)self + 0x70) = 0x120 + 0x1b;
+            std::fprintf(stderr, "[hudslide] hud frame %d: counters off screen, slide state 2\n", cnt);
+        }
+    }
+#endif
+    int x = *(short *)((char *)self + 0x70);
+    if (hud_slide_state() && x > 0xf0) x = 0xf0;
+    const signed char *digits = (const signed char *)((char *)self + 0x74);
+    int i;
+
+    self->CalculateDigits(_Z8NumStarsv());
+
+    {
+        unsigned char m = gPrevReturnState;
+        if ((m != 2 && gMeterCounterSlideState == 4) ||
+            (m == 1 && gMeterCounterSlideState >= 3 && gMeterCounterSlideState < 6)) {
+            int flag;
+            if (gNewStarCollected != 0) {
+                if (gLevelClearStep == 3 && (data_020a0db0 & 0x18) == 0)
+                    flag = 0;
+                else
+                    flag = 1;
+            } else {
+                flag = 1;
+            }
+            if (flag == 0)
+                return;
+            for (i = 2; i >= 0; i--) {
+                if (digits[i] >= 0) {
+                    _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(0, func_020aba70[digits[i]], x, 2, -1, 1, 0);
+                    x -= 9;
+                }
+            }
+            _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(0, &func_020ab9c8, x, 10, -1, 1, 0);
+            _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(0, &func_020abad0, x - 16, 10, -1, 1, 0);
+            return;
+        }
+    }
+
+    for (i = 2; i >= 0; i--) {
+        if (digits[i] >= 0) {
+            _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(0, func_020aba70[digits[i]], x, 2 + dy, -1, 1, 0);
+            x -= 9;
+        }
+    }
+    _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(0, &func_020ab9c8, x, 10 + dy, -1, 1, 0);
+    _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(0, &func_020abad0, x - 16, 10 + dy, -1, 1, 0);
+}
+
+/* src/_ZN3HUD15RenderLifeCountEv.cpp's own TOP arm (its state-3..6 branch),
+   run unconditionally: the icon via the ten-argument OAM::Render(0, ...) at
+   scale 0x1000, glyph and digits at sub=0. xBase is at HUD+0x6e, digits at
+   HUD+0x74. */
+static void port_adv_life_count_top(dMeter_c *self, int dy)
+{
+    unsigned char idx = gLocalPlayerId;
+    const unsigned char *info = (const unsigned char *)gPlayers[idx];
+    int face = info[0x6d9];
+    short xBase = *(short *)((char *)self + 0x6e);
+    g_port_hud_dlx = g_hud_lx_prev == -30000 ? 0 : xBase - g_hud_lx_prev;
+    g_hud_lx_prev = xBase;
+    if (hud_slide_state() && xBase < 0x10) xBase = 0x10;
+    const signed char *digits = (const signed char *)((char *)self + 0x74);
+
+    port_sa_oam_render10(0, func_020ab948[face], xBase, 0xa + dy, -1, 1, 0x1000, 0x1000, 0, -1);
+    _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(0, &func_020ab9c8, xBase + 0x10, 0xa + dy, -1, 1, 0);
+    self->CalculateDigits((unsigned short)gNumLives);
+    int x = xBase + 0x18;
+    for (int i = 0; i < 3; i++) {
+        signed char d = digits[i];
+        if (d >= 0) {
+            _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(0, func_020aba70[d], x, 2 + dy, -1, 1, 0);
+            x += 9;
+        }
+    }
+}
+
+/* src/_ZN3HUD15RenderCoinCountEv.cpp's adventure (else, gGameMode != 1)
+   arm, verbatim except the three OAM::Render calls carry dy so the coin count
+   now sits one sprite row BELOW the star count instead of on the top row it
+   used to hold. Leaf-copied here -- not the ROM's RenderCoinCount face -- only
+   so the y offset can be applied; the leading engine argument stays the ROM's
+   own 0 (engine A / TOP), and the ROM's SublevelToLevel==0x1d suppression is
+   kept unchanged. digits[3] is at HUD+0x74. coin_dy defaults to 18. */
+extern "C" {
+int SublevelToLevel(int i);
+extern signed char gCurrentSublevel;
+}
+static void port_adv_coin_count_top(dMeter_c *self, int dy)
+{
+    if (SublevelToLevel(gCurrentSublevel) == 0x1d)
+        return;
+    int sb = 0xf0;
+    self->CalculateDigits(gNumCoins[gLocalPlayerId]);
+    const signed char *digits = (const signed char *)((char *)self + 0x74);
+    for (int i = 2; i >= 0; i--) {
+        const signed char d = digits[i];
+        if (d >= 0) {
+            _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(0, func_020aba70[d],
+                                                     sb, 2 + dy, -1, 1, 0);
+            sb -= 9;
+        }
+    }
+    _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(0, &func_020ab9c8, sb, 0xa + dy,
+                                             -1, 1, 0);
+    _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(0, &func_020abad8, sb - 0x10,
+                                             2 + dy, -1, 1, 0);
+}
+
+/* src/_ZN3HUD15RenderTimeTimerEv.cpp, verbatim except every y carries dy.
+ *
+ * THE COURSE TIMER MOVES DOWN WITH THE COINS. The cartridge draws the timer
+ * one row under the coin count: coin digits at y 2, timer digits at y 0x16 and
+ * its TIME / ' / " glyphs at y 0x1e, all on the top-right. This arm moved the
+ * coin count down by coin_dy to make room for the star count on the top row,
+ * which put the coins exactly on the timer's rows (digits at 2 + 18 = 20
+ * against the timer's 22), and the coins, drawn first, took the sprite
+ * priority tie: the timer sat behind them. Shifting the timer by the same
+ * coin_dy keeps the ROM's own coin-to-timer spacing (0x16 - 2 = 20 rows) under
+ * the moved coin row, so the three rows stack the way the cartridge stacks its
+ * two. The x positions, glyphs, digit split, language test and the 99'59"99
+ * cap are the ROM's; the one guard, gShowRaceTimer, is the ROM's "a timer
+ * is running on this course" byte that the player's floor check sets on the
+ * slide's start floor (src/game/player/Player.cpp:2606-2616).
+ *
+ * SM64DS_TIMER_TRACE=1 prints the Timer's raw GetTime and the time the HUD
+ * shows, once every 30 calls (one second of ticks at the course divider), so
+ * the rate can be read against the cartridge's: 33514000 / 64 timer counts a
+ * second (the ROM's own divisor below). */
+extern "C" {
+extern unsigned char gShowRaceTimer;  /* a timer is on this course    */
+extern int gRaceTimer;                  /* the course Timer object      */
+extern char _ZN3OAM13TIME_FR_IT_ESE;           /* TIME glyph, languages 2/4/5  */
+extern char _ZN3OAM4TIMEE;                 /* TIME glyph                   */
+extern char _ZN3OAM7MINUTESE;              /* the ' glyph                  */
+extern char _ZN3OAM7SECONDSE;           /* the " glyph                  */
+extern unsigned long long _ZN5Timer7GetTimeEv(void *);
+int GetOwnerLanguage(void);
+}
+static void port_adv_time_timer_top(int dy)
+{
+    if (gShowRaceTimer == 0)
+        return;
+
+    const unsigned long long raw = _ZN5Timer7GetTimeEv(&gRaceTimer);
+    const unsigned long long t = raw << 6;
+    unsigned long long sec = t / 33514000;
+    unsigned long long centi = t / 33514 % 1000 / 10;
+    unsigned long long min = sec / 60;
+    sec = sec % 60;
+    if (min >= 100) {
+        min = 99;
+        sec = 59;
+        centi = 99;
+    }
+
+    {
+        static int trace = -1, calls;
+        if (trace < 0) trace = std::getenv("SM64DS_TIMER_TRACE") != 0;
+        if (trace && (calls++ % 30) == 0) {
+            std::fprintf(stderr, "[timer] call %d GetTime %llu shows %02u'%02u\"%02u\n",
+                         calls - 1, raw, (unsigned)min, (unsigned)sec,
+                         (unsigned)centi);
+            std::fflush(stderr);
+        }
+    }
+
+    const int lang = GetOwnerLanguage();
+    void *label = (lang == 5 || lang == 4 || lang == 2)
+                      ? (void *)&_ZN3OAM13TIME_FR_IT_ESE : (void *)&_ZN3OAM4TIMEE;
+    if (min / 10 != 0) {
+        port_sa_oam_render10(0, label, 0xa4, 0x1e + dy, -1, 1,
+                                                    0x1000, 0x1000, 0, -1);
+        _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(0, func_020aba70[min / 10], 0xb8,
+                                                 0x16 + dy, -1, 1, 0);
+    } else {
+        port_sa_oam_render10(0, label, 0xac, 0x1e + dy, -1, 1,
+                                                    0x1000, 0x1000, 0, -1);
+    }
+    _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(0, func_020aba70[min % 10], 0xc0, 0x16 + dy, -1, 1, 0);
+    _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(0, &_ZN3OAM7MINUTESE, 0xc4, 0x1e + dy, -1, 1, 0);
+    _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(0, func_020aba70[sec / 10], 0xcf, 0x16 + dy, -1, 1, 0);
+    _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(0, func_020aba70[sec % 10], 0xd7, 0x16 + dy, -1, 1, 0);
+    _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(0, &_ZN3OAM7SECONDSE, 0xdb, 0x1e + dy, -1, 1, 0);
+    _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(0, func_020aba70[centi / 10], 0xe8, 0x16 + dy, -1, 1, 0);
+    _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(0, func_020aba70[centi % 10], 0xf0, 0x16 + dy, -1, 1, 0);
+}
+
+/* THE RED-COIN AND SILVER-STAR ROWS, MOVED TO THE BOTTOM-LEFT (Tango, forum
+ * thread "Red coin HUD icons and Silver Stars HUD icons overlap with the life
+ * counter", 0.5.0). A LAYOUT CHOICE OF THE PORT'S, NOT THE CARTRIDGE'S.
+ *
+ * The cartridge draws both rows at the top-left of the top screen, x = 0x10,
+ * y = 0xa, with the red coins dropping to y = 0x1c when silver stars hold the
+ * row (src/_ZN3HUD14RenderRedCoinsEv.cpp, src/_ZN3HUD17RenderSilverStarsEv.cpp),
+ * and it can, because its life counter is on the BOTTOM screen. This arm put
+ * the life counter on the top screen at that same corner (xBase 0x10, y 0xa,
+ * above), so both rows landed on it. Tango's placement: silver stars at the
+ * bottom-left, red coins above them, and the two swap so the kind collected
+ * FIRST is on the bottom row. The rows keep the ROM's own sprites, x start and
+ * x step (0xb red, 0x11 silver) and the ROM's row spacing (0x1c - 0xa = 0x12),
+ * mirrored to the bottom edge: the bottom row's top at 0xa6 leaves the same 10
+ * rows under a 16-row sprite that 0xa leaves above one. Counts are the ROM's
+ * (gNumRedCoins red, gNumStageStars silver, per player).
+ *
+ * SM64DS_ADV_RS_BOTTOM=0 draws the two rows through the ROM's own leaves again
+ * (top-left, over the lives), on the same exe. */
+extern "C" {
+extern signed char gNumRedCoins[];         /* per-player red-coin counts     */
+extern char _ZN3OAM8RED_COINE;           /* the red-coin HUD sprite        */
+extern int data_ov001_020abac8[];          /* the silver-star HUD sprite     */
+}
+/* This frame's meter note, written by the adventure HUD arm below, read and cleared by hal/message_compositor.cpp. */
+extern "C" { int g_port_hdmeter_live; int g_port_hdmeter_y; int g_port_hdmeter_health; int g_port_meter_drawn; extern unsigned char gMeterShownHealth; }
+static void port_adv_red_silver_bottom(void)
+{
+    static int first;                /* 0 none yet, 1 red coins, 2 silver stars */
+    const int idx = gLocalPlayerId;
+    const int red = (unsigned char)gNumRedCoins[idx];
+    const int silver = (unsigned short)(short)gNumStageStars[idx];
+    if (!red && !silver)
+        first = 0;
+    else if (!first)
+        first = silver ? 2 : 1;      /* both on one frame: silver below */
+    /* HUDTWEAK1 (player ask, "N64 Accurate HUD Positioning"): both rows sit 14 DS pixels lower than the first bottom-left
+       placement (0xa6), the silver row's sprites ending 4 rows above the screen edge. */
+    const int bottom = 0xa6 + 14, above = 0xa6 + 14 - 0x12;
+    const int red_y = (first == 1 || !silver) ? bottom : above;
+    const int silver_y = (first == 2 || !red) ? bottom : above;
+    for (int i = 0; i < red; i++)
+        _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(0, &_ZN3OAM8RED_COINE,
+                                                 0x10 + i * 0xb, red_y, -1, 1, 0);
+    for (int i = 0; i < silver; i++)
+        _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(0, data_ov001_020abac8,
+                                                 0x10 + i * 0x11, silver_y, -1, 1,
+                                                 0);
+}
+
+/* Returns 1 when it has drawn the whole adventure arm itself and the caller
+   must NOT also run HUD::Render; 0 means "not my case, run the ROM's". */
+static int port_adv_hud_render_stars_lives_on_top(dMeter_c *self)
+{
+    static int want = -1, star_dy = 0, coin_dy = 18, life_dy = 0;
+    static int rs_bottom = 1;
+    if (want < 0) {
+        const char *rs = std::getenv("SM64DS_ADV_RS_BOTTOM");
+        rs_bottom = (rs && rs[0] == '0') ? 0 : 1;
+        const char *e = std::getenv("SM64DS_ADV_HUD_TOP");
+        want = (e && e[0] == '0') ? 0 : 1;
+        e = std::getenv("SM64DS_ADV_STAR_TOP_Y");
+        if (e) star_dy = std::atoi(e);
+        e = std::getenv("SM64DS_ADV_COIN_TOP_Y");
+        if (e) coin_dy = std::atoi(e);
+        e = std::getenv("SM64DS_ADV_LIFE_TOP_Y");
+        if (e) life_dy = std::atoi(e);
+        if (star_dy < 0) star_dy = 0; if (star_dy > 160) star_dy = 160;
+        if (coin_dy < 0) coin_dy = 0; if (coin_dy > 160) coin_dy = 160;
+        if (life_dy < 0) life_dy = 0; if (life_dy > 160) life_dy = 160;
+    }
+    if (!want)
+        return 0;
+    if (gGameMode == 1)          /* VS -> the ROM leaf, byte-for-byte */
+        return 0;
+
+    /* HUD::Render's else (adventure) arm, in its own order. Every leaf but the
+       two counts is the ROM's, called through the faces above. */
+    if ((data_0209caa0[2] & 0x80) == 0)
+        return 1;                     /* the ROM's `goto end`: nothing drawn */
+
+    unsigned char v = data_0209f20c;
+    if (((gGamePaused | v | gVsExitScreenActive) & 0xff) == 0) {
+        /* Tell the compositor where the ROM puts the meter this frame (mHealthMeterY, +0x68) and which wedge count it picked
+           (the ROM's displayed count), so host-side art can be drawn over the footprint. The ROM still draws
+           its own sprites; the compositor swaps them only when such art is present, and only for the languages whose frame carries the
+           English POWER label (the ROM's branch: not Spanish 5, not French / Italian 2 / 4). */
+        {
+            const int lang = GetOwnerLanguage();
+            g_port_hdmeter_y = *(short *)((char *)self + 0x68);
+            g_port_hdmeter_health = gMeterShownHealth;
+            g_port_hdmeter_live = (lang != 5 && lang != 4 && lang != 2) ? 1 : 0;
+            g_port_meter_drawn = 1;   /* SLICE1: the ROM draws the power meter this frame, in every language (the N64 row's meter shift keys on it) */
+        }
+        _ZN8dMeter_c17RenderHealthMeterEv((void *)self);
+        if (_ZN5Event6GetBitEj(0x1d) == 0) {
+            port_adv_coin_count_top(self, coin_dy);
+            if (rs_bottom) {
+                port_adv_red_silver_bottom();
+            } else {
+                _ZN8dMeter_c14RenderRedCoinsEv((void *)self);
+                _ZN8dMeter_c17RenderSilverStarsEv((void *)self);
+            }
+            port_adv_time_timer_top(coin_dy);
+        }
+        /* SM64DS_BOUNCE_ARROWS=1 RAISES THE ROM'S OWN CUE, and raises nothing
+           else. gShowTouchScreenArrows is the word HUD::Render reads to decide whether
+           the "look at the other screen" arrows are drawn this frame; the game
+           sets it on a map event (a warp pipe, a sign, a boss gate: Player.cpp
+           and _Z17CapIconMgr_CommitijP10dCapIcon_c among others) and clears it a few seconds
+           later. On a headless run nothing raises it, so the cue cannot be
+           MEASURED -- and the improved map moves those arrows, so it has to
+           be. Setting the game's own word is the cheapest honest way to put the
+           cue on screen: from here on it is the ROM's code that decides the
+           form, the position, the bounce and the sound, exactly as it does in
+           play. Unset, this is not compiled out but it does nothing at all. */
+        {
+            static int force = -1;
+            if (force < 0) {
+                const char *e = std::getenv("SM64DS_BOUNCE_ARROWS");
+                force = (e && *e && *e != '0') ? 1 : 0;
+            }
+            if (force) gShowTouchScreenArrows = 1;
+        }
+        if (gShowTouchScreenArrows != 0)
+            _ZN10dScStage_c20RenderBouncingArrowsEv();
+    } else {
+        if (v != 0) {
+            port_adv_life_count_top(self, life_dy);
+            port_adv_star_count_top(self, star_dy);
+        }
+    }
+
+    unsigned char v2 = data_0209f20c;
+    if ((gGamePaused | v2 | gVsExitScreenActive) & 0xff) {
+        if (v2 == 0)
+            return 1;
+        if (gLevelClearStep >= 3)
+            return 1;
+    }
+    port_adv_star_count_top(self, star_dy);
+    _ZN8dMeter_c19RenderCameraButtonsEv((void *)self);
+    port_adv_life_count_top(self, life_dy);
+    return 1;
+}
+
+// ---- HUD -------------------------------------------------------------------
+int __fastcall hud_init(void *s, void *) { return ((dMeter_c *)s)->dMeter_c::InitResources(); }
+/* run mp1 lane STARREF1: the live HUD, for a host-side reader (the HUD is
+   an fBase actor, not in dActor_c's list, so FindWithActorID(0x14e) never finds
+   it; the match clock units are at HUD+0x60). Set on every Behavior, cleared on
+   cleanup. Read only by a host-side caller. */
+extern "C" void *port_hud_self;
+void *port_hud_self;
+int __fastcall hud_clean(void *s, void *) { port_hud_self = nullptr; return ((dMeter_c *)s)->dMeter_c::CleanupResources(); }
+int __fastcall hud_behavior(void *s, void *) { port_hud_self = s; return ((dMeter_c *)s)->dMeter_c::Behavior(); }
+int __fastcall hud_render(void *s, void *)
+{
+    /* SM64DS_HUD_TRACE=1: the two globals every HUD render leaf dereferences
+       before it draws anything -- the per-player Actor table and the local
+       player index. A null there faults inside a matched leaf at a small
+       offset, which reads as a codegen bug and is not one. */
+    static int on = -1;
+    if (on < 0) on = std::getenv("SM64DS_HUD_TRACE") != 0;
+    if (on) {
+        static int said;
+        if (said < 3) {
+            ++said;
+            std::printf("  [hud] render: this=%p f394[0]=%p f250=%u "
+                        "caa0[8]=%02x f2d8=%u f2c4|f20c|f294=%02x oam=%d\n", s,
+                        (void *)gPlayers[0], (unsigned)gLocalPlayerId,
+                        (unsigned)((unsigned char *)data_0209caa0)[8],
+                        (unsigned)gGameMode,
+                        (unsigned)(gGamePaused | data_0209f20c | gVsExitScreenActive),
+                        port_sub_oam_nonzero());
+        }
+    }
+    /* the adventure star/life move; answers 0 on VS and on want=0, and the
+       ROM's own Render runs then exactly as before */
+    if (port_adv_hud_render_stars_lives_on_top((dMeter_c *)s))
+        return 1;
+    return ((dMeter_c *)s)->dMeter_c::Render();
+}
+/* PORTSYNC3: called from the top of the real dMeter_c::Render (hostgen row, since the
+   class carries the compiler's vtable and hud_render's slot is never dispatched). */
+}  // namespace
+extern "C" int port_hud_render_hook(void *s)
+{
+    if (port_adv_hud_render_stars_lives_on_top((dMeter_c *)s))
+        return 1;
+    return 0;
+}
+namespace {
+void __fastcall hud_pdes(void *s, void *) { ((dMeter_c *)s)->dMeter_c::OnPendingDestroy(); }
+void *__fastcall hud_d1(void *s, void *) { return _ZN8dMeter_cD1Ev(s); }
+void *__fastcall hud_d0(void *s, void *) { return _ZN8dMeter_cD0Ev(s); }
+
+}  // namespace
+
+extern "C" void hal_fill_hud_vtable(void)
+{
+    void **vt = _ZTV8dMeter_c;
+    sa_fill_shared(vt);
+    vt[0] = (void *)hud_init;
+    vt[3] = (void *)hud_clean;
+    vt[6] = (void *)hud_behavior;
+    vt[9] = (void *)hud_render;
+    vt[12] = (void *)hud_pdes;
+    vt[16] = (void *)PORT_D16(hud_d1);
+    vt[17] = (void *)hud_d0;
+    /* the base table is never dispatched through, but a null slot in it would
+       be indistinguishable from a bug if one ever were */
+    for (int i = 0; i < 18; ++i) _ZTV7dBase_c[i] = sa_trap_thunk[i];
+
+    /* the sprite templates the render leaves index, and the pointer pass that
+       puts OAM::NUMBERS' ten digit pointers on host addresses */
+    port_ov001_syms_patch();
+    port_ov001_pack_check();
+}
+
+// The cross-overlay pointer tables used to be hand-written here.
+//
+// OAM::MM_PLAYER_ICONS is a pointer table in ov002 (0x0210c174) whose entries
+// all point into ov001, at the MM_*_ICON OamAttr records at 0x020ab800..0x920.
+// ovdata's per-mount pointer pass rewrites pointers whose TARGET is inside the
+// same mount, and each mount is its own invocation, so this one came out
+// holding DS addresses and OAM::RenderSub was handed 0x020ab800 -- which read
+// as "the minimap draws its map and no player marker", because the OAM entry
+// it built out of whatever sat at that host address was not a sprite.
+//
+// port_cross_patch() (tools/ovdata.py --cross) now does this and every other
+// crossing, from relocs.txt rather than from a table copied out of the ROM by
+// hand. It reproduces the sixteen entries this function used to write, in the
+// same order, and adds the seventeenth the ROM table has and this did not, the
+// aliasing copy inside port_ov002_gap_0210c168, and forty-odd more between the
+// actor overlays. The harnesses call it next to port_ov002_patch().
+
+extern "C" __declspec(dllimport) int __stdcall VirtualProtect(void *, size_t, unsigned long, unsigned long *);
+/* MPSYNC1: the same for the HUD. Its real vtable is the dMeter_c class TU's, so hud_behavior / hud_clean above (which keep
+   port_hud_self, the live HUD a host-side caller reads the match clock units from) are never called. Slots 3 (Cleanup) and
+   6 (Behavior) of that table are wrapped: the wrapper keeps port_hud_self and runs what the table held. */
+extern "C" void *wide_dmeter_vtable[];
+#pragma comment(linker, "/alternatename:_wide_dmeter_vtable=??_7dMeter_c@@6B@")
+static int (__fastcall *g_dmeter_clean_orig)(void *, void *) = 0;
+static int (__fastcall *g_dmeter_behavior_orig)(void *, void *) = 0;
+static int __fastcall dmeter_clean_wrap(void *s, void *e)
+{ port_hud_self = nullptr; return g_dmeter_clean_orig(s, e); }
+static int __fastcall dmeter_behavior_wrap(void *s, void *e)
+{ port_hud_self = s; return g_dmeter_behavior_orig(s, e); }
+static void seat_hud_wrap(void)
+{
+#if defined(_WIN32) && defined(_MSC_VER) && defined(_M_IX86)
+    static bool done = false;
+    if (done) return;
+    done = true;
+    struct Slot { int idx; void *wrap; void **orig; } rows[2] = {
+        { 3, (void *)dmeter_clean_wrap, (void **)&g_dmeter_clean_orig },
+        { 6, (void *)dmeter_behavior_wrap, (void **)&g_dmeter_behavior_orig } };
+    for (int k = 0; k < 2; ++k) {
+        void **cell = &wide_dmeter_vtable[rows[k].idx];
+        unsigned long old = 0;
+        if (!VirtualProtect(cell, sizeof(void *), 0x04, &old)) continue;
+        *rows[k].orig = *cell;
+        *cell = rows[k].wrap;
+        VirtualProtect(cell, sizeof(void *), old, &old);
+        std::fprintf(stderr, "[mpsync] hud vtable slot %d wrapped\n", rows[k].idx);
+    }
+#endif
+}
+
+
+/* The Minimap's row keeps a fill for the HUD wrap above alone. dMap_c is a
+   native class, so the constructor installs the class TU's own table
+   ??_7dMap_c@@6B@ and the minimap dispatches that unchanged; the host table
+   _ZTV6dMap_c this used to fill was never read. */
+extern "C" void hal_fill_minimap_vtable(void)
+{
+    seat_hud_wrap();
+}
+
+// ---- the ov001 name aliases -------------------------------------------------
+//
+// The HUD's render TUs name six sprite tables by address because dsd could
+// not attribute them: ov000 and ov001 share the base 0x020aa420, and ov000
+// holds filename strings where ov001 holds OamAttr records. config names all
+// six in ov001, and both names are DATA at the same address, so each alias is
+// exact -- no calling convention to get wrong. The sixth is the bouncing-arrow
+// template Stage::RenderBouncingArrows draws from (the w4-e mount, seated
+// w6-c; see the seat note above).
+#pragma comment(linker, "/alternatename:_func_020ab948=__ZN3OAM10LIFE_ICONSE")
+#pragma comment(linker, "/alternatename:_func_020ab9c8=__ZN3OAM5TIMESE")
+#pragma comment(linker, "/alternatename:_func_020aba70=__ZN3OAM7NUMBERSE")
+#pragma comment(linker, "/alternatename:_func_020abad0=__ZN3OAM10POWER_STARE")
+#pragma comment(linker, "/alternatename:_func_020abad8=__ZN3OAM4COINE")
+#pragma comment(linker, "/alternatename:_func_020abd88=__ZN3OAM14BOUNCING_ARROWE")
+/* the same table under its ov000-prefixed misattribution, which one TU uses */
+#pragma comment(linker, "/alternatename:_data_ov000_020aba70=__ZN3OAM7NUMBERSE")
+#pragma comment(linker, "/alternatename:_data_ov000_020ab9c8=__ZN3OAM5TIMESE")
+
+// ---- C++-mangled references onto C-named definitions -----------------------
+//
+// The HUD's leaves declare their callees inside `namespace OAM { ... }` or as
+// plain C++ free functions, so MSVC emits C++ manglings for symbols that are
+// C-named everywhere else in the port. Every one of these is cdecl on both
+// sides, so the alias is exact -- the mechanism hal/cxx_aliases.cpp documents.
+/* RE-POINTED at ALIAS2 (wave 8, the main -> port sync), lane ALIAS's
+   derivation: the right hand side this row carried is defined nowhere in
+   the link any more. same member, same convention, same 7 argument slots, types spelled differently
+   was: #pragma comment(linker, "/alternatename:?Render@OAM@@YAX_NPAUOamAttr@@HHHHPAUMatrix2x2@@@Z=__ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2") */
+#pragma comment(linker, "/alternatename:?Render@OAM@@YAX_NPAUOamAttr@@HHHHPAUMatrix2x2@@@Z=?Render@OAM@@SAH_NPAUOamAttr@@HHHHPAUMatrix2x2@@@Z")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEFEATED: the left hand side is a real definition in this link now (_ZN3OAM9RenderSubEP7OamAttriiii.cpp.obj), so the directive is inert and alternatename_guard fails on it. */
+// #pragma comment(linker, "/alternatename:?RenderSub@OAM@@SAXPAUOamAttr@@HHHH@Z=__ZN3OAM9RenderSubEP7OamAttriiii")
+#pragma comment(linker, "/alternatename:?GetOwnerLanguage@@YAHXZ=_GetOwnerLanguage")
+#pragma comment(linker, "/alternatename:?_ZN5Timer7GetTimeEv@@YA_KPAX@Z=__ZN5Timer7GetTimeEv")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEFEATED: the left hand side is a real definition in this link now (GX_LoadOBJPltt.cpp.obj), so the directive is inert and alternatename_guard fails on it. */
+// #pragma comment(linker, "/alternatename:?LoadOBJPltt@GX@@YAXPBXII@Z=_GX_LoadOBJPltt")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEFEATED: the left hand side is a real definition in this link now (GXS_LoadOBJPltt.cpp.obj), so the directive is inert and alternatename_guard fails on it. */
+// #pragma comment(linker, "/alternatename:?LoadOBJPltt@GXS@@YAXPBXII@Z=_GXS_LoadOBJPltt")
+#pragma comment(linker, "/alternatename:?data_0209fc9c@@3EA=_data_0209fc9c")
+#pragma comment(linker, "/alternatename:?data_ov002_0210c29c@@3PAHA=_data_ov002_0210c29c")
+#pragma comment(linker, "/alternatename:?data_ov002_0210c310@@3PAFA=_data_ov002_0210c310")
+#pragma comment(linker, "/alternatename:?gMeterCounterSlideState@@3EA=_gMeterCounterSlideState")
+#pragma comment(linker, "/alternatename:?GiveLives@@YAXH@Z=_GiveLives")
+
+/* The same for the Minimap's: its InitResources declares these at file scope
+   OUTSIDE the extern "C" block, so MSVC asks for a C++ mangling of storage the
+   rest of the port owns under the C name. */
+#pragma comment(linker, "/alternatename:?gNumMinimapTileObjs@@3EA=_gNumMinimapTileObjs")
+#pragma comment(linker, "/alternatename:?gMinimapTileObjs@@3PAGA=_gMinimapTileObjs")
+#pragma comment(linker, "/alternatename:?gPlayers@@3PAPAXA=_gPlayers")
+#pragma comment(linker, "/alternatename:?gSubScreenLayers@@3EA=_gSubScreenLayers")
+#pragma comment(linker, "/alternatename:?data_ov002_02111148@@3CA=_data_ov002_02111148")
+#pragma comment(linker, "/alternatename:?data_ov002_02111150@@3EA=_data_ov002_02111150")
+#pragma comment(linker, "/alternatename:?data_ov002_0211064c@@3UState@@A=_data_ov002_0211064c")
+#pragma comment(linker, "/alternatename:?data_ov002_02110664@@3UState@@A=_data_ov002_02110664")
+/* RE-POINTED at ALIAS2 (wave 8, the main -> port sync), lane ALIAS's
+   derivation: the right hand side this row carried is defined nowhere in
+   the link any more. same member, same convention, same 0 argument slots, types spelled differently
+   was: #pragma comment(linker, "/alternatename:?GetBG3CharPtr@G2S@@YAPAXXZ=_G2S_GetBG3CharPtr") */
+#pragma comment(linker, "/alternatename:?GetBG3CharPtr@G2S@@YAPAXXZ=?GetBG3CharPtr@G2S@@YAIXZ")
+/* RE-POINTED at ALIAS2 (wave 8, the main -> port sync), lane ALIAS's
+   derivation: the right hand side this row carried is defined nowhere in
+   the link any more. same member, same convention, same 1 argument slots, types spelled differently
+   was: #pragma comment(linker, "/alternatename:?GetBit@Event@@SAHI@Z=__ZN5Event6GetBitEj") */
+#pragma comment(linker, "/alternatename:?GetBit@Event@@SAHI@Z=?GetBit@Event@@YAHI@Z")
+#pragma comment(linker, "/alternatename:?SublevelToLevel@@YAHH@Z=_SublevelToLevel")
+
+/* OAM's camera-button templates are static DATA members of class OAM in the
+   TU that draws them, and ov002 data named _ZN3OAM..E in the mount. */
+#pragma comment(linker, "/alternatename:?CAM_BUTTON_L@OAM@@2UOamAttr@@A=__ZN3OAM12CAM_BUTTON_LE")
+#pragma comment(linker, "/alternatename:?CAM_BUTTON_R@OAM@@2UOamAttr@@A=__ZN3OAM12CAM_BUTTON_RE")
+#pragma comment(linker, "/alternatename:?CAM_BUTTON_L_PRESSED@OAM@@2UOamAttr@@A=__ZN3OAM20CAM_BUTTON_L_PRESSEDE")
+#pragma comment(linker, "/alternatename:?CAM_BUTTON_R_PRESSED@OAM@@2UOamAttr@@A=__ZN3OAM20CAM_BUTTON_R_PRESSEDE")
+#pragma comment(linker, "/alternatename:?S_CAM_BUTTON_L@OAM@@2UOamAttr@@A=__ZN3OAM14S_CAM_BUTTON_LE")
+#pragma comment(linker, "/alternatename:?S_CAM_BUTTON_R@OAM@@2UOamAttr@@A=__ZN3OAM14S_CAM_BUTTON_RE")
+#pragma comment(linker, "/alternatename:?S_CAM_BUTTON_L_PRESSED@OAM@@2UOamAttr@@A=__ZN3OAM22S_CAM_BUTTON_L_PRESSEDE")
+#pragma comment(linker, "/alternatename:?S_CAM_BUTTON_R_PRESSED@OAM@@2UOamAttr@@A=__ZN3OAM22S_CAM_BUTTON_R_PRESSEDE")
+#pragma comment(linker, "/alternatename:?CAM_ZOOM_BUTTON@OAM@@2UOamAttr@@A=__ZN3OAM15CAM_ZOOM_BUTTONE")
+#pragma comment(linker, "/alternatename:?CAM_ZOOM_BUTTON_PRESSED@OAM@@2UOamAttr@@A=__ZN3OAM23CAM_ZOOM_BUTTON_PRESSEDE")
+#pragma comment(linker, "/alternatename:?S_CAM_ZOOM_BUTTON@OAM@@2UOamAttr@@A=__ZN3OAM17S_CAM_ZOOM_BUTTONE")
+#pragma comment(linker, "/alternatename:?S_CAM_ZOOM_BUTTON_PRESSED@OAM@@2UOamAttr@@A=__ZN3OAM25S_CAM_ZOOM_BUTTON_PRESSEDE")
+
+/* catchup1 round 3: d_s_stage_methods.cpp defines sStageGraphCallback. The C name reaches that storage: */
+#pragma comment(linker, "/alternatename:_sStageGraphCallback=?sStageGraphCallback@@3VgraphCallback_c@dScStage_c@@A")

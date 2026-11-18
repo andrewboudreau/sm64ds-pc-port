@@ -1,0 +1,198 @@
+# ov004: the MINIGAME SCENE FRAMEWORK's data, all of it.
+#
+# ov004 is dScMgBase_c, d_Scene_MiniGame_Base -- the base class the twenty-three
+# Rec Room minigames in ov006 derive from, plus the option screen's touch icon
+# (N10dMgPsOpt_c11TouchIcon_cE). It is the third occupant of the scene slot at
+# 0x020ad660 to be mounted, after ov003 and ov007, and it is the only one of the
+# six that is never loaded on its own: func_0201a798 loads it as a PASSENGER of
+# ov006 and func_0201a754 unloads the pair together. See
+# port/ov004_ov007_2d_map.txt for the entry chain and port/ov004_ov006_binding_diff.txt
+# for what the mount did to the cross pass.
+#
+# NOTHING BOOTS THIS SCENE YET and this mount does not change that. walk_window
+# runs the ov002 occupant, none of ov004's 276 matched source TUs is compiled
+# in, and no host caller reaches any symbol below. The mount puts every byte of
+# ov004's read-only, initialised and zero data on the host under its ROM name
+# and at its ROM spacing, so the TU wiring and the minigame scene boot have
+# storage to resolve against.
+#
+# WHY ALL 597. --pack fills the space BETWEEN mounted symbols with zeroed
+# padding, not with ROM bytes, so a partial mount of a contiguous section leaves
+# holes of zeros wherever a symbol was skipped and any walk that steps across
+# one reads zeros where the ROM had content. Mounting every data-kind and
+# bss-kind symbol dsd names -- 3 in .rodata, 510 in .data, 84 in .bss -- makes
+# the run contiguous from 0x020b944c to 0x020bfec0, 27252 bytes of span holding
+# 24832 bytes of named symbols.
+#
+# THE ONE GAP IS 2420 BYTES AND IT IS NOT ZERO IN THE ROM. It runs 0x020b948c to
+# 0x020b9e00 and it is not a hole in the data: it is the whole of .init
+# (0x020b948c..0x020b9de4, ARM code), the whole of .ctor
+# (0x020b9de4..0x020b9df4) and twelve bytes of alignment padding. A data walk
+# does not cross a code section, and the emitter has been zeroing ROM content
+# under pack padding since the first packed mount -- 220 of the 245 pack gaps in
+# this build cover non-zero ROM bytes. This gap is the same class and the safest
+# member of it. Recorded because ov007's header could say its one gap was zero
+# in the ROM too, and this one cannot.
+#
+# THE FOUR .ctor ENTRIES ARE DELIBERATELY ABSENT, and not because they are
+# uninteresting. dsd names them `.p__sinit_ov004_020b948c` and so on, with a
+# leading dot, which is not a valid C identifier; ovdata would emit
+# `u8 .p__sinit_ov004_020b948c[4]` and the compile would fail. The config holds
+# 308 names that are not C identifiers, 305 of them .ctor words spelled this way
+# and the other three itcm kind:label(arm) names. ovdata now refuses a requested
+# name that is not an identifier rather than emitting broken C. Leaving the table out is also the right answer on its own terms: the four
+# words hold DS addresses of .init code this mount does not host, so hosting
+# them would give a ctor walk four addresses that resolve to nothing, while the
+# zeroed padding reads as an immediately-terminated table.
+#
+# THE FOUR SINITS ARE INVENTORIED AND NOT WIRED. The ROM overlay table gives
+# ov004 a static-init range of 0x020b9de4..0x020b9df8, five words: four function
+# pointers and a NULL terminator. They are
+#
+#   __sinit_ov004_020b948c  0xd0 bytes     __sinit_unit020b4aa4.cpp  0x54 bytes
+#   __sinit_ov004_020b955c  0x574 bytes    __sinit_d_mg_ps_opt.cpp  0x2c0 bytes
+#
+# None of the four is compiled in and nothing calls them. They are named here so
+# that the lane which does boot a minigame scene has the set already counted and
+# does not rediscover it. (ov003 and ov007 have none; ov002 has 26; ov006 31.)
+#
+# SIX SIZES ARE PINNED, all one pattern and the same one ov007 and ov003 hit:
+# dsd named a halfword table at byte 0 and again at byte 2 because the code
+# addresses the two columns separately, so the ROM delta to the next symbol is
+# 2 while ovdata's default size is max(4, delta). The four-byte floor makes the
+# first column overlap the second and --pack refuses the layout. Pinning the
+# first to its real ROM width lets --pack lay the second immediately after. The
+# widths are the ROM's, read off config/arm9/overlays/ov004/symbols.txt:
+#
+#   sPsOptIconPosA   2    sPsOptIconPosB   2    sPsOptStylePos   2
+#   sPsOptIconPosAY   2    sPsOptIconPosBY   2    sPsOptStylePosY   2
+#
+# THE MOUNT IS NOT A LINKAGE CLAIM. Mounted bytes are not matched TUs, so the
+# linked count does not move for them.
+sMgCounterMaxByDigits sMgBrushPalette sMgCoinRiseFrames data_ov004_020b9e00 data_ov004_020b9e04 data_ov004_020b9e08
+data_ov004_020b9e0c data_ov004_020b9e10 data_ov004_020b9e14 data_ov004_020b9e18 data_ov004_020b9e1c data_ov004_020b9e20
+data_ov004_020b9e24 data_ov004_020b9e28 data_ov004_020b9e2c data_ov004_020b9e30 data_ov004_020b9e34 data_ov004_020b9e38
+data_ov004_020b9e3c data_ov004_020b9e40 data_ov004_020b9e44 data_ov004_020b9e48 data_ov004_020b9e4c sMgMsgSuperEsperSpritesEnglish
+data_ov004_020b9e54 data_ov004_020b9e58 data_ov004_020b9e5c data_ov004_020b9e60 data_ov004_020b9e64 data_ov004_020b9e68
+data_ov004_020b9e6c sMgMsgNoPairSpritesEnglish data_ov004_020b9e74 sMgMsgFullHouseSpritesEnglish sMgMsgTimeOverSpritesEnglish data_ov004_020b9e80
+data_ov004_020b9e84 data_ov004_020b9e88 sMgMsgQuitSpritesEnglish sMgMsgYouWinSpritesEnglish data_ov004_020b9e94 sMgMsgRetrySpritesEnglish
+data_ov004_020b9e9c data_ov004_020b9ea0 sMgMsgGoalSpritesEnglish sMgMsgHateSpritesEnglish data_ov004_020b9eac data_ov004_020b9eb0
+data_ov004_020b9eb4 sMgMsgPerfectSpritesEnglish sMgMsgWhereSpritesEnglish data_ov004_020b9ec0 data_ov004_020b9ec4 data_ov004_020b9ec8
+data_ov004_020b9ecc data_ov004_020b9ed0 sMgMsgTooBadSpritesEnglish data_ov004_020b9ed8 data_ov004_020b9edc data_ov004_020b9ee0
+sMgMsgLikeSpritesEnglish sMgMsgFiveCardSpritesEnglish data_ov004_020b9eec sMgMsgLoveSpritesEnglish data_ov004_020b9ef4 data_ov004_020b9ef8
+sMgMsgTwoPairSpritesEnglish data_ov004_020b9f00 data_ov004_020b9f04 data_ov004_020b9f08 sMgMsgEsperSpritesEnglish data_ov004_020b9f10
+data_ov004_020b9f14 data_ov004_020b9f18 data_ov004_020b9f1c data_ov004_020b9f20 data_ov004_020b9f24 data_ov004_020b9f28
+sMgMsgLevelClearSpritesEnglish data_ov004_020b9f30 data_ov004_020b9f34 data_ov004_020b9f38 data_ov004_020b9f3c data_ov004_020b9f40
+data_ov004_020b9f44 data_ov004_020b9f48 data_ov004_020b9f4c data_ov004_020b9f50 sMgMsgGiveUpSprites data_ov004_020b9f58
+sMgMsgResultHiScoreSpritesEnglish sMgMsgOnePairSpritesEnglish data_ov004_020b9f64 data_ov004_020b9f68 data_ov004_020b9f6c data_ov004_020b9f70
+data_ov004_020b9f74 sMgMsgStartSpritesEnglish sMgMsgDislikeSpritesEnglish data_ov004_020b9f80 data_ov004_020b9f84 sMgMsgThreeCardSpritesEnglish
+data_ov004_020b9f8c data_ov004_020b9f90 data_ov004_020b9f94 data_ov004_020b9f98 data_ov004_020b9f9c sMgMsgLevelSpritesEnglish
+data_ov004_020b9fa4 data_ov004_020b9fa8 data_ov004_020b9fac data_ov004_020b9fb0 data_ov004_020b9fb4 data_ov004_020b9fb8
+data_ov004_020b9fbc data_ov004_020b9fc0 data_ov004_020b9fc4 sMgMsgFourCardSpritesEnglish data_ov004_020b9fcc data_ov004_020b9fd0
+data_ov004_020b9fd4 sMgMsgHiScoreSpritesEnglish data_ov004_020b9fdc data_ov004_020b9fe0 data_ov004_020b9fe4 data_ov004_020b9fe8
+data_ov004_020b9fec data_ov004_020b9ff0 data_ov004_020b9ff4 data_ov004_020b9ff8 sMgMsgDrawSpritesEnglish data_ov004_020ba000
+data_ov004_020ba004 data_ov004_020ba008 data_ov004_020ba00c sMgMsgGameOverSpritesEnglish data_ov004_020ba014 data_ov004_020ba018
+data_ov004_020ba01c data_ov004_020ba020 data_ov004_020ba024 data_ov004_020ba028 data_ov004_020ba02c data_ov004_020ba030
+data_ov004_020ba034 data_ov004_020ba054 data_ov004_020ba074 data_ov004_020ba094 data_ov004_020ba0b4 data_ov004_020ba0d4
+data_ov004_020ba0f4 data_ov004_020ba114 data_ov004_020ba134 data_ov004_020ba154 data_ov004_020ba174 data_ov004_020ba194
+data_ov004_020ba1b4 data_ov004_020ba1d4 data_ov004_020ba1f4 data_ov004_020ba214 data_ov004_020ba234 data_ov004_020ba254
+data_ov004_020ba274 data_ov004_020ba294 data_ov004_020ba2b4 data_ov004_020ba2d4 data_ov004_020ba2f4 data_ov004_020ba314
+data_ov004_020ba334 data_ov004_020ba354 data_ov004_020ba374 data_ov004_020ba394 data_ov004_020ba3b4 data_ov004_020ba3d4
+data_ov004_020ba3f4 data_ov004_020ba414 data_ov004_020ba43c data_ov004_020ba464 data_ov004_020ba48c data_ov004_020ba4b4
+data_ov004_020ba4dc data_ov004_020ba504 data_ov004_020ba52c data_ov004_020ba554 data_ov004_020ba57c data_ov004_020ba5a4
+data_ov004_020ba5cc data_ov004_020ba5f4 data_ov004_020ba61c data_ov004_020ba644 data_ov004_020ba674 data_ov004_020ba6a4
+data_ov004_020ba6d4 data_ov004_020ba704 data_ov004_020ba734 data_ov004_020ba764 data_ov004_020ba794 data_ov004_020ba7c4
+data_ov004_020ba7f4 data_ov004_020ba824 data_ov004_020ba854 data_ov004_020ba884 data_ov004_020ba8b4 data_ov004_020ba8e4
+data_ov004_020ba914 data_ov004_020ba944 data_ov004_020ba974 data_ov004_020ba9a4 data_ov004_020ba9d4 data_ov004_020baa04
+data_ov004_020baa34 data_ov004_020baa64 data_ov004_020baa9c data_ov004_020baad4 data_ov004_020bab0c data_ov004_020bab44
+data_ov004_020bab7c data_ov004_020baba8 data_ov004_020babb4 data_ov004_020babec data_ov004_020babf0 data_ov004_020bac24
+data_ov004_020bac5c data_ov004_020bac94 data_ov004_020baccc data_ov004_020bad04 data_ov004_020bad10 data_ov004_020bad3c
+data_ov004_020bad74 data_ov004_020badac data_ov004_020bade4 data_ov004_020bae1c data_ov004_020bae54 data_ov004_020bae8c
+data_ov004_020baec4 data_ov004_020baefc data_ov004_020baf34 data_ov004_020baf6c data_ov004_020bafac data_ov004_020bafec
+data_ov004_020bb02c data_ov004_020bb06c data_ov004_020bb0ac data_ov004_020bb0ec data_ov004_020bb12c data_ov004_020bb16c
+data_ov004_020bb1ac data_ov004_020bb1ec data_ov004_020bb22c data_ov004_020bb26c data_ov004_020bb2ac data_ov004_020bb2ec
+data_ov004_020bb32c data_ov004_020bb36c data_ov004_020bb3ac data_ov004_020bb3ec data_ov004_020bb434 data_ov004_020bb47c
+data_ov004_020bb4c4 data_ov004_020bb50c data_ov004_020bb554 data_ov004_020bb59c data_ov004_020bb5e4 data_ov004_020bb62c
+data_ov004_020bb674 data_ov004_020bb6bc data_ov004_020bb70c data_ov004_020bb75c data_ov004_020bb7ac data_ov004_020bb804
+data_ov004_020bb85c data_ov004_020bb8b4 data_ov004_020bb90c data_ov004_020bb964 data_ov004_020bb9bc data_ov004_020bba14
+data_ov004_020bba6c data_ov004_020bbac4 data_ov004_020bbb1c data_ov004_020bbb7c data_ov004_020bbbdc data_ov004_020bbc44
+data_ov004_020bbcac data_ov004_020bbd14 data_ov004_020bbd7c data_ov004_020bbdec data_ov004_020bbe5c data_ov004_020bbecc
+data_ov004_020bbf4c@0x020bbf4c data_ov004_020bbf54@0x020bbf54 data_ov004_020bbf5c@0x020bbf5c data_ov004_020bbf64@0x020bbf64 _ZTI11dScMgBase_c _ZTIN11dScMgBase_c15graphCallback_cE
+_ZTS11dScMgBase_c sMgMenuScreenByLanguage sMgSpriteTables sMgMenuItem1SpritesByLanguage sMgMenuItem2SpritesByLanguage sMgStockCounterFiles
+sMgPauseBgNcgByLanguage sMgOptionNcgByLanguage sMgMenuItem0SpritesByLanguage data_ov004_020bc03c _ZTSN11dScMgBase_c15graphCallback_cE sMgSceneKindByGame
+data_ov004_020bc0c0 sMgBannerButtonsArmed
+pmf_Banner_UpdateWave
+pmf_Banner_DrawSpin
+pmf_Banner_DrawWave
+pmf_Banner_UpdateSpin pmf_Banner_UpdatePressed
+pmf_Banner_UpdatePressed_2
+pmf_Banner_DrawPressed sMgBannerGfxSlotCharNo sMgMsgWhereSpritesByLanguage sMgMsgLikeSpritesByLanguage
+sMgMsgLoveSpritesByLanguage sMgMsgDislikeSpritesByLanguage sMgMsgEsperSpritesByLanguage sMgMsgSuperEsperSpritesByLanguage sMgMsgGoalSpritesByLanguage sMgMsgOnePairNcgByLanguage
+sMgMsgTwoPairNcgByLanguage sMgMsgFourCardNcgByLanguage sMgMsgHateSpritesByLanguage sMgMsgFiveCardNcgByLanguage sMgMsgDrawNcgByLanguage sMgMsgNoPairNcgByLanguage
+sMgMsgTimeOverSpritesByLanguage sMgMsgGameOverNcgByLanguage sMgMsgLevelClearNcgByLanguage sMgMsgHiScoreNcgByLanguage sMgMsgPerfectNcgByLanguage sMgMsgResultHiScoreNcgByLanguage
+sMgMsgQuitNcgByLanguage sMgMsgRetryNcgByLanguage sMgMsgLevelNcgByLanguage sMgMsgTooBadNcgByLanguage sMgMsgYouWinNcgByLanguage sMgMsgWhereNcgByLanguage
+sMgMsgLikeNcgByLanguage sMgMsgLoveNcgByLanguage sMgMsgDislikeNcgByLanguage sMgMsgEsperNcgByLanguage sMgMsgSuperEsperNcgByLanguage sMgMsgGoalNcgByLanguage
+sMgMsgNoPairSpritesByLanguage sMgMsgOnePairSpritesByLanguage sMgMsgTwoPairSpritesByLanguage sMgMsgThreeCardSpritesByLanguage sMgMsgFourCardSpritesByLanguage sMgMsgFiveCardSpritesByLanguage
+sMgMsgHateNcgByLanguage sMgMsgDrawSpritesByLanguage sMgMsgFullHouseSpritesByLanguage sMgMsgGameOverSpritesByLanguage sMgMsgTimeOverNcgByLanguage sMgMsgLevelClearSpritesByLanguage
+sMgMsgHiScoreSpritesByLanguage sMgMsgPerfectSpritesByLanguage sMgMsgStartNcgByLanguage sMgMsgResultHiScoreSpritesByLanguage sMgMsgQuitSpritesByLanguage sMgMsgRetrySpritesByLanguage
+sMgMsgStartSpritesByLanguage sMgMsgLevelSpritesByLanguage sMgMsgTooBadSpritesByLanguage sMgMsgYouWinSpritesByLanguage sMgMsgFullHouseNcgByLanguage sMgMsgThreeCardNcgByLanguage
+sMgBannerFileTemplate sMgCoinsBetCap gMgCoinsShowDelta
+sMgCoinsButtonSprites sMgCoinsDeltaSprites sMgScoreX sMgRecordBannerX sMgDrawBannerY
+sMgScoreDigitsX sMgWinBannerY sMgResultsBannerY sMgDrawBannerX sMgQuitX sMgScoreDigitsY
+sMgRetryBannerY sMgLoseBannerX sMgRecordBannerY sMgClearBannerX sMgClearBannerY sMgResultsBannerX
+sMgWinBannerX sMgLoseBannerY sMgRetryBannerX sMgPlayAgainY sMgScoreY sMgNextBanner
+sMgQuitY sMgPlayAgainX sMgTopBannerY sMgTopBannerX sMgMainBannerY sMgMainBannerX
+pmf_dMgState_c_NextRound_Update pmf_dMgState_c_RoundBanner5_Update pmf_dMgState_c_DrawScore pmf_dMgState_c_RetryPrompt_Update pmf_dMgState_c_UpdateRetryFadeOut pmf_dMgState_c_Results_Update
+pmf_dMgState_c_Win_Update pmf_dMgState_c_Lose_Update pmf_dMgState_c_UpdateRetryPrompt pmf_dMgState_c_UpdateGameOverToMenu pmf_dMgState_c_LoseResume_Update pmf_dMgState_c_UpdateRetryFadeOut_2
+pmf_dMgState_c_DrawRecordTable pmf_dMgState_c_GameOver_Update pmf_dMgState_c_Draw_Enter pmf_dMgState_c_Tie_Enter pmf_dMgState_c_UpdateAfterHidden pmf_dMgState_c_LoseResume_Enter
+pmf_dMgState_c_Lose_Enter pmf_dMgState_c_Win_Enter pmf_dMgState_c_RetryPrompt_Enter pmf_dMgState_c_RoundBanner5_Enter pmf_dMgState_c_NextRound_Enter pmf_dMgState_c_RoundClear_Enter
+pmf_dMgState_c_RoundClearTop_Enter pmf_dMgState_c_RetryPromptB_Enter pmf_dMgState_c_UpdateGameOverToMenu_2 pmf_dMgState_c_UpdateFadeThenResume pmf_dMgState_c_ScoreThenRound_Enter pmf_dMgState_c_RetryPromptWide_Enter
+pmf_dMgState_c_UpdateWaitThenResume pmf_dMgState_c_UpdateWaitThenResume_2 pmf_dMgState_c_DigitsThenRound_Enter pmf_dMgState_c_DrawScoreDigits pmf_dMgState_c_ResultsNewRecord_Update pmf_dMgState_c_BannerEThenRound_Enter
+pmf_dMgState_c_Results_Enter pmf_dMgState_c_RoundClearTop_Update pmf_dMgState_c_ResultsNewRecord_Enter pmf_dMgState_c_GameOver_Enter pmf_dMgState_c_RetryPromptB_Update pmf_dMgState_c_UpdateFadeThenResume_2
+pmf_dMgState_c_Finished_Enter pmf_dMgState_c_UpdateRetryFadeOut_3 pmf_dMgState_c_RoundClear_Update pmf_dMgState_c_ScoreThenRound_Update pmf_dMgState_c_DrawRecordTable_2 pmf_dMgState_c_Finished_Update
+pmf_dMgState_c_RetryPromptWideB_Enter sMgStateTextSpritesByLanguage sPsOptSoundPrevSprite sPsOptSoundNextSprite _ZTIN10dMgPsOpt_c11TouchIcon_cE _ZTVN10dMgPsOpt_c11TouchIcon_cE
+_ZTSN10dMgPsOpt_c11TouchIcon_cE data_ov004_020bcaa0 data_ov004_020bd074 data_ov004_020bd698 data_ov004_020bd828 data_ov004_020bdccc
+data_ov004_020be34c data_ov004_020be9ec data_ov004_020be9f4 data_ov004_020be9fc data_ov004_020bea04 data_ov004_020bea0c
+data_ov004_020bea14 sMgMenuBgPltt sMgMenuSubBgPltt sMgWorkBuffer sMgPaintWord gMgScene
+sMgTopScreenYOffset sMgSparkleSpritesGuard data_ov004_020beb7c@0x020beb7c
+sMgBannerGfxSlotUsed sBannerWaveFxGravityGuard sBannerZoomFxGravityGuard sBannerWaveFxGravity
+sBannerZoomFxGravity sBannerZoomFxGravityDtorRec sBannerWaveFxGravityDtorRec data_ov004_020bf41c@0x020bf41c
+gMgCoinsStatus sMgCoinsDelta
+sMgCoinsBetPlaced sMgCoinsSoundPending sMgCoinsLastLostAlt sMgCoinsPayoutLeft sMgCoinsToStep sMgCoinsIndex
+sMgCoinsWait sMgCoinsLastReturned sMgCoinsLastSpent sMgCoinsLaunchPending sMgCoinsLastLost gMgCoinsInPlay
+sMgCoinsSlowLaunches sMgCoinsStep sMgCoinsDeltaShown data_ov004_020bfa28 sMgCoinsVisible
+data_ov004_020bfd04@0x020bfd04 data_ov004_020bfd08@0x020bfd08 data_ov004_020bfda8 data_ov004_020bfdb4 data_ov004_020bfdc0 data_ov004_020bfdcc
+data_ov004_020bfdd8 data_ov004_020bfde4 data_ov004_020bfdf0 data_ov004_020bfdfc data_ov004_020bfe08 data_ov004_020bfe14
+data_ov004_020bfe20 data_ov004_020bfe2c data_ov004_020bfe38 data_ov004_020bfe44 data_ov004_020bfe50 data_ov004_020bfe5c
+data_ov004_020bfe68 sPsOptIconPosAY:0x2 data_ov004_020bfe78 data_ov004_020bfe7c data_ov004_020bfe80
+data_ov004_020bfe84 sPsOptIconPosBY:0x2 data_ov004_020bfe8c data_ov004_020bfe90 data_ov004_020bfe94
+data_ov004_020bfe98 sPsOptStylePosY:0x2 data_ov004_020bfea0 data_ov004_020bfea4 data_ov004_020bfea8
+data_ov004_020bfeac data_ov004_020bfeb0 data_ov004_020bfeb4
+
+# RETIRED at PORTSYNC2 (the 2026-10 main merge). Each symbol below was
+# hosted here as a ROM data blob AND is now defined by a translation unit the
+# build compiles (main folded it into the class TU, or the rename by address
+# made a host array's name and this row one name), so the link would report it
+# twice (LNK2005). The src TUs among the definers are on PORT_DSSTATE_FI_SOURCES
+# in port/CMakeLists.txt, so the objects stay inside the captured .dsstate span
+# (hal/dsstate_all.h says why).
+#   sMgGraphCallback                        now defined by src/minigames/d_s_mg_base.cpp
+#   sMgFxUpdateTable                        now defined by src/minigames/d_s_mg_base.cpp
+#   sMgFxDrawTable                        now defined by src/minigames/d_s_mg_base.cpp
+#   sMgSparkleSprites                        now defined by src/minigames/d_s_mg_base.cpp
+#   sMgFxPool                        now defined by src/minigames/d_s_mg_base.cpp
+#   sBannerUpdateTable                        now defined by src/minigames/unit020b2c84.cpp
+#   sBannerSetupTable                        now defined by src/minigames/unit020b2c84.cpp
+#   sBannerDrawTable                        now defined by src/minigames/unit020b2c84.cpp
+#   sMgBannerFiles                        now defined by src/minigames/unit020b2c84.cpp
+#   sMgBannerSprites                        now defined by src/minigames/unit020b2c84.cpp
+#   gMgBanners                        now defined by src/minigames/unit020b2c84.cpp
+# PORTSYNC3 name-only rows (extern C definitions in a class TU):
+sMgSparkleSprites! sMgFxPool! sMgGraphCallback! sMgFxUpdateTable! sMgFxDrawTable! sMgBannerFiles! gMgBanners! sBannerUpdateTable! sBannerSetupTable! sBannerDrawTable! sMgBannerSprites!
+
+# catchup1 Stage D (PLY4 blocker 1): name-only rows. A linked decomp TU defines each
+# of these objects, so the mount carries no storage for them, but the NAME stays in the
+# list so tools/ovdata.py still rebases ROM pointers into them onto the TU object
+# (SYM4 f1916fd9b2f had deleted the tokens outright, which sent those pointers to gap
+# blocks or left raw DS addresses).
+sMgCoins! sPsOptIconPosA:0x2! sPsOptIconPosB:0x2! sPsOptStylePos:0x2!

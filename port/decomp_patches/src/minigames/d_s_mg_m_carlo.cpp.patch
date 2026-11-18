@@ -1,0 +1,36 @@
+diff --git a/src/minigames/d_s_mg_m_carlo.cpp b/src/minigames/d_s_mg_m_carlo.cpp
+--- a/src/minigames/d_s_mg_m_carlo.cpp
++++ b/src/minigames/d_s_mg_m_carlo.cpp
+@@ -93,20 +93,32 @@
+ extern int sMgCoinsBetPlaced;
+ 
+ extern int func_0203d5dc(const int *a, const int *b);
++#ifndef _MSC_VER /* host: MSVC rejects a C-linkage redeclaration of a function an earlier line declares C++; the ROM names are C++ (_Z...), so the host drops the extern "C" */
+ extern "C" {
++#endif
+ void MgCoins_Draw(void);
++#ifndef _MSC_VER
+ }
++#endif
+ extern "C" void Dealer_Draw(void *self);
+ int Dealer_IsIdle(Dealer *dealer);
++#ifndef _MSC_VER /* host: MSVC rejects a C-linkage redeclaration of a function an earlier line declares C++; the ROM names are C++ (_Z...), so the host drops the extern "C" */
+ extern "C" {
++#endif
+ void MgCoins_Update(void);
++#ifndef _MSC_VER
+ }
++#endif
+ void Dealer_StartShuffle(Dealer *dealer, int unused, short count, s16 *counter);
++#ifndef _MSC_VER /* host: MSVC rejects a C-linkage redeclaration of a function an earlier line declares C++; the ROM names are C++ (_Z...), so the host drops the extern "C" */
+ extern "C" {
++#endif
+ void MgCoins_Reset(void);
+ 
+ void MgCoins_StartPayout(int count);
++#ifndef _MSC_VER
+ }
++#endif
+ 
+ extern unsigned short gMgCoinsStatus;
+ void LoadCard2SubBg3(void *);

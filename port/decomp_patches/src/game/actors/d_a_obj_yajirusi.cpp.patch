@@ -1,0 +1,26 @@
+diff --git a/src/game/actors/d_a_obj_yajirusi.cpp b/src/game/actors/d_a_obj_yajirusi.cpp
+--- a/src/game/actors/d_a_obj_yajirusi.cpp
++++ b/src/game/actors/d_a_obj_yajirusi.cpp
+@@ -217,10 +217,21 @@
+ 
+ /* The PC actor slice retains its existing ROM-data/HAL resource setup;
+  * these resource-family constructor aliases belong to the NDS link. */
+-#ifndef SM64DS_PLATFORM_PC
++#if !defined(SM64DS_PLATFORM_PC) || defined(_MSC_VER)
++#ifdef _MSC_VER
++/* Host: the arrow signs' table data_ov098_0213c380 (mounted from ov098) points at
++   these four by their C names, and InitResources loads through it, so the host
++   defines them here with the ROM file ids. Without them the mounted bss copies
++   stay zero and the first LoadFile asks the FAT for entry 0. The constructors are
++   structor_faces.py faces onto the same arm9 veneers the cartridge calls. */
++extern "C" {
++#endif
+ /* Construction order follows the two models, then the two collision files. */
+ YajirusiModelFile gYajirusiLModelFile(0x0497);
+ YajirusiModelFile gYajirusiRModelFile(0x0499);
+ YajirusiCollisionFile gYajirusiLCollisionFile(0x0498);
+ YajirusiCollisionFile gYajirusiRCollisionFile(0x049a);
++#ifdef _MSC_VER
++}
+ #endif
++#endif

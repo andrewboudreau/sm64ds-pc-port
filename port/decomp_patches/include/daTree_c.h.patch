@@ -1,0 +1,18 @@
+diff --git a/include/daTree_c.h b/include/daTree_c.h
+--- a/include/daTree_c.h
++++ b/include/daTree_c.h
+@@ -18,7 +18,14 @@
+      * factory constructs all five, InitResources loads only its own. */
+     dExtSimpleModel_c mModel[5]; /* 0x0d4 */
+ 
++    #ifdef _MSC_VER
++    /* host two-arm destructor spelling; ruling in include/ModelBase.h */
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~daTree_c() {}   /* no slot */
++    #else
+     virtual ~daTree_c() {}
++    #endif
+     virtual s32 InitResources();     /* slot  0 -- key function */
+     virtual s32 CleanupResources();  /* slot  3 */
+     virtual s32 Behavior();          /* slot  6 */

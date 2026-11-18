@@ -1,0 +1,68 @@
+diff --git a/include/daObjYajirusi_c.h b/include/daObjYajirusi_c.h
+--- a/include/daObjYajirusi_c.h
++++ b/include/daObjYajirusi_c.h
+@@ -27,6 +27,7 @@
+ 
+ #if defined(SM64DS_PLATFORM_PC) && defined(_MSC_VER)
+ #include <stddef.h>
++#include "dBgActor_c.h"  /* host: the forwarders below call the real base */
+ /* mwccarm reuses dBgActor_c's two bytes of tail padding, placing this class's
+    first derived storage at 0x31e. MSVC starts after sizeof(dBgActor_c)==0x320,
+    which shifts the derived fields and grows the object to 0x384 even though
+@@ -46,8 +47,13 @@
+     s32 mPosY;                         /* 0x060 */
+     s32 mPosZ;                         /* 0x064 */
+     u8  pad_068[0xc];
+-    s32 mCamSpacePosX;                 /* 0x074 */
+-    u8  pad_078[0x16];
++    union {
++        s32 mCamSpacePosX;             /* 0x074 */
++        /* Host: Kill passes the whole camera-space position by name
++           (Sound::PlayBank3(0x41, mCamSpacePos)); same word at 0x074. */
++        Vector3 mCamSpacePos;          /* 0x074 */
++    };
++    u8  pad_080[0xe];
+     s16 mAngleY;                       /* 0x08e */
+     u8  pad_090[0x44];
+     dExtSimpleModel_c mModel;          /* 0x0d4 */
+@@ -79,6 +85,25 @@
+        all. */
+     void DisappearPoofDustAt(const Vector3 &pos);
+     void MarkForDestruction();
++
++    /* Host: Behavior calls these three inherited members unqualified. Inline
++       forwarders on the same object viewed as its real base, so they bind to
++       dBgActor_c's and dActor_c's own host definitions (the call the ROM
++       makes) and add no symbol and no field. */
++    int UpdateKillByMegaChar(s16 a, s16 b, s16 c, fx32 d)
++    {
++        return reinterpret_cast<dBgActor_c *>(this)->UpdateKillByMegaChar(a, b, c, d);
++    }
++    void DropShadowScaleXYZ(dExtShadowModel_c &shadow, Matrix4x3 &matrix, fx32 scaleX, fx32 scaleY,
++                            fx32 scaleZ, u8 opacity)
++    {
++        reinterpret_cast<dBgActor_c *>(this)->DropShadowScaleXYZ(shadow, matrix, scaleX, scaleY, scaleZ,
++                                                                 opacity);
++    }
++    int IsClsnInRangeOnScreen(fx32 a, fx32 b)
++    {
++        return reinterpret_cast<dBgActor_c *>(this)->IsClsnInRangeOnScreen(a, b);
++    }
+ 
+     /* Shadow matrix at +0x348. */
+     void UpdateShadowMatrix();
+@@ -117,7 +142,14 @@
+        emits the retail D1-then-D0 pair in ROM order plus _ZTV/_ZTI/_ZTS
+        homed in the instantiating TU, and no leaf D2. Out-of-line emits
+        D0 before D1, which the production isolate refuses. */
++    #ifdef _MSC_VER
++    /* host two-arm destructor spelling; ruling in include/ModelBase.h */
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~daObjYajirusi_c() {}   /* no slot */
++    #else
+     virtual ~daObjYajirusi_c() {}
++    #endif
+ 
+     int Behavior();
+     int CleanupResources();

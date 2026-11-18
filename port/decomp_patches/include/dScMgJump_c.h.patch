@@ -1,0 +1,41 @@
+diff --git a/include/dScMgJump_c.h b/include/dScMgJump_c.h
+--- a/include/dScMgJump_c.h
++++ b/include/dScMgJump_c.h
+@@ -46,6 +46,9 @@
+ #include "dMgJump3DMario_c.h"
+ #include "dExtSimpleModel_c.h"
+ #include "Heyho.h"
++#ifdef _MSC_VER
++#pragma pack(push, 4) /* host only: MSVC aligns pointer-to-member fields to 8, mwccarm to 4 */
++#endif
+ 
+ struct dScMgJump_c : dScMgD3DBase_c {
+     /* DEFINED IN THE CLASS BODY, DELIBERATELY -- not a style choice.
+@@ -63,7 +66,18 @@
+        DECLARED but not defined here is InitResources below, which lives in
+        src/minigames/d_s_mg_jump_methods.cpp, so _ZTV11dScMgJump_c is emitted by that one
+        translation unit and by no other. */
+-    virtual ~dScMgJump_c() {}
++    /* The destructor pair spelled as two plain virtuals on the host, plus
++       the non-virtual destructor declaration the src/ definitions need; the
++       whole ruling is in include/ModelBase.h. An override takes its base's
++       slots, so these carry the SAME TWO NAMES the base declares -- a fresh
++       name would append a slot instead of claiming one. */
++#ifdef _MSC_VER
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~dScMgJump_c() {}   /* no slot */
++#else
++    virtual ~dScMgJump_c() {}   /* D1 and D0 */
++#endif
+ 
+     /* This class's own overrides, read off the ROM's vtable: the slots where the
+        table differs from dScMgD3DBase_c's. Spelled WITHOUT the `virtual` keyword,
+@@ -115,4 +129,7 @@
+ typedef char dScMgJump_c_size_must_be_0x5834[sizeof(dScMgJump_c) == 0x5834 ? 1 : -1];
+ #endif
+ 
++#ifdef _MSC_VER
++#pragma pack(pop)
+ #endif
++#endif

@@ -1,0 +1,36 @@
+# run linkfull, lane S4CARD: the game card's read path and bring-up, stage A
+# (the CPU path). Read by port/CMakeLists.txt's "W28 S4CARD" block; every row
+# goes on walk_window and walk_window_hires only (smoke_player keeps
+# hal/nitrofs_face.cpp's synchronous FS_Init face and has no card). A row named
+# in W28C_HOSTGEN_TU builds from its hostgen copy so its register accesses reach
+# ntr/io.cpp, where ntr/card.cpp answers them. Host pieces: hal/card_globals.cpp.
+#
+# THE READ. FS_Init (src/func_0205d96c.c, compiled without the old
+# FSi_ReadRomCallback=port_nitrofs_read rename) registers FSi_ReadRomCallback as the "rom"
+# archive's read function. It calls CARDi_ReadRom asynchronously and returns 6;
+# CARDi_ReadRom takes the busy bit, parks the request in cardi_common and, with
+# FS_Init's channel -1 above 3, finds CARDi_TryReadCardDma's DMA test false (it still
+# builds the ROMCTRL word from 0x027ffe60) and hands CARDi_ReadRomSyncCore to the ROM's
+# card thread through CARDi_SetTask. CARDi_ReadRomSyncCore copies what the cached page
+# holds (CARDi_ReadFromCache) and calls the page reader CARDi_ReadCard, which sends B7h
+# through CARDi_SetRomOp and reads the block out of the data port; then
+# CARDi_ReadEnd wakes the waiters and calls FSi_OnRomReadDone, which tells the FS
+# layer (FS_NotifyArchiveAsyncEnd) the read is done.
+src/engine/fs/FS_Rom.cpp
+src/engine/card/CARD_Rom.c
+src/engine/card/CARD_Common.cpp
+#
+# THE DMA ARM, linked because CARDi_ReadRom and CARDi_TryReadCardDma name it and dead
+# while FS_Init's channel is -1 (CARDi_ReadRom skips MI_StopDma above channel
+# 3 and CARDi_TryReadCardDma's aligned test needs channel <= 3). Built plain: their
+# computed DMA-register stores are that dead arm. Stage B (FS_Init(2), card DMA,
+# IRQ 19) would route them; it is not this lane.
+src/engine/mi/MI_Dma.cpp
+#
+# THE BRING-UP. _Z13func_02042f68iPh's arm 1 is src/func_02060890.c again (the
+# CARD_Init=port_rom_card_bringup rename is gone), in the ROM's order inside
+# main's _Z13func_0201a054v seam (hal/boot_arms.cpp's R2c arm), before the first card
+# read of any run: it seeds the work object, creates the card thread
+# (CARDi_InitCommon), points rom_stat at CARDi_ReadCard and installs the IREQ_MC
+# handler on IRQ bit 20 (func_02061138), which nothing raises on this port.
+src/engine/card/CARD_PullOut.cpp

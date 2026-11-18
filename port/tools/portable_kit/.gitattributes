@@ -1,0 +1,6 @@
+# Moved here from the root .gitattributes with the kit (run catchup1, lane ROOT1). These files run on
+# Linux (Steam Deck) and must keep LF on every checkout.
+launch.sh text eol=lf
+extract_assets.py text eol=lf
+steam_deck_setup.py text eol=lf
+*.desktop text eol=lf

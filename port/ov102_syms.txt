@@ -1,0 +1,88 @@
+# The ov102 data the castle grounds' QUESTION_BLOCK names.
+#
+# The gate-18 shape (see ov085_syms.txt for the long version): an ACTOR
+# overlay mounted PER SYMBOL with --pack, the overlay's whole data span
+# (.rodata 0x0214d70c, .data 0x0214e0c0, .bss 0x0214e6e0), the vtables left
+# out because they are host arrays the registry fills, and every *_SpawnInfo
+# pinned to the record's real 0x1c.
+#
+# NO VTABLE HAS TO BE EXCLUDED BY ADDRESS HERE, unlike ov100's. All four real
+# actor vtables in ov102 -- daObjSimpleBg_c, daObjHatenaBlock_c, daBmb_c and
+# daShl_c -- carry a `_ZTV*` name, so the generator's own rule catches every
+# one. Checked the same way ov100's were: a real vtable's slot 1 is
+# Actor::BeforeInitResources and a typeinfo tail's is not.
+#
+# The config's name for one of them IS shifted -- 0x0214e1d8 is spelled
+# _ZTV13FortressTower and its RTTI reads daObjSimpleBg_c -- but nothing here
+# depends on that, and QUESTION_BLOCK's own table checks out against
+# daObjHatenaBlock_c (hatena: the question mark).
+data_ov102_0214d70c:0x8 _ZTI15daObjSimpleBg_c:0xc _ZTS15daObjSimpleBg_c:0x14
+g_profile_KI_IWA:0x1c g_profile_KI_HASIRA_DAI:0x1c g_profile_BK_TOWER:0x1c
+g_profile_DOKAN:0x1c g_profile_MC_DODAI:0x1c g_profile_MC_HAZAD:0x1c
+data_ov102_0214e188:0x4 data_ov102_0214e18c:0x4 data_ov102_0214e190:0xc8
+data_ov102_0214e258:0x8 data_ov102_0214e260:0x8 data_ov102_0214e268:0x8
+data_ov102_0214e270:0x8 data_ov102_0214e278:0x8 data_ov102_0214e280:0x8
+data_ov102_0214e288:0x8 data_ov102_0214e290:0x8 data_ov102_0214e298:0x8
+data_ov102_0214e2a0:0x8 data_ov102_0214e2a8:0x8 data_ov102_0214e2b0:0x8
+data_ov102_0214e2b8:0x8 data_ov102_0214e2c0:0x8 data_ov102_0214e2c8:0x8
+data_ov102_0214e2d0:0x8 data_ov102_0214e2d8:0x8 data_ov102_0214e2e0:0x8
+data_ov102_0214e2e8:0x8 data_ov102_0214e2f0:0x8 data_ov102_0214e2f8:0x8
+data_ov102_0214e300:0x8 data_ov102_0214e308:0x8 data_ov102_0214e310:0x8
+data_ov102_0214e318:0x8 data_ov102_0214e320:0x8 data_ov102_0214e328:0x8
+data_ov102_0214e330:0x8 data_ov102_0214e338:0x8 data_ov102_0214e340:0x8
+data_ov102_0214e348:0x8 data_ov102_0214e350:0x8 data_ov102_0214e358:0x8
+data_ov102_0214e360:0x8 data_ov102_0214e368:0x8 data_ov102_0214e370:0x8
+data_ov102_0214e378:0x8 data_ov102_0214e380:0x8 data_ov102_0214e388:0x8
+data_ov102_0214e390:0x8 data_ov102_0214e398:0x8 data_ov102_0214e3a0:0x8
+_ZTI18daObjHatenaBlock_c:0xc _ZTS18daObjHatenaBlock_c:0x18
+_ZTS7daBmb_c:0xc
+_ZTI7daBmb_c:0xc
+data_ov102_0214e5d4@0x0214e5d4:0x8 data_ov102_0214e5dc@0x0214e5dc:0x8 data_ov102_0214e5e4@0x0214e5e4:0x8
+data_ov102_0214e5ec@0x0214e5ec:0x8 data_ov102_0214e5f4@0x0214e5f4:0x8 data_ov102_0214e5fc@0x0214e5fc:0x8
+data_ov102_0214e604@0x0214e604:0x8 data_ov102_0214e60c@0x0214e60c:0x8 _ZTS7daShl_c:0xc
+_ZTI7daShl_c:0xc g_profile_SHELL:0x1c 
+  
+  
+  
+  data_ov102_0214e740@0x0214e740:0xc
+data_ov102_0214e74c@0x0214e74c:0xc data_ov102_0214e758@0x0214e758:0xc data_ov102_0214e764@0x0214e764:0xc
+data_ov102_0214e770@0x0214e770:0xc data_ov102_0214e77c@0x0214e77c:0xc data_ov102_0214e788@0x0214e788:0xc
+data_ov102_0214e794@0x0214e794:0xc data_ov102_0214e7a0@0x0214e7a0:0xc data_ov102_0214e7ac@0x0214e7ac:0xc
+data_ov102_0214e7b8@0x0214e7b8:0xc data_ov102_0214e7c4@0x0214e7c4:0xc 
+  
+  
+ data_ov102_0214e810@0x0214e810:0xc data_ov102_0214e81c@0x0214e81c:0xc
+data_ov102_0214e828@0x0214e828:0xc data_ov102_0214e834@0x0214e834:0xc data_ov102_0214e840@0x0214e840:0xc
+data_ov102_0214e84c@0x0214e84c:0xc data_ov102_0214e858@0x0214e858:0xc data_ov102_0214e864@0x0214e864:0xc
+  
+data_ov102_0214e9d0:0xc
+data_ov102_0214e9dc:0xc data_ov102_0214e9e8:0xc data_ov102_0214e9f4:0xc
+data_ov102_0214ea00:0xc data_ov102_0214ea0c:0xc
+data_ov102_0214ea1c:0x4 data_ov102_0214ea20:0x4 data_ov102_0214ea24:0xc
+data_ov102_0214ea30:0xc data_ov102_0214ea3c:0xc
+
+# RETIRED at PORTSYNC2 (the 2026-10 main merge). Each symbol below was
+# hosted here as a ROM data blob AND is now defined by a translation unit the
+# build compiles (main folded it into the class TU, or the rename by address
+# made a host array's name and this row one name), so the link would report it
+# twice (LNK2005). The src TUs among the definers are on PORT_DSSTATE_FI_SOURCES
+# in port/CMakeLists.txt, so the objects stay inside the captured .dsstate span
+# (hal/dsstate_all.h says why).
+#   data_ov102_0214ea48                        now defined by src/game/actors/d_a_shl.cpp
+#   data_ov102_0214ea58                        now defined by src/game/actors/d_a_shl.cpp
+#   data_ov102_0214ea68                        now defined by src/game/actors/d_a_shl.cpp
+#   data_ov102_0214ea78                        now defined by src/game/actors/d_a_shl.cpp
+
+# PORTSYNC3 RETIRED (main's daBmb_c.cpp now defines these objects itself): data_ov102_0214e514 data_ov102_0214e524 g_profile_BOMBHEI
+# PORTSYNC3 name-only rows (the class TU defines the storage):
+gBkTowerCollisionFile! gKiHasiraDaiModelFile! gKiHasiraDaiCollisionFile! gObjDokanCollisionFile! gBkTowerModelFile! gMcDodaiCollisionFile! gKiIwaModelFile! gdaObjSimpleBgObjDokanModelFile! gMcHazadModelFile! gMcHazadCollisionFile! gMcDodaiModelFile! gKiIwaCollisionFile! data_ov102_0214e7d0! data_ov102_0214e7d8! data_ov102_0214e7e0! data_ov102_0214e7e8! data_ov102_0214e7f0! data_ov102_0214e7f8! data_ov102_0214e800! data_ov102_0214e808! data_ov102_0214e870! data_ov102_0214e890! data_ov102_0214e8c0!
+# PORTSYNC3 name-only rows (extern C definitions in a class TU):
+data_ov102_0214ea48! data_ov102_0214ea58! data_ov102_0214ea68! data_ov102_0214ea78! data_ov102_0214e514! data_ov102_0214e524!
+
+# catchup1 Stage D (PLY4 blocker 1): name-only rows. A linked decomp TU defines each
+# of these objects, so the mount carries no storage for them, but the NAME stays in the
+# list so tools/ovdata.py still rebases ROM pointers into them onto the TU object
+# (SYM4 f1916fd9b2f had deleted the tokens outright, which sent those pointers to gap
+# blocks or left raw DS addresses).
+g_profile_VS_ITEM_BLOCK:0x1c! g_profile_HATENA_BLOCK:0x1c! g_profile_ITEM_BLOCK:0x1c! g_profile_CAP_BLOCK_M:0x1c! g_profile_CAP_BLOCK_L:0x1c! g_profile_CAP_BLOCK_W:0x1c! gBmbWalkAnimFile:0x8! gBmbCarryAnimFile:0x8!
+gBmbCarryOffsets:0x4!

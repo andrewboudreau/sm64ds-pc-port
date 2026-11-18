@@ -1,0 +1,34 @@
+# Decomp tools the port still calls (run catchup1, Task 1.5)
+#
+# Every script below lives in the decomp's top-level tools/ and stays there: the decomp's own
+# tooling, CI or tests use it too, so it belongs to the decomp, not to the port. The port reaches
+# it through the decomp root (port/tools/decomp_root.py, CMake DECOMP_ROOT), never through "..".
+# Port-only scripts live in port/tools/.
+#
+# Classified 2026-11-14 at port line 61efad8c765 (decomp 03a6d6aea41): every top-level tools/*.py
+# that port/CMakeLists.txt, port/cmake/, port/*.cmd or a port/tools script calls, imports or tells
+# the user to run, and the decomp-side callers that keep it in the decomp.
+#
+# script                 how the port uses it                                      decomp callers (why it stays)
+# srcpath.py             imported: dtorfwd, hostarm_recover, merge_remap, ovdata,   tools/actor_names.py, tools/check_call_arity.py,
+#                        tu_props_audit (symbol -> source path)                     tools/clone.py, tools/cpp_index.py and more
+# relocs.py              imported: merge_remap (relocs.txt reader)                  tools/bytegate.py, tools/coddog.py, tools/clone.py and more
+# unpack.py              run: romextract.py (ROM -> extracted/)                     tools/rombuild.py, tools/tubuild.py, tools/modules.py
+# asset_catalog.py       named in error messages as the command that writes         tools/test_asset_catalog.py, .github/workflows/tool-tests.yml
+#                        build/assets (battery, gate, install_mismatch_probe,
+#                        ntr_manifest, portsync_common, yoshi_cap_proof, docs)
+#
+# Named only in comments and notes, never run by the port: match.py, actor_names.py,
+# evidence_rom.py, ovsweep.py (the port has its own port/tools/ovsweep.py; the decomp's differs).
+#
+# Moved out of the decomp's tools/ into port/tools/ by this task (no decomp caller):
+#   tools/resolve_crash.py  -> port/tools/resolve_crash.py   (crash-dump symbolizer for walk_window)
+#   tools/portable_kit/     -> port/tools/portable_kit/      (the player kit: package_kit.ps1, play.bat,
+#                                                             extract_assets, Steam Deck setup)
+# Everything the plan expected to move (hostgen*.py, facegen.py, closure.py, porttrace.py,
+# narrowret_census.py, ovreset.py, ovsweep.py, dtorfwd.py, the *_guard.py set) was already under
+# port/tools/ at the base.
+srcpath.py
+relocs.py
+unpack.py
+asset_catalog.py

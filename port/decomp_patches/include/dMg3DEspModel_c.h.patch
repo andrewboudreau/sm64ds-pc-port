@@ -1,0 +1,21 @@
+diff --git a/include/dMg3DEspModel_c.h b/include/dMg3DEspModel_c.h
+--- a/include/dMg3DEspModel_c.h
++++ b/include/dMg3DEspModel_c.h
+@@ -4,6 +4,9 @@
+ #include "dExtAnmModel_c.h"
+ #include "dExtAnmTexPat_c.h"
+ #include "dMg3DEspAnimSet_c.h"
++#ifdef _MSC_VER
++#pragma pack(push, 4) /* host only: MSVC aligns pointer-to-member fields to 8, mwccarm to 4 */
++#endif
+ 
+ /* The source spelling and ordinary method names are inferred from its sole
+  * owner, dScMg3DEsp_c, and each method's role. The 0x21c-byte extent and
+@@ -51,4 +54,7 @@
+     sizeof(dMg3DEspModel_c) == 0x21c ? 1 : -1];
+ #endif
+ 
++#ifdef _MSC_VER
++#pragma pack(pop)
+ #endif
++#endif

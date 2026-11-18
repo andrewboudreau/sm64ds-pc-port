@@ -1,0 +1,79 @@
+/* HOST ARM recovered by PORTSYNC2 (port/tools/hostarm_recover.py draft, reviewed).
+ * The port line carried this in src/_ZN9dScDSMT_c8BehaviorEv.cpp under #ifdef _MSC_VER; the
+ * 2026-10 main merge (749f5799a) took main's src/, where that code
+ * now lives in src/game/stages/d_s_dsmt.cpp without the arm. mwccarm never saw the arm,
+ * so nothing here moves a ROM byte.
+ *
+ * The arm sat in the middle of the method, so the host definition is the
+ * whole member: main's body text with the arm's slot-passing calls in place of
+ * the mwcc (void) calls. Main's TU also defines this member, so the TU's
+ * hostgen copy must park _ZN9dScDSMT_c8BehaviorEv. */
+// @symbol _ZN9dScDSMT_c8BehaviorEv
+#include "dScDSMT_c.h"
+#include "types.h"
+#include "Sound.h"
+#include "SaveData.h"
+#include "Heap.h"
+#include "decl_common.h"
+#include "nitro/spi/tp.h"
+#include "math/CalcLib.h"
+
+/* Declared as main's TU (src/game/stages/d_s_dsmt.cpp) declares them: the save file
+ * and data_0209caa0 come from the headers, the overlay callees have C++ linkage. */
+extern "C" {
+extern FileSaveData *data_0209b33c;
+/* Linker-defined overlay IDs: the address is the overlay number. */
+extern int OVERLAY_100_ID;
+extern int OVERLAY_102_ID;
+}
+extern "C++" int func_ov007_020b7090(u16 a0, u16 a1, u16 a2, u16 a3, int arg4);
+extern "C++" void StartMinigameMenu(unsigned char returnToRecRoom);
+
+s32 dScDSMT_c::Behavior()
+{
+    int result;
+
+    if (data_ov007_02103260 >= 0 && DecIfAbove0_Short(&data_ov007_02104c28) == 0) {
+        Sound::LoadAndSetMusic_Layer1(data_ov007_02103260);
+        data_ov007_02103260 = -1;
+    }
+
+    /* The ROM leaves each func_0203da9c() result, the comms slot index, in r0
+       for the accessor after it (0x020cc310..0x020cc320); pass it. */
+    {
+        TPData *tp = func_0203dabc(func_0203da9c());
+        int arg4;
+        arg4 = func_0203dae4(func_0203da9c());
+        result = func_ov007_020b7090(tp->x, tp->y, tp->touch, tp->validity, arg4);
+    }
+
+    if ((unsigned int)(result - 3) <= 2) {
+        int idx = 0;
+        if (result == 4) {
+            idx = 1;
+        } else if (result == 5) {
+            idx = 2;
+        }
+        func_02013c84(idx, data_0209b33c + idx, -1, &data_0209caa0.file);
+        StartFile(1, 0);
+    } else if (result == 6) {
+        if (data_0209d524 == 0) {
+            Heap *h1 = (Heap *)func_0201a458();
+            Heap *h2 = h1->SetDefault();
+            LoadArchive(1);
+            LoadTextNarcs();
+            h1->Rescue();
+            h2->SetDefault();
+            LoadOverlay((int)&OVERLAY_100_ID);
+            LoadOverlay((int)&OVERLAY_102_ID);
+        }
+        dScene_c::StartSceneFade(6, 0, 0x7fff);
+    } else if (result == 7) {
+        StartMinigameMenu(0);
+    } else if (result == 2) {
+        dScene_c::StartSceneFade(1, 0, 0x7fff);
+    }
+
+    dScene_c::SetFaders(&fader);
+    return 1;
+}

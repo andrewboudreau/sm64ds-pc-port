@@ -1,0 +1,27 @@
+diff --git a/src/fListNode.cpp b/src/fListNode.cpp
+--- a/src/fListNode.cpp
++++ b/src/fListNode.cpp
+@@ -54,6 +54,13 @@
+     Obj *obj; // 0x10
+ };
+ 
++#ifdef _MSC_VER
++/* The host's member pointer is the ROM's eight bytes (/vmg /vmm), but MSVC
++ * aligns it to eight, which would put `callback` at +8 where the scene tree's
++ * head keeps it at +4 ({head, callback}, the seat in hal/actor_registry.cpp).
++ * Packing to four keeps the ROM's layout; mwccarm never sees this arm. */
++#pragma pack(push, 4)
++#endif
+ struct Thing {
+     Node *head;   // 0
+     PMF callback; // 4
+@@ -64,6 +71,9 @@
+     }
+     void *func_020441cc();
+ };
++#ifdef _MSC_VER
++#pragma pack(pop)
++#endif
+ }
+ 
+ /* The five process-list heads func_02044120 walks. The tree sentinel is three

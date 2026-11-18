@@ -1,0 +1,36 @@
+# Gate-2 slice: the ExpandingHeapAllocator family -- the allocator LAYER
+# only. The Heap class layer above it (CreateRootHeap, SetupRootHeap) reads
+# OS arena globals and waits for the OS seam in a later gate.
+#
+# Chosen second because Opie's implementation order starts at
+# memory/runtime/heaps, and because this is where the LP64 bug class lived:
+# an allocator that survives a fill-pattern torture test on the host is the
+# strongest layout evidence a port can buy per line of test code.
+
+src/engine/heap/ExpandingHeapAllocator.cpp
+# FOLDED into src/engine/heap/ExpandingHeapAllocator.cpp (row 10): src/_ZN22ExpandingHeapAllocatorC1EPvj.cpp
+src/engine/heap/NestedHeapIterator.cpp
+# FOLDED into src/engine/heap/ExpandingHeapAllocator.cpp (row 10): src/_ZN22ExpandingHeapAllocator8AllocateEji.cpp
+# FOLDED into src/engine/heap/ExpandingHeapAllocator.cpp (row 10): src/_ZN22ExpandingHeapAllocator16AllocateForwardsEjj.cpp
+# FOLDED into src/engine/heap/ExpandingHeapAllocator.cpp (row 10): src/_ZN22ExpandingHeapAllocator17AllocateBackwardsEjj.cpp
+# FOLDED into src/engine/heap/ExpandingHeapAllocator.cpp (row 10): src/_ZN22ExpandingHeapAllocator10DeallocateEPv.cpp
+# FOLDED into src/engine/heap/ExpandingHeapAllocator.cpp (row 10): src/_ZN22ExpandingHeapAllocator14SizeofInternalEPv.cpp
+# FOLDED into src/engine/heap/ExpandingHeapAllocator.cpp (row 10): src/_ZN22ExpandingHeapAllocator10CreateNodeEPN10MemoryNode6TargetEt.cpp
+# FOLDED into src/engine/heap/ExpandingHeapAllocator.cpp (row 10): src/_ZN22ExpandingHeapAllocator12AllocateNodeEP10MemoryNodeS1_Pvjt.cpp
+# FOLDED into src/engine/heap/ExpandingHeapAllocator.cpp (row 10): src/_ZN22ExpandingHeapAllocator8FreeNodeEP10MemoryNodePNS0_6TargetE.cpp
+# FOLDED into src/engine/heap/ExpandingHeapAllocator.cpp (row 10): src/_ZN22ExpandingHeapAllocator8LinkNodeEP10MemoryNodeS1_S1_.cpp
+# FOLDED into src/engine/heap/ExpandingHeapAllocator.cpp (row 10): src/_ZN22ExpandingHeapAllocator10UnlinkNodeEP10MemoryNodeS1_.cpp
+# FOLDED into src/engine/heap/ExpandingHeapAllocator.cpp (row 10): src/_ZN10MemoryNode6TargetC1EPS_.cpp
+
+# NestedHeapIterator: the HeapAllocator base ctor registers every allocator
+# in the global nesting registry, so the iterator family rides along.
+# FOLDED into src/engine/heap/NestedHeapIterator.cpp (row 12): src/_ZN18NestedHeapIteratorC1Ej.cpp
+# FOLDED into src/engine/heap/NestedHeapIterator.cpp (row 12): src/_ZN18NestedHeapIterator10FindNestedEPv.cpp
+# FOLDED into src/engine/heap/NestedHeapIterator.cpp (row 12): src/_ZN18NestedHeapIterator19RecursiveFindNestedEPv.cpp
+# FOLDED into src/engine/heap/NestedHeapIterator.cpp (row 12): src/_ZN18NestedHeapIterator7AddLastEP13HeapAllocator.cpp
+# FOLDED into src/engine/heap/NestedHeapIterator.cpp (row 12): src/_ZN18NestedHeapIterator5AddAtEP13HeapAllocatorS1_.cpp
+# FOLDED into src/engine/heap/NestedHeapIterator.cpp (row 12): src/_ZN18NestedHeapIterator4InitEP13HeapAllocator.cpp
+# FOLDED into src/engine/heap/NestedHeapIterator.cpp (row 12): src/_ZN18NestedHeapIterator4NextEP13HeapAllocator.cpp
+# FOLDED into src/engine/heap/NestedHeapIterator.cpp (row 12): src/_ZN18NestedHeapIterator8AddFirstEP13HeapAllocator.cpp
+# FOLDED into src/engine/heap/NestedHeapIterator.cpp (row 12): src/_ZN18NestedHeapIterator8PreviousEP13HeapAllocator.cpp
+# FOLDED into src/engine/heap/NestedHeapIterator.cpp (row 12): src/_ZN18NestedHeapIterator6RemoveEP13HeapAllocator.cpp

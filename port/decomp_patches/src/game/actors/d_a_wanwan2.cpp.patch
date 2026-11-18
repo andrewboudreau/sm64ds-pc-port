@@ -1,0 +1,30 @@
+diff --git a/src/game/actors/d_a_wanwan2.cpp b/src/game/actors/d_a_wanwan2.cpp
+--- a/src/game/actors/d_a_wanwan2.cpp
++++ b/src/game/actors/d_a_wanwan2.cpp
+@@ -569,6 +569,10 @@
+    mPrevAngleY eases toward it and mAngleY copies mPrevAngleY. The model
+    matrices are rebuilt, and the collision body is updated only when a daPly_c
+    exists and is not vanished. */
++#ifdef _MSC_VER
++/* Host: the cartridge's signed divide (x / 0 = x), see Behavior. */
++extern "C" int ds_idiv(int, int);
++#endif
+ int daWanwan2_c::Behavior()
+ {
+     DecIfAbove0_Short(&mCoinTimer);
+@@ -610,7 +614,15 @@
+ 
+     int flag = (gGameMode == 1);
+     if (flag != 0 && mCoinTimer == 0) {
++#ifdef _MSC_VER
++        /* Host: mwccarm compiles this `/` to the ROM helper _s32_div_f, which
++           answers x / 0 = x; x86 idiv faults (c0000094). mPathNodeIndex is 0
++           right after the path wraps, so on VS map 0 the chomp reached it at
++           frame 1401. hal/cstd_div.c's ds_idiv gives the helper's answer. */
++        int q16 = ds_idiv(0x10000, mPathNodeIndex);
++#else
+         int q16 = 0x10000 / mPathNodeIndex;
++#endif
+         short spd = (short)q16;
+         dActor_c *pl = ClosestPlayer();
+         (void)pl;

@@ -1,0 +1,265 @@
+diff --git a/src/runtime/actor/d_actor.cpp b/src/runtime/actor/d_actor.cpp
+--- a/src/runtime/actor/d_actor.cpp
++++ b/src/runtime/actor/d_actor.cpp
+@@ -196,6 +196,170 @@
+ /* This frame's actor update mask, copied from gNextActorUpdateMask; see
+    ACTOR_UPDATE_MASK_STAGE_ENDING in dActor_c.h. */
+ extern u32 gActorUpdateMask;
++#define PAUSE_THINK_BYTE gGamePaused
++#ifdef _MSC_VER
++/* HOST ONLY (settings.json DrawDistance, default 100 = the ROM). Widens what is
++   DRAWN and never what is updated: the ROM's own decision below (flag 0x08 and
++   the behaviour skip) is computed exactly as before, and the host byte set here
++   (HOST_DRAW_BYTE, the free alignment byte after mClipResult at 0x0c5; mCarryMatrix at +0xc8 is a different field) only
++   lets BeforeRender draw an actor the ROM would cull for being past its clip
++   distance or past the camera's far plane. */
++extern "C" int host_setting_draw_distance_pct(void);
++#define HOST_DRAW_BYTE(a) (((u8 *)&(a)->mClipResult)[1])
++#include <stdio.h>
++#include <stdlib.h>
++static void HostWidenDraw(dActor_c *a, int r, int thresh, Vector3 *camPos, int radius)
++{
++    const int pct = host_setting_draw_distance_pct();
++    if (pct <= 100)
++        return;
++    long long t2 = (long long)thresh * pct / 100;
++    if (t2 > 0x3fffffff)
++        t2 = 0x3fffffff;
++    if (r == 0x7fffffff) {
++        /* outside the frustum, or past the far plane: the side planes decide,
++           with the far plane scaled by the same factor. hint 0 leaves the
++           clipper's cached plane alone. */
++        dClipper *c = &data_0209f43c;
++        const int saved = c->mFarZ;
++        long long f2 = (long long)saved * pct / 100;
++        if (f2 > 0x3fffffff)
++            f2 = 0x3fffffff;
++        c->mFarZ = (int)f2;
++        r = data_0209f43c.ClipSphere(*camPos, radius, (u8 *)0);
++        c->mFarZ = saved;
++    }
++    if (r != 0x7fffffff && r <= t2) {
++        /* CAMPACK2 (tester: "Draw Distance doesn't appear to be working, I can't see anything even on max"). BeforeRender returns 0 on
++           flag 0x20 whatever the host byte says, and AfterInitResources gives every actor 0x38: only the in-range branch above clears
++           0x20, the far branch keeps what it has. So an actor that STARTED beyond its clip distance (every far goomba, tree, coin of a
++           big level) kept 0x20 forever and the widened distance never drew it; only actors that had once been near did. The game's own
++           flag is NOT touched (draw distance must not change game state): the host byte is set to 2, "area showing, ignore the stale
++           0x20", which only BeforeRender reads. The area test above did not fire, so the area is showing. An actor whose Behavior is
++           skipped while far (flags 1 and 8) and that never ran has no pose yet, so it stays hidden (mode 2, the default);
++           SM64DS_DRAW_DIST_MODE=1 draws it anyway (to look for stray objects at the origin), 0 is the old behaviour. */
++        static int mode = -1;
++        if (mode < 0) { const char *m = getenv("SM64DS_DRAW_DIST_MODE"); mode = m ? atoi(m) : 2; }
++        const int stale20 = (a->mFlags & 0x20) != 0;
++        /* INTROBIRD1: a 0x10000 actor past its clip range returns from BeforeBehavior right after this call, so it is
++           skipped exactly like the flags-1-and-8 case and has no pose either. The castle-grounds birds carry 0x10002
++           (no 0x01): before this they were drawn here with Model::C2's identity matrix, at the world origin. */
++        const int noBehave = (a->mFlags & 9) == 9 || (a->mFlags & 0x10000) != 0;
++        static int n_ok, n_stale_run, n_stale_skip, n_tot;
++        ++n_tot;
++        if (!stale20) {
++            ++n_ok;
++            HOST_DRAW_BYTE(a) = 1;
++        } else if (mode >= 1 && (mode == 1 || !noBehave)) {
++            ++n_stale_run;
++            HOST_DRAW_BYTE(a) = 2;
++        } else {
++            ++n_stale_skip;
++            HOST_DRAW_BYTE(a) = 0;
++        }
++        static int cnt, logon = -1;
++        if (logon < 0)
++            logon = getenv("SM64DS_DRAW_DIST_LOG") ? 1 : 0;
++        if (logon && (n_tot % 4000) == 0)
++            fprintf(stderr, "[drawdist] mode %d totals: drawn-before %d, stale-0x20 cleared %d, stale-0x20 kept hidden (no behaviour yet) %d\n",
++                    mode, n_ok, n_stale_run, n_stale_skip);
++        if (logon && (cnt++ % 1500) == 0)
++            fprintf(stderr, "[drawdist] pct %d: actor id %d drawn past the ROM cull (depth %d, ROM limit %d, widened limit %lld)\n",
++                    pct, (int)*(unsigned short *)((char *)a + 0xc), r, thresh, t2);
++    }
++}
++
++/* HOST ONLY (settings.json DrawDistance, default 100 = the ROM, where this does nothing and the ROM's
++   update decision below runs byte for byte as before). Past 100 the ROM's clip distance that decides
++   whether an actor THINKS (flag 0x08 set while beyond it, and a Behavior that is skipped while that flag
++   is up) is scaled by the same factor as the draw distance, so a far enemy the player can now see walks
++   and attacks instead of standing frozen (tester: Chain Chomp in Bob-omb Battlefield). Returns the
++   clipper depth when the actor is inside the widened range (so the caller takes the ROM's own "in range"
++   branch), else 0x7fffffff. The side planes still decide, as in the ROM: an actor off to the side of or
++   behind the camera stays asleep. mFarDistance (the ROM's LOD and effect gate) is not scaled.
++   Actor classes listed in g_wake_skip keep the ROM range whatever the setting is; each has a reason. */
++static const unsigned short g_wake_skip[] = {
++    0   /* placeholder terminator: no class is excluded yet */
++};
++static int HostWakeSkipped(dActor_c *a)
++{
++    const unsigned short id = *(unsigned short *)((char *)a + 0xc);
++    for (int i = 0; g_wake_skip[i]; ++i)
++        if (g_wake_skip[i] == id)
++            return 1;
++    return 0;
++}
++/* INTROBIRD1: the ROM's own think gate at the foot of BeforeBehavior, read for an actor the widened range would take
++   into the in-range branch (so 0x08 is about to clear and (flags & 9) != 9). A cutscene's think mask (gActorUpdateMask,
++   0x20000000 through the castle-grounds opening) or a freeze byte refuses it the same way. */
++static int HostWouldThink(dActor_c *a)
++{
++    if (((PAUSE_THINK_BYTE | data_0209f20c | gVsExitScreenActive) & 0xff) != 0)
++        return 0;
++    return gActorUpdateMask == 0 || (a->mFlags & gActorUpdateMask) != 0 || data_0209fc68 != 0;
++}
++/* 1 when the THINK range is widened along with the draw range for this actor (Draw distance past 100, not the SM64DS_WAKE_OFF row,
++   not a g_wake_skip class, not a multiplayer session); else the ROM's think range holds. */
++static int HostUpdateWidened(dActor_c *a)
++{
++    const int pct = host_setting_draw_distance_pct();
++    static int off = -1;     /* SM64DS_WAKE_OFF=1: the ROM's update range at any setting (the "before" rows of a proof) */
++    if (off < 0) off = getenv("SM64DS_WAKE_OFF") ? 1 : 0;
++    if (pct <= 100 || off || HostWakeSkipped(a))
++        return 0;
++    return 1;
++}
++static int HostWidenUpdate(dActor_c *a, int r, int thresh, Vector3 *camPos, int radius)
++{
++    if (!HostUpdateWidened(a))
++        return 0x7fffffff;
++    const int pct = host_setting_draw_distance_pct();
++    long long t2 = (long long)thresh * pct / 100;
++    if (t2 > 0x3fffffff)
++        t2 = 0x3fffffff;
++    if (r == 0x7fffffff) {
++        dClipper *c = &data_0209f43c;
++        const int saved = c->mFarZ;
++        long long f2 = (long long)saved * pct / 100;
++        if (f2 > 0x3fffffff)
++            f2 = 0x3fffffff;
++        c->mFarZ = (int)f2;
++        r = data_0209f43c.ClipSphere(*camPos, radius, (u8 *)0);
++        c->mFarZ = saved;
++    }
++    return (r != 0x7fffffff && r <= t2) ? r : 0x7fffffff;
++}
++/* SM64DS_WAKE_LOG=1: per actor class, how many BeforeBehavior calls the ROM let think (proof rows for the widened update range). */
++static void HostWakeLog(dActor_c *a, int updated)
++{
++    static int on = -1;
++    if (on < 0) on = getenv("SM64DS_WAKE_LOG") ? 1 : 0;
++    if (!on)
++        return;
++    static unsigned calls[1024], upd[1024];
++    static unsigned total;
++    const unsigned id = *(unsigned short *)((char *)a + 0xc) & 1023;
++    ++calls[id];
++    upd[id] += updated;
++    {
++        const char *ids = getenv("SM64DS_WAKE_POS");   /* SM64DS_WAKE_POS=<id>: log that class's position now and then */
++        if (ids && (unsigned)atoi(ids) == id && (calls[id] % 30) == 0)
++            fprintf(stderr, "[wakepos] id %u call %u thought %u pos (%d,%d,%d) %s\n", id, calls[id], upd[id],
++                    (int)(a->mPosX >> 12), (int)(a->mPosY >> 12), (int)(a->mPosZ >> 12), updated ? "run" : "frozen");
++    }
++    if (++total % 30000 == 0) {
++        unsigned c = 0, u = 0;
++        for (int i = 0; i < 1024; ++i) { c += calls[i]; u += upd[i]; }
++        fprintf(stderr, "[wake] pct %d: %u calls, %u thought (%.1f%%)\n", host_setting_draw_distance_pct(), c, u, c ? 100.0 * u / c : 0.0);
++        for (int i = 0; i < 1024; ++i)
++            if (calls[i] && upd[i] != calls[i])
++                fprintf(stderr, "[wake]   id 0x%x: %u/%u thought\n", i, upd[i], calls[i]);
++    }
++}
++#define HOST_WAKE(a, u) HostWakeLog(a, u)
++#else
++#define HOST_WAKE(a, u) ((void)0)
++#endif
+ 
+ /* Culls the actor for this frame: flags 0x38 plus a far-away camera position
+    when its area is hidden or the dClipper rejects it, then the pause and
+@@ -206,6 +370,9 @@
+         return 0;
+ 
+     data_0209b458 = 0;
++#ifdef _MSC_VER
++    HOST_DRAW_BYTE(this) = 0;
++#endif
+ 
+     signed char areaId = mAreaId;
+     if (areaId >= 0 && !IsAreaShowing(areaId)) {
+@@ -213,8 +380,10 @@
+         mCamSpacePosX = 0x7fffffff;
+         mCamSpacePosY = 0x7fffffff;
+         mCamSpacePosZ = 0x7fffffff;
+-        if (data_0209fc68 == 0 || (mFlags & 0x10000))
++        if (data_0209fc68 == 0 || (mFlags & 0x10000)) {
++            HOST_WAKE(this, 0);
+             return 0;
++        }
+     } else {
+         if (mClipRadius != 0) {
+             Vector3 tmp;
+@@ -228,10 +397,30 @@
+             int thresh = mClipDistance;
+             if (data_0209f274)
+                 thresh <<= 1;
++#ifdef _MSC_VER
++            if (r > thresh) {
++                const int rw = HostWidenUpdate(this, r, thresh, &mCamSpacePos, mClipRadius);
++                /* INTROBIRD1: the widened range is for actors that will THINK. One that has never been in range
++                   (0x20 still set from AfterInitResources) and that the think gate below refuses this frame would
++                   only lose 0x38 and be drawn without ever having posed: the castle-grounds flock leader, frozen by
++                   the opening's think mask, drew at the world origin in the moat under the bridge (Draw distance
++                   above 100 only; the cartridge culls it there). It keeps the ROM's out-of-range branch instead. */
++                const int neverPosed = (mFlags & 0x20) && !HostWouldThink(this);
++                if (rw != 0x7fffffff && !neverPosed) {
++                    r = rw;
++                    thresh = r;       /* inside the widened range: the ROM's in-range branch below */
++                }
++            }
++#endif
+             if (r > thresh) {
+                 mFlags |= 0x18;
+-                if (mFlags & 0x10000)
++#ifdef _MSC_VER
++                HostWidenDraw(this, r, thresh, &mCamSpacePos, mClipRadius);
++#endif
++                if (mFlags & 0x10000) {
++                    HOST_WAKE(this, 0);
+                     return 0;
++                }
+             } else {
+                 mFlags &= ~0x38;
+                 if (r > mFarDistance)
+@@ -242,11 +431,14 @@
+         }
+     }
+ 
+-    if (((gGamePaused | data_0209f20c | gVsExitScreenActive) & 0xff) != 0 ||
++    if (((PAUSE_THINK_BYTE | data_0209f20c | gVsExitScreenActive) & 0xff) != 0 ||
+         (((mFlags & 9) == 9 || (gActorUpdateMask != 0 && (mFlags & gActorUpdateMask) == 0)) &&
+-         data_0209fc68 == 0))
++         data_0209fc68 == 0)) {
++        HOST_WAKE(this, 0);
+         return 0;
++    }
+ 
++    HOST_WAKE(this, 1);
+     mPrevPosX = mPosX;
+     mPrevPosY = mPosY;
+     mPrevPosZ = mPosZ;
+@@ -268,8 +460,19 @@
+         return 0;
+ 
+     flags = mFlags;
++#ifdef _MSC_VER
++    if ((flags & 0x20) && HOST_DRAW_BYTE(this) != 2)     /* 2 = the host's draw distance saw the area showing past a stale 0x20 */
++        return 0;
++    if ((flags & 8) && (flags & 2)) {
++        if (HOST_DRAW_BYTE(this)) {     /* drawn only for the widened Draw distance */
++            return 1;
++        }
++        return 0;
++    }
++#else
+     if ((flags & 0x20) || ((flags & 8) && (flags & 2)))
+         return 0;
++#endif
+     return 1;
+ }
+ 

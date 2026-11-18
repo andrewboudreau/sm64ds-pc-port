@@ -1,0 +1,28 @@
+diff --git a/include/daJango_c.h b/include/daJango_c.h
+--- a/include/daJango_c.h
++++ b/include/daJango_c.h
+@@ -165,8 +165,24 @@
+         Vector3 mSpawnPos; /* 0x484 */
+     };
+ 
++#ifdef _MSC_VER
++    /* Host only. The anonymous union holding a Vector3 (which has a user
++       constructor) deletes MSVC's implicit default constructor, so the
++       factory's `new daJango_c()` cannot compile. fBase_c::operator new
++       clears the block before construction, so an empty constructor builds
++       exactly what the implicit one does. */
++    daJango_c() {}
++#endif
++
+     /* --- vtable --- */
++    #ifdef _MSC_VER
++    /* host two-arm destructor spelling; ruling in include/ModelBase.h */
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~daJango_c() {}   /* no slot */
++    #else
+     virtual ~daJango_c() {}
++    #endif
+ 
+     virtual s32   OnAimedAtWithEgg();      /* slot 29 */
+ 

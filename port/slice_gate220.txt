@@ -1,0 +1,126 @@
+# GATE 220 -- _ZTV5Stage SLOT 6: THE ROM'S OWN Stage::Behavior, AND THE FRAME
+# LOOP THAT WAS HOSTING IT.  (run link100, lane FRAME)
+# ============================================================================
+#
+# WHAT THIS GATE IS.  Slot 6 of the Stage's own vtable held a host occupant --
+# `static int __fastcall st_behavior(void *, void *) { return 1; }` -- through
+# five Stage lanes.  Every one of them declined the ROM body, and
+# port/stage_lifecycle_map.txt section 12b finally measured why: it was never a
+# missing symbol.  port/tests/walk_window.cpp WAS the port's copy of
+# Stage::Behavior, transcribed statement by statement into the frame loop, with
+# the freeze-mask latch in hal/actor_registry.cpp, UpdateMessage's body in
+# hal/message_pump.cpp and the VS countdown in hal/star_flow.cpp.  Seating the
+# ROM body without retiring those runs the cutscene script twice a frame.
+#
+# All five sites are retired in the same commit as this file.  Section 13 of
+# port/stage_lifecycle_map.txt is the accounting; hal/stage_frame.cpp carries
+# the faces and the two entry points; hal/stage_globals.cpp hosts the eighteen
+# arm9 .bss words the closure reads.
+#
+# WHY THE PAUSE SCREEN IS IN HERE AND COULD NOT BE SEAMED.  Stage::Behavior's
+# last block is the pause TRIGGER: on START it writes gGamePaused = 1, stops
+# the timer and calls PS_Init() then PS_Update().  A seat that seamed those two
+# would enter the pause state and never leave it -- the pause trio
+# (gVsExitScreenActive | gGamePaused | data_0209f20c) gates Actor::BeforeBehavior,
+# so the world would freeze with no menu drawn and no way out.  That is worse
+# than the program this replaces, where START did nothing at all.
+#
+# AND IT IS REACHABLE, which is the half that settles it rather than an
+# argument from caution.  In adventure mode the trigger's own gate is
+#
+#     if ((b1 && data_0209fc68 == 0) || (data_0209caa0[2] & 0x80))
+#
+# where b1 is VS mode, so a single-player frame needs flags2 bit 7.  Exactly
+# one write in the whole image sets that bit: src/func_ov085_0212d5dc.cpp:51,
+# LakituBro's last opening state, `data_0209caa0[2] |= 0x80`.  It is the
+# "the opening has been seen" bit -- HUD::Behavior and HUD::Render gate on the
+# same word -- so any run that has been through the opening reaches the pause
+# trigger, and the port's own boot goes through the opening.  The whole
+# PS_Update tree is therefore enrolled: the five menu arms
+# (PS_UpdateSaveMenu, PS_UpdateOptionsMenu, PS_UpdateOkAndBackButtons,
+# UpdateMenuButtons) and the nine Message::Display* bodies they draw through.
+#
+# THE ONE SEAM, NAMED.  func_020199a4 is not here.  Stage::Behavior reaches it
+# on the VS side only (`if (data_0209fcc8 >= 7u) func_020199a4()`), and its own
+# closure is 63 further TUs behind a 36-symbol wall that is the DS's own HEAP
+# ALLOCATOR (func_0204xxxx/func_0205xxxx, NestedHeapIterator, HeapAllocator)
+# and the IRQ/CP15 primitives under it -- SVC_WaitByLoop, OS_UnLockCartridge,
+# OSi_DoTryLockByWord and OS_SpinWait are ARM asm MSVC cannot assemble.  The port
+# has its own allocator and does not want the cartridge's.  hal/stage_frame.cpp
+# carries the seam and it is LOUD: a reach prints once and names itself.
+#
+# WHAT THE ENROLMENT COSTS OUTSIDE THIS FILE, all of it declared in section 13:
+#   hal/stage_globals.cpp   18 arm9 .bss words, sized by ROM span, plus the
+#                           __aeabi_uidiv host primitive (the signed twin has
+#                           been in hal/actor_vtables.cpp since wave 5)
+#   port/tools/romdata.py   EIGHT NAMED rows, every one checked the way lane
+#                           STAGE checked its three: relocation-free over the
+#                           whole span (config/arm9/relocs.txt) and
+#                           delta-to-next-symbol exact.  They are the pause
+#                           screen's BG TILE-OFFSET TABLES and not pointers,
+#                           which is the thing to check before reading the
+#                           `PAG` in ?data_020755c0@@3PAGA as an address:
+#                           src/_ZN5Stage20PS_UpdateOptionsMenuEv.cpp:36 reads
+#                           `G2S::GetBG1ScrPtr() + data_020755c0[j]`, so the
+#                           table holds tile INDICES and the pointer is the
+#                           accessor's.
+#   hal/cxx_aliases.cpp     the link100 FRAME block: spelling binds between the
+#                           .c-recovered and .cpp-recovered halves of one call
+#                           graph.  Nothing there changes a body; each row
+#                           names the same function twice.
+#
+src/Message.cpp
+src/engine/gx/GX_BgCnt.c
+src/engine/sound/Sound.cpp
+# FOLDED into src/engine/sound/Sound.cpp (row 74): src/_ZN5Sound12PlayBank3_2DEj.cpp
+# FOLDED into src/engine/sound/Sound.cpp (row 74): src/_ZN5Sound12UnpauseMusicEv.cpp
+src/game/stages/d_s_stage_methods.cpp
+# FOLDED into src/game/stages/d_s_stage_methods.cpp (row 77): src/_ZN5Stage17PS_UpdateSaveMenuEb.cpp
+# FOLDED into src/game/stages/d_s_stage_methods.cpp (row 77): src/_ZN5Stage17UpdateMenuButtonsEb.cpp
+# FOLDED into src/game/stages/d_s_stage_methods.cpp (row 77): src/_ZN5Stage20PS_UpdateOptionsMenuEv.cpp
+# FOLDED into src/game/stages/d_s_stage_methods.cpp (row 77): src/_ZN5Stage25PS_UpdateOkAndBackButtonsEb.cpp
+# FOLDED into src/game/stages/d_s_stage_methods.cpp (row 77): src/_ZN5Stage7VE_InitEv.cpp
+# FOLDED into src/game/stages/d_s_stage_methods.cpp (row 77): src/_ZN5Stage9LC_UpdateEv.cpp
+# FOLDED into src/game/stages/d_s_stage_methods.cpp (row 77): src/_ZN5Stage9PS_UpdateEv.cpp
+# FOLDED into src/game/stages/d_s_stage_methods.cpp (row 77): src/_ZN5Stage9VE_UpdateEv.cpp
+src/game/player/d_a_ply_methods.cpp
+port/unmatched/hostarm/Player.cpp
+# FOLDED into src/Message.cpp (row 72): src/_ZN7Message11DisplayTextEt.cpp
+# FOLDED into src/Message.cpp (row 72): src/_ZN7Message16DisplayPauseTextEth.cpp
+src/Message3.cpp
+# FOLDED into src/Message.cpp (row 72): src/_ZN7Message19DisplayDontSaveTextEt.cpp
+# FOLDED into src/Message.cpp (row 72): src/_ZN7Message19DisplaySaveMenuTextEt.cpp
+# FOLDED into src/Message.cpp (row 72): src/_ZN7Message21DisplayLevelClearTextEta.cpp
+# FOLDED into src/Message.cpp (row 72): src/_ZN7Message21DisplaySaveStatusTextEt.cpp
+# FOLDED into src/Message.cpp (row 72): src/_ZN7Message22DisplayOptionsMenuTextEt.cpp
+# FOLDED into src/Message.cpp (row 72): src/_ZN7Message25DisplayControllerModeTextEt.cpp
+# FOLDED into src/Message.cpp (row 72): src/_ZN7Message7DisplayEj.cpp
+# FOLDED into src/engine/sound/Sound.cpp (row 74): src/func_02011c24.c
+# FOLDED into src/engine/sound/Sound.cpp (row 74): src/func_02011c54.c
+# FOLDED into src/engine/sound/Sound.cpp (row 74): src/func_02011db4.c
+src/unnamed/arm9/0201/func_020199a4.c
+# catchup1 (SLICE4, Stage C round 2): main folded func_02019a58 (the row that
+# stood here) into func_020199a4.c, so the TU is linked whole and the seam
+# hal/stage_frame.cpp kept for func_020199a4 goes (needs row to PLY4). Its
+# closure is now these two TUs; the heap allocator wall the header names is
+# linked from other slices.
+src/unnamed/arm9/0201/func_02019dfc.c
+src/unnamed/arm9/0201/func_02019ed0.c
+src/Message2.cpp
+# FOLDED into src/Message.cpp (row 72): src/func_0201cfb8.c
+# FOLDED into src/Message.cpp (row 72): src/func_0201d418.c
+# FOLDED into src/Message.cpp (row 72): src/func_0201d850.c
+# FOLDED into src/Message.cpp (row 72): src/func_0201e220.cpp
+# FOLDED into src/Message3.cpp (row 91): src/func_020321fc.c
+# FOLDED into src/Message3.cpp (row 91): src/func_020326ac.c
+# FOLDED into src/Message3.cpp (row 91): src/func_02032f54.c
+# FOLDED into src/Message3.cpp (row 91): src/func_020345b0.c
+src/engine/sound/SoundEngine.cpp
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 114): src/func_0204f558.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 114): src/func_0204f958.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 114): src/func_0204fce8.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 114): src/func_0204fed0.cpp
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 114): src/func_020501b8.c
+# FOLDED into src/engine/sound/SoundEngine.cpp (row 114): src/func_02052234.c
+src/engine/snd/SND_Interface.cpp
+src/engine/spi/PM.c

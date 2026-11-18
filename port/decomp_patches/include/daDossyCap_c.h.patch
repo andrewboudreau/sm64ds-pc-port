@@ -1,0 +1,18 @@
+diff --git a/include/daDossyCap_c.h b/include/daDossyCap_c.h
+--- a/include/daDossyCap_c.h
++++ b/include/daDossyCap_c.h
+@@ -60,7 +60,14 @@
+ 
+     /* Inline is load-bearing: src/game/actors/d_a_dossy.cpp defines the key
+        function InitResources, so it emits D1 then D0 with no homeless D2. */
++    #ifdef _MSC_VER
++    /* host two-arm destructor spelling; ruling in include/ModelBase.h */
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~daDossyCap_c() {}   /* no slot */
++    #else
+     virtual ~daDossyCap_c() {}
++    #endif
+ 
+     virtual s32 InitResources();       /* slot 0 */
+     virtual s32 Behavior();            /* slot 6 */

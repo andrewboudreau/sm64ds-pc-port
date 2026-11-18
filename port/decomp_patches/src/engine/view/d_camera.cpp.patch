@@ -1,0 +1,25 @@
+diff --git a/src/engine/view/d_camera.cpp b/src/engine/view/d_camera.cpp
+--- a/src/engine/view/d_camera.cpp
++++ b/src/engine/view/d_camera.cpp
+@@ -3597,12 +3597,21 @@
+     Math_Function_0203b0fc(&self->z, src->z, stepZ, 0x7fffffff);
+ }
+ 
++#ifdef _MSC_VER
++/* host: func_02007cec below has no return statement on purpose (see its
++   comment); MSVC makes that C4716, an error, so silence it as /wd4716 would. */
++#pragma warning(push)
++#pragma warning(disable : 4716)
++#endif
+ /* The same with one rate for all three axes. Its callers' declaration
+    says int, and the ROM hands back whatever ApproachVec3fAsymptotic left in r0, so
+    there is no return statement. */
+ extern "C" int func_02007cec(void *dest, const Vector3 *src, int step) {
+     ApproachVec3fAsymptotic((Vector3 *)dest, src, step, step, step);
+ }
++#ifdef _MSC_VER
++#pragma warning(pop)
++#endif
+ 
+ /* Super Mario 64's vec3f_get_dist_and_angle: the distance and the pitch and
+    yaw from v0 to v1. */

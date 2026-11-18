@@ -1,0 +1,437 @@
+diff --git a/src/game/stages/d_s_stage_methods.cpp b/src/game/stages/d_s_stage_methods.cpp
+--- a/src/game/stages/d_s_stage_methods.cpp
++++ b/src/game/stages/d_s_stage_methods.cpp
+@@ -281,21 +281,56 @@
+    node for dClipper sit between the tables. */
+ /* The pause page to show next: PS_Update moves it into sPauseState at the
+    top of each frame. */
++/* The host keeps its own C-linkage storage for each of the file statics below
++   that carry this guard (port/hal: auto_bss.cpp, w8a_stage_storage.cpp,
++   level_boot.cpp, actor_vtables.cpp, camera_bridges.cpp), each at least as
++   wide as the type here. A file static would be a second copy the host
++   seats never reach, so under MSVC the name binds to that storage. */
++#if defined(_MSC_VER)
++extern "C" u8 sNextPauseState;
++#else
+ static u8 sNextPauseState;
++#endif
+ u8 gNextStarId;
++/* catchup1 Stage D (PLY4): on the host these file-scope bss words are SHARED storage.
++   Every other TU and the port's own boot write the C-linkage object that
++   hal/ defines (actor_vtables.cpp, w8a_stage_storage.cpp, auto_bss.cpp,
++   camera_bridges.cpp, fader_wipes.cpp, each at least this wide), and a TU-local
++   copy here was never written: LoadModel read a null data_0209f340 at level
++   entry. The cartridge has one object at each address; so does the host. */
++#if defined(_MSC_VER)
++extern "C" u8 data_0209f1f4;
++#else
+ static u8 data_0209f1f4;
++#endif
+ u8 gNumViewObjs;
++#if defined(_MSC_VER)
++extern "C" u8 data_0209f1fc;
++#else
+ static u8 data_0209f1fc;
++#endif
+ u8 gReturnEntranceId;
+ u8 data_0209f204;
+ u8 data_0209f208;
+ u8 data_0209f20c;
+ /* Counts down from 3 frames after a pause arrow is touched; PS_Update clears
+    sPressedPauseArrow when it reaches 0. */
++#if defined(_MSC_VER)
++extern "C" u8 sPauseArrowPressTimer;
++#else
+ static u8 sPauseArrowPressTimer;
++#endif
++#if defined(_MSC_VER)
++extern "C" u8 sNumEntranceObjs;
++#else
+ static u8 sNumEntranceObjs;
++#endif
+ /* Set when the pause was opened with SELECT rather than START. */
++#if defined(_MSC_VER)
++extern "C" u8 sPausedWithSelect;
++#else
+ static u8 sPausedWithSelect;
++#endif
+ /* How many players this stage runs with: InitResources copies it from
+    data_0208a0e0 (1 at boot; dScEntry_c::EnterMatchLoading can set 4), and
+    the player loops run to it. */
+@@ -303,44 +338,116 @@
+ u8 gCurrentStarId;
+ u8 data_0209f224;
+ u8 gCollectedStarId;
++#if defined(_MSC_VER)
++extern "C" u8 sMenuWaitTimer;
++#else
+ static u8 sMenuWaitTimer;
++#endif
++#if defined(_MSC_VER)
++extern "C" u8 data_0209f230;
++#else
+ static u8 data_0209f230;
++#endif
++#if defined(_MSC_VER)
++extern "C" u8 data_0209f234;
++#else
+ static u8 data_0209f234;
++#endif
+ /* The pause arrow drawn pressed in, 0 for none. On the course page 1 is the
+    left arrow and 2 the right (PS_Render moves that arrow two pixels out); the
+    sound-options page sets 2 for its left arrow and 1 for its right. */
++#if defined(_MSC_VER)
++extern "C" u8 sPressedPauseArrow;
++#else
+ static u8 sPressedPauseArrow;
++#endif
+ /* Another options-page countdown: PS_Update repaints the page when it
+    reaches 0, like sSoundBoxFlashTimer and sBacklightFlashTimer. Nothing in the
+    ROM sets it non-zero (its only other access is PS_Init's clear), and the
+    runtime pass did not confirm a role, so it keeps its placeholder name. */
++#if defined(_MSC_VER)
++extern "C" u8 data_0209f23c;
++#else
+ static u8 data_0209f23c;
++#endif
++#if defined(_MSC_VER)
++extern "C" u8 data_0209f240;
++#else
+ static u8 data_0209f240;
++#endif
+ /* Frames until the selected big button's highlight is redrawn. Touching or
+    confirming the button that is already selected sets it to 4 frames, and
+    UpdateMenuButtons, PS_UpdateOkAndBackButtons and PS_UpdateSaveMenu draw the
+    highlight palette only once it is 0, so the press blinks. Each update loop
+    repaints the buttons when it reaches 0. */
++#if defined(_MSC_VER)
++extern "C" u8 sMenuHighlightDelay;
++#else
+ static u8 sMenuHighlightDelay;
++#endif
+ /* The pause page shown, the switch PS_Update runs. */
++#if defined(_MSC_VER)
++extern "C" u8 sPauseState;
++#else
+ static u8 sPauseState;
++#endif
++#if defined(_MSC_VER)
++extern "C" u8 sCheckpointEntranceId;
++#else
+ static u8 sCheckpointEntranceId;
++#endif
+ /* This console's player: InitResources stores func_0203da9c(), the local
+    player number, so the HUD, the pause screen and the camera index the
+    per-player arrays (gPlayers, gPlayerHealth, gNumStageStars) by it. */
+ u8 gLocalPlayerId;
+ u8 data_0209f254;
++#if defined(_MSC_VER)
++extern "C" u8 sNumFogObjs;
++#else
+ static u8 sNumFogObjs;
++#endif
++#if defined(_MSC_VER)
++extern "C" u8 sNumMinimapScaleObjs;
++#else
+ static u8 sNumMinimapScaleObjs;
++#endif
++#if defined(_MSC_VER)
++extern "C" u8 sLevelClearCoinCount;
++#else
+ static u8 sLevelClearCoinCount;
++#endif
+ u8 gCurrentEntranceId;
++#if defined(_MSC_VER)
++extern "C" u8 sNextEntranceId;
++#else
+ static u8 sNextEntranceId;
++#endif
++#if defined(_MSC_VER)
++extern "C" u8 sReturnState;
++#else
+ static u8 sReturnState;
++#endif
++#if defined(_MSC_VER)
++extern "C" u8 sCheckpointStarId;
++#else
+ static u8 sCheckpointStarId;
++#endif
+ u8 data_0209f274;
++#if defined(_MSC_VER)
++extern "C" u8 data_0209f278;
++#else
+ static u8 data_0209f278;
++#endif
++#if defined(_MSC_VER)
++extern "C" u8 data_0209f27c;
++#else
+ static u8 data_0209f27c;
++#endif
++#if defined(_MSC_VER)
++extern "C" u8 data_0209f280;
++#else
+ static u8 data_0209f280;
++#endif
+ /* Non-zero while a talk or event is pointing the player at the Touch Screen:
+    dMeter_c::Render then calls RenderBouncingArrows, which draws the three
+    down-arrows along the foot of the top screen. Every writer that sets it
+@@ -351,30 +458,66 @@
+ u8 gShowTouchScreenArrows;
+ u8 gShowRedCoinMarkers;
+ u8 data_0209f28c;
++#if defined(_MSC_VER)
++extern "C" u8 data_0209f290;
++#else
+ static u8 data_0209f290;
++#endif
+ /* Non-zero from VE_Init (the VS time-up exit screen: exit text, both screens
+    dimmed) until the next InitResources; data_0209f290 is that screen's step.
+    Every "is play suspended" test ORs it with gGamePaused (pause) and
+    data_0209f20c, so while it is set the HUD, camera, actor behaviour and
+    button input all stand still. */
+ u8 gVsExitScreenActive;
++#if defined(_MSC_VER)
++extern "C" u8 data_0209f298;
++#else
+ static u8 data_0209f298;
++#endif
+ /* Which of the two buttons along the foot of the controls and options pages
+    is selected while sSelectedMenuButton is on that row: 0 the left (OK) and 1
+    the right (Back). PS_UpdateOkAndBackButtons highlights button i when this is
+    i; choosing 1 returns to the previous pause page. It is a selection, not a
+    "pressed" flag. */
++#if defined(_MSC_VER)
++extern "C" u8 sBackButtonSelected;
++#else
+ static u8 sBackButtonSelected;
++#endif
++#if defined(_MSC_VER)
++extern "C" u8 data_0209f2a0;
++#else
+ static u8 data_0209f2a0;
++#endif
++#if defined(_MSC_VER)
++extern "C" u8 data_0209f2a4;
++#else
+ static u8 data_0209f2a4;
++#endif
++#if defined(_MSC_VER)
++extern "C" u8 sLevelClearPaletteTimer;
++#else
+ static u8 sLevelClearPaletteTimer;
++#endif
+ u8 gNewStarCollected;
++#if defined(_MSC_VER)
++extern "C" u8 sLevelClearNewRecord;
++#else
+ static u8 sLevelClearNewRecord;
++#endif
+ /* How many big buttons the current menu has (2 to 4); UpdateMenuButtons
+    repaints that many from sMenuButtonTileOffsets. On the controls page a
+    sSelectedMenuButton equal to it means the bottom OK/Back row. */
++#if defined(_MSC_VER)
++extern "C" u8 sNumMenuButtons;
++#else
+ static u8 sNumMenuButtons;
++#endif
++#if defined(_MSC_VER)
++extern "C" u8 data_0209f2b8;
++#else
+ static u8 data_0209f2b8;
++#endif
+ u8 data_0209f2bc;
+ u8 data_0209f2c0;
+ /* Non-zero while the pause screen is up. dActor_c::BeforeBehavior, the
+@@ -383,13 +526,25 @@
+ /* The course the pause screen shows stars and the coin record for, stepped by
+    the course arrows. 0xf is the castle: the total star count, with no
+    star/coin line. */
++#if defined(_MSC_VER)
++extern "C" u8 sPauseDisplayedCourse;
++#else
+ static u8 sPauseDisplayedCourse;
++#endif
+ /* Set to 4 frames when a backlight button is touched without changing the
+    backlight, or when the toggle flips it. PS_UpdateOptionsMenu draws the
+    selected backlight button with the highlight palette (0x6000) only while it
+    is 0, so the press blinks; PS_Update repaints the page when it reaches 0. */
++#if defined(_MSC_VER)
++extern "C" u8 sBacklightFlashTimer;
++#else
+ static u8 sBacklightFlashTimer;
++#endif
++#if defined(_MSC_VER)
++extern "C" u8 sNumTeleportDestObjs;
++#else
+ static u8 sNumTeleportDestObjs;
++#endif
+ u8 gLevelClearStep;
+ /* 0 in the adventure (StartFile), 1 in VS (PrepareVsMode), 2 while the
+    ending's fall-in-front-of-the-castle cutscene runs: KuppaScript sets it when
+@@ -398,25 +553,45 @@
+ /* The controller mode chosen on the controls page (0..2), seeded from the
+    player's record, saved through SetControllerMode, and the index of the
+    callout-text sprite PS_Render draws. */
++#if defined(_MSC_VER)
++extern "C" u8 sSelectedControllerMode;
++#else
+ static u8 sSelectedControllerMode;
++#endif
+ /* The selected big button of the pause, VS-exit and course-clear menus (the
+    cursor row on the controls page). The menus read it when the selection is
+    confirmed. */
++#if defined(_MSC_VER)
++extern "C" u8 sSelectedMenuButton;
++#else
+ static u8 sSelectedMenuButton;
++#endif
+ /* Set to 8 when an arrow steps the sound mode. While it is non-zero
+    PS_UpdateOptionsMenu draws the SOUND box with palette 0x5000 instead of the
+    highlight 0x6000, and PS_Update repaints the page when it reaches 0. */
++#if defined(_MSC_VER)
++extern "C" u8 sSoundBoxFlashTimer;
++#else
+ static u8 sSoundBoxFlashTimer;
++#endif
+ u8 gNumMinimapTileObjs;
+ /* The backlight button drawn selected on the options page: 0 the left (on)
+    and 1 the right (off). Seeded from data_0208ee3c ^ 1 when the page opens;
+    touching a button sets it, and the toggle flips it. The buttons show it only
+    when PS_UpdateOptionsMenu repaints the page. */
++#if defined(_MSC_VER)
++extern "C" u8 sSelectedBacklightButton;
++#else
+ static u8 sSelectedBacklightButton;
++#endif
+ /* Set when no course 0..14 has a star yet: the pause screen then shows only
+    the castle total (sPauseDisplayedCourse 0xf) and neither draws nor reads
+    the course arrows. */
++#if defined(_MSC_VER)
++extern "C" u8 sCourseArrowsHidden;
++#else
+ static u8 sCourseArrowsHidden;
++#endif
+ /* The lives count: SetPlayerGlobals starts it at 4, GiveLives clamps it to
+    0..100, KillPlayer and HitDeathPlane go to game over at 0, and
+    dMeter_c::RenderLifeCount draws it. */
+@@ -426,9 +601,21 @@
+ /* Frames the pause screen ignores input for: PS_Init and PS_Cleanup set it
+    to 0xf and Behavior counts it down; the pages return while it is
+    non-zero, and the pause cannot be opened again until it is 0. */
++#if defined(_MSC_VER)
++extern "C" u16 sPauseInputLockout;
++#else
+ static u16 sPauseInputLockout;
++#endif
++#if defined(_MSC_VER)
++extern "C" u16 data_0209f304;
++#else
+ static u16 data_0209f304;
++#endif
++#if defined(_MSC_VER)
++extern "C" u16 data_0209f308;
++#else
+ static u16 data_0209f308;
++#endif
+ s8 gNumRedCoins[4];
+ /* gNumRedCoins + 1 and gNumStageStars + 1: NumRedCoins and NumVsStarsObtained
+    load each sum's second element through its own literal. */
+@@ -438,29 +625,73 @@
+    sound is 0x19 + it) and each player's stars in a VS match. */
+ s8 gNumStageStars[4];
+ extern s8 data_0209f311;
++#if defined(_MSC_VER)
++extern "C" int data_0209f314;
++#else
+ static int data_0209f314;
++#endif
+ /* The stage's camera: LoadEntranceObjects spawns it (profile 0x14c) once the
+    players are placed, and CleanupResources clears it. */
+ dCamera_c *gCamera;
++#if defined(_MSC_VER)
++extern "C" char *sFogObjs;
++#else
+ static char *sFogObjs;
++#endif
++#if defined(_MSC_VER)
++extern "C" int data_0209f320;
++#else
+ static int data_0209f320;
++#endif
++#if defined(_MSC_VER)
++extern "C" void *data_0209f324;
++#else
+ static void *data_0209f324;
++#endif
++#if defined(_MSC_VER)
++extern "C" LVL_Overlay::StandardEntry *sEntranceObjs;
++#else
+ static LVL_Overlay::StandardEntry *sEntranceObjs;
++#endif
+ s32 data_0209f32c;
++#if defined(_MSC_VER)
++extern "C" void *sTeleportDestObjs;
++#else
+ static void *sTeleportDestObjs;
++#endif
+ u16 *gMinimapTileObjs;
+ void *gUnusedType13Objs;
+ void *data_0209f33c;
++#if defined(_MSC_VER)
++extern "C" char *data_0209f340;
++#else
+ static char *data_0209f340;
++#endif
+ u8 *data_0209f344;
++#if defined(_MSC_VER)
++extern "C" short *sMinimapScaleObjs;
++#else
+ static short *sMinimapScaleObjs;
++#endif
++#if defined(_MSC_VER)
++extern "C" s32 sEventFlags;
++#else
+ static s32 sEventFlags;
++#endif
+ u8 data_0209f350[4];
++#if defined(_MSC_VER)
++extern "C" void *sViewObjs;
++#else
+ static void *sViewObjs;
++#endif
+ short gNumCoins[4];
+ /* Each big button's offset, in screen entries, into the sub engine's BG1
+    map; the menu that opens sets them with sNumMenuButtons. */
++#if defined(_MSC_VER)
++extern "C" u16 sMenuButtonTileOffsets[4];
++#else
+ static u16 sMenuButtonTileOffsets[4];
++#endif
+ static u16 data_0209f368[4];
+ /* Per cap slot (data_0209f3e8, nine of them): the character whose cap it is,
+    0 Mario, 1 Luigi, 2 Wario. func_0202a8e0 stores its caller's byte when it
+@@ -492,7 +723,11 @@
+ /* The actor death table: a 16-word bit row per level part, indexed by an
+    actor's deathTableID. InitResources clears it only when the course
+    changes, so it survives a reload of the same course. */
++#if defined(_MSC_VER)
++extern "C" u32 sActorDeathTable[3][16];
++#else
+ static u32 sActorDeathTable[3][16];
++#endif
+ extern dFdBrightness_c *gSceneFader;
+ extern dFdColor_c gSceneColorFader;
+ extern int gRunningKuppaScript;
+@@ -3175,7 +3410,12 @@
+     signed char *p;
+     if (i >= gNumPlayers)
+         return sum;
++#if defined(_MSC_VER)
++    /* host: data_0209f311 is gNumStageStars + 1 on the DS (one run); here it is one array, so walk it. */
++    p = &gNumStageStars[1];
++#else
+     p = &data_0209f311;
++#endif
+     do {
+         sum = (sum + *p);
+         i++;

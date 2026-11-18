@@ -1,0 +1,23 @@
+diff --git a/include/daIwante_c.h b/include/daIwante_c.h
+--- a/include/daIwante_c.h
++++ b/include/daIwante_c.h
+@@ -160,7 +160,18 @@
+     s32 mHandUniqueID2;                                     /* 0x870 */
+ 
+     /* --- vtable --- */
+-    virtual ~daIwante_c();
++    /* The destructor pair spelled as two plain virtuals on the host, plus
++       the non-virtual destructor declaration the src/ definitions need; the
++       whole ruling is in include/ModelBase.h. An override takes its base's
++       slots, so these carry the SAME TWO NAMES the base declares -- a fresh
++       name would append a slot instead of claiming one. */
++#ifdef _MSC_VER
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~daIwante_c();   /* no slot */
++#else
++    virtual ~daIwante_c();   /* D1 and D0 */
++#endif
+ 
+     int Behavior();
+     int CleanupResources();

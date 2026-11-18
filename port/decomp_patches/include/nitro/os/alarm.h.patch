@@ -1,0 +1,31 @@
+diff --git a/include/nitro/os/alarm.h b/include/nitro/os/alarm.h
+--- a/include/nitro/os/alarm.h
++++ b/include/nitro/os/alarm.h
+@@ -28,6 +28,16 @@
+ 
+ /* One alarm in the queue OS_Alarm.cpp keeps sorted by fire tick. handler is
+  * 0 while the alarm is not set; a nonzero period re-queues it from start. */
++#ifdef _MSC_VER
++/* The alarm record is the ROM's: every 64-bit field sits on a 4-byte
++ * boundary (fire at +0x0c, period at +0x1c, start at +0x24). MSVC aligns a
++ * 64-bit member to eight, which moved the fire time to +0x10, so the insert
++ * wrote the tick's high word over +0x14, the prev link OS_CancelAlarm reads:
++ * 0 until the tick passes 2^32 (8202 s of DS time), then 1, and the next
++ * cancel wrote through it. Packing to four keeps the ROM's layout; mwccarm
++ * never sees this arm. */
++#pragma pack(push, 4)
++#endif
+ typedef struct OSiAlarm {
+     OSAlarmHandler handler; /* 0x00 */
+     void *arg;              /* 0x04 */
+@@ -38,6 +48,10 @@
+     u64 period;             /* 0x1c */
+     u64 start;              /* 0x24 */
+ } OSAlarm;
++#ifdef _MSC_VER
++#pragma pack(pop)
++typedef char OSAlarm_host_size_must_be_0x2c[sizeof(OSAlarm) == 0x2c ? 1 : -1];
++#endif
+ 
+ void OS_InitAlarm(void);
+ int OS_IsAlarmAvailable(void);

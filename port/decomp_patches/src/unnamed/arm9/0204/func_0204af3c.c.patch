@@ -1,0 +1,22 @@
+diff --git a/src/unnamed/arm9/0204/func_0204af3c.c b/src/unnamed/arm9/0204/func_0204af3c.c
+--- a/src/unnamed/arm9/0204/func_0204af3c.c
++++ b/src/unnamed/arm9/0204/func_0204af3c.c
+@@ -30,9 +30,18 @@
+ void func_0204af3c(struct Tex *self)
+ {
+     struct TexParam p = self->param;
++#ifdef _MSC_VER   /* the host compiles this as C++, which wants the enum casts */
++    G3_TexImageParam((GXTexFmt)p.fmt, GX_TEXGEN_TEXCOORD, (GXTexSizeS)p.sizeS, (GXTexSizeT)p.sizeT, (GXTexRepeat)p.repeat,
++                     (GXTexFlip)p.flip, (GXTexPlttColor0)p.color0, self->texAddr);
++#else
+     G3_TexImageParam(p.fmt, GX_TEXGEN_TEXCOORD, p.sizeS, p.sizeT, p.repeat, p.flip, p.color0,
+                      self->texAddr);
++#endif
++#ifdef _MSC_VER
++    G3_TexPlttBase(self->pltAddr, (GXTexFmt)p.fmt);
++#else
+     G3_TexPlttBase(self->pltAddr, p.fmt);
++#endif
+     G3_MtxMode(GX_MTXMODE_TEXTURE);
+     G3_Identity();
+     G3_Scale(self->width << 12, self->height << 12, 0);

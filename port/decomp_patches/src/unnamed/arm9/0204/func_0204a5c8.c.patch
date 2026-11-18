@@ -1,0 +1,33 @@
+diff --git a/src/unnamed/arm9/0204/func_0204a5c8.c b/src/unnamed/arm9/0204/func_0204a5c8.c
+--- a/src/unnamed/arm9/0204/func_0204a5c8.c
++++ b/src/unnamed/arm9/0204/func_0204a5c8.c
+@@ -8,6 +8,13 @@
+ extern void func_0204b028(void *self, void *node);
+ extern void func_0204bbd8(void *self, void *node);
+ extern void SPLDraw_Child_DirectionalBillboard(void *self, void *node);
++#ifdef _MSC_VER
++/* Host only: Smooth Motion pairs each particle with the same element a tick later (port/ntr/gx.cpp ip_part_tag_now). */
++extern void port_particle_tag(const void *elem);
++#define PORT_PARTICLE_TAG(n) port_particle_tag(n)
++#else
++#define PORT_PARTICLE_TAG(n)
++#endif
+ 
+ /* Draw the current system's particles, then its child particles: bind the
+  * definition's texture, pick the draw routine by draw type (billboard,
+@@ -44,6 +51,7 @@
+     if (n != 0) {
+         do {
+             setTexture(&mgr->mTextures[n->texture]);
++            PORT_PARTICLE_TAG(n);
+             draw(self, n);
+             n = n->next;
+         } while (n != 0);
+@@ -70,6 +78,7 @@
+     if (n == 0)
+         return;
+     do {
++        PORT_PARTICLE_TAG(n);
+         draw(self, n);
+         n = n->next;
+     } while (n != 0);

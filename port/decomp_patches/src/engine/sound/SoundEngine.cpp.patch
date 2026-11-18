@@ -1,0 +1,13 @@
+diff --git a/src/engine/sound/SoundEngine.cpp b/src/engine/sound/SoundEngine.cpp
+--- a/src/engine/sound/SoundEngine.cpp
++++ b/src/engine/sound/SoundEngine.cpp
+@@ -1874,6 +1874,9 @@
+     /* func_0204f5a0 is void, so there is no return: the call is a tail call and r0 is the
+        callee's. */
+     func_0204f5a0(handle->player, fade);
++#ifdef _MSC_VER
++    return 0;   /* host: MSVC rejects a value function without a return (C4716); no caller reads it */
++#endif
+ }
+ 
+ extern "C" void func_0204f9c4(int idx, int arg1) {

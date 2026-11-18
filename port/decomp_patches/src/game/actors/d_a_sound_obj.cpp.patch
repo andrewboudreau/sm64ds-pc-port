@@ -1,0 +1,42 @@
+diff --git a/src/game/actors/d_a_sound_obj.cpp b/src/game/actors/d_a_sound_obj.cpp
+--- a/src/game/actors/d_a_sound_obj.cpp
++++ b/src/game/actors/d_a_sound_obj.cpp
+@@ -90,6 +90,30 @@
+     int thisAdjust;
+ };
+ 
++#ifdef _MSC_VER
++/* Host: Behavior calls these records as pointers to member, which MSVC does
++   with the object in ecx and &mCounter pushed (callee cleans). The two plain
++   functions below take (self, counter) off the stack, so the host records hold
++   __fastcall faces instead: self arrives in ecx, edx is dead, counter is the one
++   stack argument, the same frame the member call builds. Direct calls keep the
++   plain bodies. The other three starters already take their receiver in ecx on
++   the host (pmf_guard). */
++static int __fastcall func_ov002_020f9468_pmf(daSoundObj_c *self, void *, u16 *counter)
++{
++    return func_ov002_020f9468(self, counter);
++}
++static int __fastcall func_ov002_020f93a8_pmf(daSoundObj_c *self, void *, u16 *counter)
++{
++    return func_ov002_020f93a8(self, counter);
++}
++SoundObjStarter data_ov002_0210c010 = {(int)&Sound::PlaySmallSecretSound, 0};
++SoundObjStarter data_ov002_0210c018 = {(int)&func_ov002_020f9468_pmf, 0};
++SoundObjStarter data_ov002_0210c020 = {(int)&func_0200f7f0, 0};
++SoundObjStarter data_ov002_0210c028 = {(int)&func_ov002_020f9468_pmf, 0};
++SoundObjStarter data_ov002_0210c030 = {(int)&func_ov002_020f93a8_pmf, 0};
++SoundObjStarter data_ov002_0210c038 = {(int)&func_ov002_020f9468_pmf, 0};
++SoundObjStarter data_ov002_0210c040 = {(int)&Sound::PlaySecretSound, 0};
++#else
+ SoundObjStarter data_ov002_0210c010 = {(int)&Sound::PlaySmallSecretSound, 0};
+ SoundObjStarter data_ov002_0210c018 = {(int)&func_ov002_020f9468, 0};
+ SoundObjStarter data_ov002_0210c020 = {(int)&func_0200f7f0, 0};
+@@ -97,6 +121,7 @@
+ SoundObjStarter data_ov002_0210c030 = {(int)&func_ov002_020f93a8, 0};
+ SoundObjStarter data_ov002_0210c038 = {(int)&func_ov002_020f9468, 0};
+ SoundObjStarter data_ov002_0210c040 = {(int)&Sound::PlaySecretSound, 0};
++#endif
+ 
+ SoundObjectCallback data_ov002_0211110c[7] = {
+     *(SoundObjectCallback *)&data_ov002_0210c040, *(SoundObjectCallback *)&data_ov002_0210c010,

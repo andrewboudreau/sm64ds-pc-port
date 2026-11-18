@@ -1,0 +1,68 @@
+diff --git a/src/cstd6.cpp b/src/cstd6.cpp
+--- a/src/cstd6.cpp
++++ b/src/cstd6.cpp
+@@ -29,6 +29,7 @@
+ 
+ extern "C" {
+ 
++#ifndef _MSC_VER /* host: the CRT supplies this; MSVC refuses to define an intrinsic (C2169) */
+ unsigned int strlen(const char *s)
+ {
+   int n = -1;
+@@ -39,9 +40,11 @@
+   } while (c != 0);
+   return n;
+ }
++#endif
+ }
+ 
+ extern "C" {
++#ifndef _MSC_VER /* host: the CRT supplies this; MSVC refuses to define an intrinsic (C2169) */
+ char *strcpy(char *dst, const char *src) {
+     u8 *s = (u8 *)src;
+     u8 *d = (u8 *)dst;
+@@ -83,10 +86,12 @@
+     } while (*d2 != 0);
+     return dst;
+ }
++#endif
+ }
+ 
+ extern "C" {
+ 
++#ifndef _MSC_VER /* host: the CRT supplies this; a second strong definition collides with the CRT (LNK2005) */
+ char *strncpy(char *dst, const char *src, unsigned int n)
+ {
+   char *d = dst;
+@@ -103,9 +108,11 @@
+   } while (--n);
+   return dst;
+ }
++#endif
+ }
+ 
+ extern "C" {
++#ifndef _MSC_VER /* host: the CRT supplies this; MSVC refuses to define an intrinsic (C2169) */
+ int strcmp(const char *a, const char *b) {
+     unsigned int wb, wa, t;
+     unsigned int cnt;
+@@ -171,9 +178,11 @@
+             return 0;
+     }
+ }
++#endif
+ }
+ 
+ extern "C" {
++#ifndef _MSC_VER /* host: the CRT supplies this; a second strong definition collides with the CRT (LNK2005) */
+ char *strchr(const char *s, int ch_in) {
+     unsigned char ch = ch_in;
+     unsigned char c = *s;
+@@ -187,6 +196,7 @@
+     if (ch != 0) return 0;
+     return (char *)(p - 1);
+ }
++#endif
+ }
+ 
+ /* MSL raise (signal.c), statement for statement with Spirit Tracks' copy:

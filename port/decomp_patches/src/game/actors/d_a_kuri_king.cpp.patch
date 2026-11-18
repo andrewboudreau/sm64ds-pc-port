@@ -1,0 +1,29 @@
+diff --git a/src/game/actors/d_a_kuri_king.cpp b/src/game/actors/d_a_kuri_king.cpp
+--- a/src/game/actors/d_a_kuri_king.cpp
++++ b/src/game/actors/d_a_kuri_king.cpp
+@@ -147,7 +147,13 @@
+ }
+ extern "C" void func_02011cfc();
+ namespace Sound {
++#ifdef _MSC_VER
++/* Host: include/Sound.h and Sound.cpp give it an int result, and MSVC puts
++   the return type in the decorated name, so the host must agree to link. */
++int ChangeMusicVolume(u32 a, int f);
++#else
+ void ChangeMusicVolume(u32 a, int f);
++#endif
+ }
+ extern unsigned short data_ov074_02122e04[];
+ extern "C" int ApproachAngle(short *, short, int, int, int);
+@@ -184,6 +190,11 @@
+ extern "C" u8 data_ov074_02122d80[];
+ extern SharedFilePtr data_ov002_0210da30;
+ extern SharedFilePtr data_ov084_02130cf8;
++#ifdef _MSC_VER
++/* Host: hostgen gives this reference C linkage, but src/game/actors/d_a_krb.cpp
++   defines the object with C++ linkage as a KrbModelFilePtr. */
++#pragma comment(linker, "/alternatename:_data_ov084_02130cf8=?data_ov084_02130cf8@@3UKrbModelFilePtr@@A")
++#endif
+ extern SharedFilePtr data_ov084_0213089c;
+ extern KrbAnimationFileHandle data_ov084_02130cc8;
+ extern KuriKingModelFilePtr gKurikingModelModelFile;

@@ -1,0 +1,149 @@
+/* HOST COPIES of src/func_ov002_020bbd5c.cpp and src/func_ov002_020bbda4.cpp
+ * -- the sign's own five-state machine, with the mwcc pointer-to-member pairs
+ * read as plain function pointers and seated with host addresses.
+ *
+ * data_ov002_0210e084 is five {Init, Main} PMF pairs, written by
+ * __sinit_ov002_02101738 out of ten statics at ov002 0x02109a64..0x02109ab4.
+ * All ten are the nonvirtual { function, 0 } form:
+ *
+ *     0  planted   init 020bba24 (empty)   main 020bb9fc  talk/grab checks
+ *     1  read      init 020bb9f0           main 020bb614  UNMATCHED
+ *     2  carried   init 020bbd50           main 020bbcb8
+ *     3  thrown    init 020bbc78           main 020bbb14
+ *     4  dropped   init 020bbac8           main 020bba28
+ *
+ * Two host-only steps, the same pair OneUpMushroom_Behavior.cpp needs.
+ *
+ * MSVC forms a pointer-to-member of an INCOMPLETE class as the most general
+ * representation (four words, not one), which would stride the table at 0x20
+ * instead of 0x10 and dispatch a neighbour's Init as a Main. Both source TUs
+ * declare `struct C;` before the typedef, so both hit it.
+ *
+ * And the words the sinit copied are the ov002 image's own -- DS CODE
+ * ADDRESSES, which is the ovdata contract. The seat below rewrites each with
+ * its host body after checking the stored word against the ROM address that
+ * body was compiled from, so a mount pointing at the wrong bytes says so
+ * instead of calling into the overlay image.
+ *
+ * STATE 1'S MAIN IS THE MATCHED BODY NOW (run linkfull, lane PMF3). ov002
+ * 0x020bb614 (the read loop, 0x3dc) sat behind a logic-verified near-miss host
+ * copy here from gate 181 until the floor broke: src/func_ov002_020bb614.c
+ * matches the ROM (tools/match.py 2004/b56) and rides port/slice_w31_pmf3.txt,
+ * and the seat below installs it like the other nine bodies. It walks the
+ * player to the sign, turns both, then hands off to daPly_c::ShowMessage2.
+ *
+ * THE OLD NOTE HERE SAID ShowMessage2 IS DECLINED AND THAT A SIGN READ
+ * "APPROACHES AND IDLES". THAT HAS BEEN FALSE SINCE 2026-08-08: the decline
+ * was removed, the matched src is back in slice_gate10, and hal/message_pump.cpp
+ * ticks Message::UpdateWindow + Message::Update every frame, so the box really
+ * opens. Traced live (SM64DS_SIGN_TRIGGER=1 SM64DS_TRACE_SIGN=1, level 3): the
+ * read state runs sub 0 turn for 15 frames, sub 1 walk, sub 2 face for 15
+ * frames, then ShowMessage2 fires and the box reaches state 7 and stays there
+ * until dismissed. Anyone debugging the reported sign soft-lock should not
+ * start from "the message is declined", because it is not.
+ *
+ * SUB-STATE 1 HAS NO TIMEOUT AND NO ABORT. It drives the PLAYER'S POSITION
+ * (Vec3_ApproachHorz on player+0x5c, 0xa000 per frame toward a point 0x78000
+ * in front of the sign), and Vec3_ApproachHorz writes x/z DIRECTLY and is
+ * collision-blind -- its arrival test is horizontal length only. So the walk
+ * can only fail to arrive if something writes the player's position back
+ * between sign ticks.
+ *
+ * MEASURED, AND IT DOES NOT -- but read the rig before trusting the number.
+ *
+ * FIRST ATTEMPT, WHICH DOES NOT COUNT: eight approach directions at radius 700
+ * around the level-3 sign, walk arrived every time, achieved step always the
+ * full 0xa000. That measurement was taken on a player who never leaves
+ * St_LevelEnter (0x020c7838) on level 3: speed 0 every frame, no movement
+ * state, full stick ignored. He could not have contended for his position
+ * under any conditions, so "nothing contests the write" was true of a case
+ * incapable of contesting it. A rig that cannot fail the test does not pass it.
+ *
+ * REDONE WHERE THE PLAYER REALLY MOVES (level 1, SM64DS_SELFTEST_DASH, speed
+ * 131072 = 32 units/frame in the frame before entry): ENTERING THE TALK ZEROES
+ * HIS SPEED. spd goes 131072 -> 0 on the entry frame and stays 0 for the whole
+ * walk, and the achieved step is the full 0xa000 every frame. So residual
+ * momentum cannot fight the walk either: the talk takes his velocity before
+ * sub 1 starts. Making the no-timeout loop fire needs a third party that moves
+ * him WITHOUT going through his speed (a moving platform, a moving collider),
+ * not momentum and not terrain.
+ *
+ * THE REPORTED SOFT-LOCK IS THEREFORE STILL UNEXPLAINED, and specifically the
+ * ROTATION is: sub 0 turns for 15 frames and converges, sub 2 turns for 15 and
+ * converges, and sub 0 cannot chase an unstable angle because the read point
+ * is 0x78000 (120 units) out and the proximity escape fires at 0x32000 (200),
+ * so the player can never be near enough to that point to destabilise
+ * Vec3_HorzAngle while still in sub 0. Three hypotheses tested, all negative.
+ * Do not treat this machine as the known cause.
+ *
+ * STILL UNTESTED, and it is what the third reporter actually described
+ * ("quickly trying to read"): RE-ENTRANCY. Triggering the read repeatedly, or
+ * during the transition, or cancelling and re-entering. The probe in
+ * hal/input_probe.cpp latches on `entered` and fires once, so it cannot
+ * produce that case; testing it needs a rig that can re-arm.
+ */
+#include <cstdio>
+#include <cstdlib>
+#include "hal/pmf_tc.h"
+
+extern "C" {
+
+void _ZN15daObjTatefuda_c8InitIdleEv(void *);   /* 0 Init  */
+void _ZN15daObjTatefuda_c4IdleEv(void *);   /* 0 Main  */
+void _ZN15daObjTatefuda_c8InitTalkEv(void *);   /* 1 Init  */
+void _ZN15daObjTatefuda_c4TalkEv(void *);   /* 1 Main  (src/func_ov002_020bb614.c) */
+void _ZN15daObjTatefuda_c11InitCarriedEv(void *);   /* 2 Init  */
+void _ZN15daObjTatefuda_c7CarriedEv(void *);   /* 2 Main  */
+void _ZN15daObjTatefuda_c10InitThrownEv(void *);   /* 3 Init  */
+void _ZN15daObjTatefuda_c6ThrownEv(void *);   /* 3 Main  */
+void _ZN15daObjTatefuda_c11InitDroppedEv(void *);   /* 4 Init  */
+void _ZN15daObjTatefuda_c7DroppedEv(void *);   /* 4 Main  */
+
+struct PortStatePair { unsigned fn; int delta; };
+struct PortSignPostState { PortStatePair init, main_; };
+extern PortSignPostState data_ov002_0210e084[];
+
+}  /* extern "C" */
+
+enum { PORT_SIGNPOST_STATES = 5 };
+
+static const struct { unsigned rom; void (*host)(void *); } g_states[10] = {
+    {0x020bba24, _ZN15daObjTatefuda_c8InitIdleEv}, {0x020bb9fc, _ZN15daObjTatefuda_c4IdleEv},
+    {0x020bb9f0, _ZN15daObjTatefuda_c8InitTalkEv}, {0x020bb614, _ZN15daObjTatefuda_c4TalkEv},
+    {0x020bbd50, _ZN15daObjTatefuda_c11InitCarriedEv}, {0x020bbcb8, _ZN15daObjTatefuda_c7CarriedEv},
+    {0x020bbc78, _ZN15daObjTatefuda_c10InitThrownEv}, {0x020bbb14, _ZN15daObjTatefuda_c6ThrownEv},
+    {0x020bbac8, _ZN15daObjTatefuda_c11InitDroppedEv}, {0x020bba28, _ZN15daObjTatefuda_c7DroppedEv},
+};
+
+extern "C" void port_sign_post_states_seat(void)
+{
+    PortStatePair *p = (PortStatePair *)data_ov002_0210e084;
+    for (int i = 0; i < 10; ++i) {
+        if ((unsigned)(p[i].fn) < 0x02000000u || (unsigned)(p[i].fn) >= 0x02400000u) continue;  /* PORTSYNC3: a mount word that is not a DS code address: the class TU owns the live table */
+        if (p[i].fn != g_states[i].rom) {
+            std::fprintf(stderr, "FATAL: SignPost state %d %s: the sinit left "
+                         "%08x, the ROM's own table says %08x -- WRONG "
+                         "BYTES\n", i / 2, (i & 1) ? "Main" : "Init", p[i].fn,
+                         g_states[i].rom);
+            std::abort();
+        }
+        p[i].fn = PORT_PMF_TC(g_states[i].host);
+        p[i].delta = 0;
+    }
+}
+
+/* BOTH DISPATCHERS ARE BACK ON THE SLICE. src/func_ov002_020bbd5c.cpp and
+   src/func_ov002_020bbda4.cpp are on port/slice_pmf3.txt (run link100 lane
+   PMF3): /vmg /vmm makes MSVC's pointer-to-member the ROM's 8-byte record, so
+   the stride is the ROM's 0x10 and both bodies TAIL JUMP; the mangled table
+   reference is bridged in port/hal/pmf3_aliases.cpp. The seat above is
+   unchanged and is what the rows are gated on -- it verifies each of the ten
+   records against the ROM's own address, zeroes the adjustment word as it
+   seats, and installs the host bodies -- and the ten source statics at ov002
+   0x02109a64..0x02109ab4 were re-read out of overlay_0002.bin with their
+   relocations, every adjustment word ROM zero.
+
+   ONE GUARD GOES WITH THE HOST BODIES and it is worth naming: they tested
+   `(unsigned)i >= PORT_SIGNPOST_STATES` and ABORTED. The ROM makes no such
+   test, and because the host test was an abort rather than a silent skip,
+   every green battery this port has run is proof it never fired. */

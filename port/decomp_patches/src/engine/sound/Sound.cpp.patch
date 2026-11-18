@@ -1,0 +1,174 @@
+diff --git a/src/engine/sound/Sound.cpp b/src/engine/sound/Sound.cpp
+--- a/src/engine/sound/Sound.cpp
++++ b/src/engine/sound/Sound.cpp
+@@ -98,6 +98,18 @@
+ extern int Player_PlaySoundEffect(NNSSndHandle *handle, int arg1, int arg2);
+ extern int Sound_PlayIfNotActive(int a, int b, int c, short d);
+ 
++#ifdef _MSC_VER
++/* host: this module's state is not private to this file. The host's own
++ * sound bring-up and drain (port/hal/sdat/consumer.cpp, sound_abi.cpp) and
++ * several hal files read and write these objects by their ROM names, and the
++ * port already hosts each of them once (port/hal/sdat/sound_bss.cpp,
++ * romdata.c with the ROM's .data values, and the bss hosts). A file-private
++ * copy here left the game and the port each working on its own object: the
++ * sound heap the host carved never reached this file, and the bank, group and
++ * layer music the port reads were never the ones this file set. So the host
++ * names those objects; the DS build keeps them file-private as retail did. */
++#define SOUND_HOSTED_STATE 1
++#endif
+ /* Module state. Volumes are 0..0x7f; the current ones are 20.12 fixed point
+    and ramp toward their targets by one shared step (func_02012d64,
+    func_020132d8). The "sub" channel is the second sequence Sound::PlaySub
+@@ -106,14 +118,30 @@
+ /* While no volumes are saved, -1. Sound::PauseMusic and func_02012e78 save
+    both targets here and duck them to 0x40; Sound::UnpauseMusic and
+    func_02012e1c put them back. */
++#ifdef SOUND_HOSTED_STATE
++extern "C" signed char sSavedMusicVolume;
++#else
+ static signed char sSavedMusicVolume = -1;
++#endif
++#ifdef SOUND_HOSTED_STATE
++extern "C" signed char sSavedSubVolume;
++#else
+ static signed char sSavedSubVolume = -1;
++#endif
+ 
+ /* The bank Sound::LoadGroupAndSetBank last set; Player_PlaySoundEffect
+    starts a type-3 sequence with it. */
++#ifdef SOUND_HOSTED_STATE
++extern "C" signed char sCurrentBank;
++#else
+ static signed char sCurrentBank = -1;
++#endif
+ 
++#ifdef SOUND_HOSTED_STATE
++extern "C" signed char sMusicVolumeTarget;
++#else
+ static signed char sMusicVolumeTarget = 0x7f;
++#endif
+ 
+ /* The sequence Sound::PlaySub started on sSubHandle, -1 when none. The player
+    and daSoundObj_c read it. */
+@@ -125,52 +153,120 @@
+ 
+ /* The track mode func_02013078 last picked for the music handle (the mode
+    func_0204921c and func_020494cc take). */
++#ifdef SOUND_HOSTED_STATE
++extern "C" int sMusicTrackMode;
++#else
+ static int sMusicTrackMode = -1;
++#endif
+ 
+ /* The music each layer's LoadAndSetMusic asked for, -1 when none. */
++#ifdef SOUND_HOSTED_STATE
++extern "C" int sLayer1Music;
++#else
+ static int sLayer1Music = -1;
++#endif
++#ifdef SOUND_HOSTED_STATE
++extern "C" int sLayer2Music;
++#else
+ static int sLayer2Music = -1;
++#endif
++#ifdef SOUND_HOSTED_STATE
++extern "C" int sLayer3Music;
++#else
+ static int sLayer3Music = -1;
++#endif
+ 
++#ifdef SOUND_HOSTED_STATE
++extern "C" signed char sSubVolumeTarget;
++#else
+ static signed char sSubVolumeTarget;
++#endif
+ 
+ /* Raised and dropped again by the lid-close handler func_02019ac4. While it
+    is set, func_02013524 moves every volume to 0 at once. */
+ unsigned char gSoundMuted;
+ 
+ /* The voice group func_02011f7c loaded, 0 when none. */
++#ifdef SOUND_HOSTED_STATE
++extern "C" unsigned char sPlayerVoiceGroup;
++#else
+ static unsigned char sPlayerVoiceGroup;
++#endif
+ 
+ /* The group Sound::LoadGroupAndSetBank loaded. */
++#ifdef SOUND_HOSTED_STATE
++extern "C" unsigned char sLoadedGroup;
++#else
+ static unsigned char sLoadedGroup;
++#endif
+ 
+ /* Set once func_020133bc has brought sound up. */
+ unsigned char gSoundInitialized;
+ 
++#ifdef SOUND_HOSTED_STATE
++extern "C" int data_0209b484;
++#else
+ static int data_0209b484;
++#endif
++#ifdef SOUND_HOSTED_STATE
++extern "C" int data_0209b488;
++#else
+ static int data_0209b488;
++#endif
++#ifdef SOUND_HOSTED_STATE
++extern "C" int data_0209b48c;
++#else
+ static int data_0209b48c;
++#endif
+ int gMusicVolume;
++#ifdef SOUND_HOSTED_STATE
++extern "C" int sVolumeRampStep;
++#else
+ static int sVolumeRampStep;
++#endif
+ 
+ /* The sound heap func_020133bc carves out of a 0x100000-byte block. */
++#ifdef SOUND_HOSTED_STATE
++extern "C" struct SndHeap *sSndHeap;
++#else
+ static struct SndHeap *sSndHeap;
++#endif
+ 
+ int gSubVolume;
+ 
+ /* Sequence handles. */
++#ifdef SOUND_HOSTED_STATE
++extern "C" NNSSndHandle sMusicHandle;
++#else
+ static NNSSndHandle sMusicHandle;
++#endif
++#ifdef SOUND_HOSTED_STATE
++extern "C" NNSSndHandle data_0209b4a4;
++#else
+ static NNSSndHandle data_0209b4a4;
++#endif
+ 
++#ifdef SOUND_HOSTED_STATE
++extern "C" int data_0209b4a8;
++#else
+ static int data_0209b4a8;
++#endif
+ 
+ /* The music now playing on sMusicHandle; daSetSE_c reads it. */
+ int gCurrentMusicID;
+ 
++#ifdef SOUND_HOSTED_STATE
++extern "C" NNSSndHandle sSubHandle;
++#else
+ static NNSSndHandle sSubHandle;
++#endif
+ 
+ /* The sound archive func_020133bc opens. */
++#ifdef SOUND_HOSTED_STATE
++extern "C" char sSndArc[0x88];
++#else
+ static char sSndArc[0x88];
++#endif
+ 
+ extern int data_0209baa0;
+ /* "/data/sound_data.sdat", the archive path func_020133bc opens. Most likely

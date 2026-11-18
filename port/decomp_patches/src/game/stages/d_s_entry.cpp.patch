@@ -1,0 +1,24 @@
+diff --git a/src/game/stages/d_s_entry.cpp b/src/game/stages/d_s_entry.cpp
+--- a/src/game/stages/d_s_entry.cpp
++++ b/src/game/stages/d_s_entry.cpp
+@@ -671,6 +671,10 @@
+ extern dScEntry_c::Step data_ov075_0211c8d8;
+ 
+ dScEntry_c::graphCallback_c sEntryGraphCallback;
++#ifdef _MSC_VER
++/* MSVC has no GNU attributes; the aligned(4) below only pins ROM layout. */
++#define __attribute__(x)
++#endif
+ extern "C" EntryPair data_ov075_0211d948[14] __attribute__((aligned(4))) = {
+     EntryPair(0x80, 0x10), EntryPair(0x3c, 0x10), EntryPair(0x1c, 0x10), EntryPair(8, 0x10),
+     EntryPair(8, 0x10),    EntryPair(0x20, 0x10), EntryPair(0x30, 0x10), EntryPair(0x20, 0x20),
+@@ -685,6 +689,9 @@
+ extern "C" EntryPair data_ov075_0211d754[5] __attribute__((aligned(4))) = {
+     EntryPair(0x20, 0x10), EntryPair(0x20, 0x10), EntryPair(0x28, 0x10), EntryPair(0x20, 0x10),
+     EntryPair(0x30, 0x10)};
++#ifdef _MSC_VER
++#undef __attribute__
++#endif
+ 
+ dScEntry_c::StepSet EntryDelaySteps = {0, data_ov075_0211c8d0, 0};
+ dScEntry_c::StepSet EntryFadeOutSteps = {data_ov075_0211c700, data_ov075_0211c750, 0};

@@ -1,0 +1,23 @@
+diff --git a/src/game/actors/d_a_shark.cpp b/src/game/actors/d_a_shark.cpp
+--- a/src/game/actors/d_a_shark.cpp
++++ b/src/game/actors/d_a_shark.cpp
+@@ -291,7 +291,19 @@
+ SharkModelFilePtr data_ov090_021345a4(ASSET_HOJIRO_BMD);
+ SharkAnimationFilePtr data_ov090_021345ac(ASSET_HOJIRO_SWIM_BCA);
+ 
++#ifdef _MSC_VER
++/* Host: SetState runs the enter record as a pointer to member, which MSVC does
++   with the shark in ecx and nothing pushed, but InitStateSwim is a static that
++   takes the shark off the stack. The host record holds a __fastcall face that
++   takes it from ecx and makes the static call; direct calls are unchanged. */
++static int __fastcall daShark_InitStateSwim_pmf(daShark_c *self)
++{
++    return daShark_c::InitStateSwim(self);
++}
++SharkFreeState data_ov090_021343a0 = {(int (*)(daShark_c *))&daShark_InitStateSwim_pmf};
++#else
+ SharkFreeState data_ov090_021343a0 = {&daShark_c::InitStateSwim};
++#endif
+ SharkFreeState data_ov090_021343a8 = {&daShark_c::StateSwim};
+ 
+ SharkStateTable data_ov090_021345cc;

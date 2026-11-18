@@ -1,0 +1,54 @@
+diff --git a/include/dScEntry_c.h b/include/dScEntry_c.h
+--- a/include/dScEntry_c.h
++++ b/include/dScEntry_c.h
+@@ -7,6 +7,17 @@
+ #include "dThIcon_c.h"
+ 
+ struct dEntObj_c;
++
++#ifdef _MSC_VER
++/* host: the ROM puts the Step pointers-to-member at +0x54/+0x5c/+0x64 (four-byte
++ * aligned); MSVC aligns an eight-byte member to eight. d_s_entry_methods.cpp is
++ * built /Zp4 for that reason, but the factory (d_s_entry_entry.cpp) and
++ * d_s_entry.cpp were not, so the factory constructed the icons at +0x74 while
++ * Behavior stepped them at +0x70 and called through a null vptr (scene 6).
++ * Packing the class here gives every includer the ROM's offsets. */
++#include <stddef.h>
++#pragma pack(push, 4)
++#endif
+ 
+ /* Course-entry / results scene. ov075 hosts ENTRY(6) and RESULT(7); both
+  * spawn dScEntry_c. Nested icon_c (dThIcon_c leaf) and graphCallback_c
+@@ -146,7 +157,18 @@
+     dScEntry_c();
+ 
+     /* Out of line: the key function, defined first in src/game/stages/d_s_entry.cpp. */
++    /* The destructor pair spelled as two plain virtuals on the host, plus
++       the non-virtual destructor declaration the src/ definitions need; the
++       whole ruling is in include/ModelBase.h. An override takes its base's
++       slots, so these carry the SAME TWO NAMES the base declares -- a fresh
++       name would append a slot instead of claiming one. */
++#ifdef _MSC_VER
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~dScEntry_c();   /* no slot */
++#else
+     virtual ~dScEntry_c(); /* slots 16 (D1), 17 (D0) */
++#endif
+ 
+     virtual s32 InitResources();        /* slot  0 */
+     virtual bool BeforeInitResources(); /* slot  1 */
+@@ -179,6 +201,13 @@
+     void QueueBg2Screen(void *);
+ };
+ 
++#ifdef _MSC_VER
++#pragma pack(pop)
++typedef char dScEntry_c_host_mEnterStep_at_0x54[offsetof(dScEntry_c, mEnterStep) == 0x54 ? 1 : -1];
++typedef char dScEntry_c_host_mIcons_at_0x70[offsetof(dScEntry_c, mIcons) == 0x70 ? 1 : -1];
++typedef char dScEntry_c_host_mIconCount_at_0x280[offsetof(dScEntry_c, mIconCount) == 0x280 ? 1 : -1];
++#endif
++
+ #ifndef SM64DS_PLATFORM_PC
+ /* ROM layout under mwccarm; host ABI divergence is tracked separately. */
+ typedef char dScEntry_c_size_must_be_0x288[sizeof(dScEntry_c) == 0x288 ? 1 : -1];

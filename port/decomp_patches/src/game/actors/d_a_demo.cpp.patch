@@ -1,0 +1,57 @@
+diff --git a/src/game/actors/d_a_demo.cpp b/src/game/actors/d_a_demo.cpp
+--- a/src/game/actors/d_a_demo.cpp
++++ b/src/game/actors/d_a_demo.cpp
+@@ -3345,6 +3345,9 @@
+     return 1;
+ }
+ 
++#ifdef _MSC_VER
++extern "C" void port_thiscall3_keep_esp(void *self, void *fn, void *a1, int a2, int a3);
++#endif
+ void daDemo_c::RunCommand(unsigned char *p, int a2, int a3) {
+     /* Indexed by the command byte p[6]. The handlers take what they read
+        from the command, so each is cast to the table's signature. */
+@@ -3374,7 +3377,26 @@
+         (PMF3)&daDemo_c::func_ov002_020f26d4, /* 22 */
+         (PMF3)&daDemo_c::func_ov002_020f26c4, /* 23 */
+     };
++#ifdef _MSC_VER
++    /* Host: the handlers are cast to (unsigned char *, int, int), but most take
++       fewer arguments, and MSVC's __thiscall callee pops only its own. On the
++       cartridge the arguments ride in registers and a short handler ignores
++       them; here a short handler leaves the extra words on the stack and this
++       frame returns through them (command 22, func_ov002_020f26d4, takes none:
++       the opening's first KuppaScript record faulted at eip 0). The call goes
++       through hal/scene_boot.cpp's port_thiscall3_keep_esp, which puts the
++       stack pointer back after it. The member pointer is split into its code
++       address and this-adjustment, the two words MSVC stores for this class. */
++    {
++        union { PMF3 pmf; struct { void *fn; int adj; } raw; } handler;
++        typedef char PMF3_is_two_words[sizeof(PMF3) == 8 ? 1 : -1];
++        handler.pmf = sCommandTable[p[6]];
++        port_thiscall3_keep_esp((char *)this + handler.raw.adj, handler.raw.fn,
++                                p + 7, a2, a3);
++    }
++#else
+     (this->*sCommandTable[p[6]])(p + 7, a2, a3);
++#endif
+ }
+ 
+ int daDemo_c::CleanupResources()
+@@ -3657,6 +3679,16 @@
+    0x13 (0x0210b610, 0x0210b600), and the BCA list for 0x1a..0x2d. */
+ SharedFilePtr *data_ov002_0210b600[1] = {(SharedFilePtr *)&data_ov002_02110b10};
+ SharedFilePtr *data_ov002_0210b604[1] = {(SharedFilePtr *)data_ov009_02113c28};
++#ifdef _MSC_VER
++/* Host: this TU (and hal/intro_ov002_seat.cpp) reaches the two seagull
++   handles through include/decl_common.h's extern "C" char arrays, while
++   src/game/actors/d_a_s_bird.cpp defines them as typed C++ objects. Itanium
++   leaves a global's name unmangled, so on the cartridge both spellings are one
++   symbol; MSVC decorates the typed definitions. Route the C names to them
++   (same objects, ROM 0x02113c20 / 0x02113c28). */
++#pragma comment(linker, "/alternatename:_data_ov009_02113c20=?data_ov009_02113c20@@3USBirdModelFilePtr@@A")
++#pragma comment(linker, "/alternatename:_data_ov009_02113c28=?data_ov009_02113c28@@3USBirdAnimationFilePtr@@A")
++#endif
+ SharedFilePtr *data_ov002_0210b608[1] = {&data_ov085_0213073c};
+ SharedFilePtr *data_ov002_0210b60c[1] = {&data_ov085_02130744};
+ SharedFilePtr *data_ov002_0210b610[1] = {(SharedFilePtr *)&data_ov002_02110bf8};

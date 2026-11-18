@@ -1,0 +1,24 @@
+diff --git a/include/nitro/gx/g3imm.h b/include/nitro/gx/g3imm.h
+--- a/include/nitro/gx/g3imm.h
++++ b/include/nitro/gx/g3imm.h
+@@ -65,8 +65,20 @@
+ 
+ typedef enum { GX_TEXPLTTCOLOR0_USE = 0, GX_TEXPLTTCOLOR0_TRNS = 1 } GXTexPlttColor0;
+ 
++/* Port patch: on the host a C++ TU that hostgen fronted with ntr/mmio.h gets
++ * these two geometry command ports through the host's register model, as
++ * nitro/hw/registers.h does for the rest (NTR_HWREG). hostgen rewrites a
++ * literal address in a TU's own text but not one that arrives through this
++ * header, so a plain store here latched in the mapped I/O window and never
++ * reached the geometry engine: ModelComponents::func_02044b30's material bind
++ * lost every TEXIMAGE_PARAM and TEXPLTT_BASE and the 3D drew untextured. */
++#if defined(_MSC_VER) && defined(__cplusplus) && defined(NTR_MMIO)
++#define reg_G3_TEXIMAGE_PARAM NTR_MMIO(u32, 0x040004a8)
++#define reg_G3_TEXPLTT_BASE NTR_MMIO(u32, 0x040004ac)
++#else
+ #define reg_G3_TEXIMAGE_PARAM (*(volatile u32 *)0x040004a8)
+ #define reg_G3_TEXPLTT_BASE (*(volatile u32 *)0x040004ac)
++#endif
+ 
+ #define GX_PACK_TEXIMAGE_PARAM(texFmt, texGen, s, t, repeat, flip, pltt0, addr)                \
+     ((u32)(((addr) >> 3) | ((texFmt) << 26) | ((texGen) << 30) | ((s) << 20) | ((t) << 23) | \

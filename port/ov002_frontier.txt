@@ -1,0 +1,380 @@
+ov002: what is left unlinked, and what each class of it is waiting on
+=====================================================================
+
+Run linkw wave C, lane cat-ov002, worktree branch cat-ov002 off 459f21a07.
+Every number below was read out of this worktree's own build:
+
+    baseline   4888 / 11243 linked, battery ALL GREEN, exe 702f3357...
+    after      4892 / 11243 linked, battery ALL GREEN, exe c13bbec7...
+    ov002      1528 matched TUs, 1123 -> 1127 linked, 405 -> 401 unlinked
+
+WHAT LINKED, AND WHY THOSE FOUR
+-------------------------------
+Gate 204 seated slot 17 -- the deleting destructor -- on four classes the port
+already fills: Coin, HealingHeart, the Cap and PushBlock. Three of them were on
+bw_trap17 and PushBlock had the member chain typed out by hand in a host thunk.
+The bodies were matched, flat C, unmarked and fully closed; what they lacked was
+a reference edge, and the ROM's own vtable word is the honest place for one.
+See slice_gate204.txt for the derivation.
+
+That gate supersedes port/slice_w1l1.txt section (2), which declines slot-17
+seats -- Coin's by name -- on the grounds that the trap is a diagnostic and
+seating it buys a double free. The distinction w1l1 does not draw is that
+bw_trap17 declines SOFT into the quarantine net while the Player's ps_trap
+aborts HARD, and that the binary-wide slot-17 dispatch count is measurably
+zero. The going-forward rule, with the measurement and its positive control,
+is written out at the bottom of slice_gate204.txt. Cite that one, not both.
+
+HOW THE REMAINING 401 SPLIT
+---------------------------
+Method: a TU's ROM address comes from config/arm9/overlays/ov002/symbols.txt;
+every ov002 relocation whose `to:` is that address and whose `from:` lands
+inside a data object is a table word; a table is HOSTED when a port/hal or
+port/unmatched file declares it as an array or names it as data_ov002_*; a
+pointer-to-member object is one whose cxx_aliases spelling carries the `@@3P8`
+member-function mangling.
+
+THE BUCKETS ARE ORDERED AND EACH TU IS COUNTED ONCE, so the counts are only
+reproducible next to the order. It is, first match wins:
+
+     1  host copy defining the Itanium name
+     2  host copy defining the MSVC-mangled name
+     3  inferred-stub marker
+     4  MSVC-method form (the source defines Class::Method, not a C body)
+     5  word in a hosted vtable
+     6  word in a pointer-to-member record
+     7  word in a vtable the port does not host
+     8  nothing above -- a plain callee
+
+A TU can qualify for several. _ZN8daCoin_cD1Ev is both an MSVC-method form and a
+hosted vtable word, and lands in 4 because 4 is the binding constraint: no
+slice line reaches a body MSVC will not compile against the host seams. Read a
+bucket as "the first thing that has to change", not as "the only thing true of
+it".
+
+  167  vtable slot on an UNSEATED class
+   97  plain callee -- no vtable word names it; it links when its caller does
+   48  MSVC-method form (a real C++ method or destructor, not a C body)
+   29  HOST-COPY, Itanium name -- already in linkage.py's replacement queue
+   28  INFERRED-STUB -- the ratchet holds it out
+   14  mwcc PMF record -- needs a states seat
+   10  hosted vtable slot, blocked on one placeholder binding
+    7  HOST-COPY, MSVC name -- INVISIBLE to linkage.py's queue
+    1  hosted vtable slot, seatable (Player D0; deliberately trapped, below)
+
+THE THREE FINDINGS WORTH CARRYING FORWARD
+-----------------------------------------
+
+1. THE ov002 VTABLE-TAIL FRONTIER IS INFERRED-STUB BODIES, NOT PORT WIRING.
+
+   Two seats in hal/actor_classes.cpp record their own tail slots as ready
+   follow-ups: SIGN_POST's header says slots 21/22/27/31 are "matched in src and
+   in no slice", and BLACK_BRICK_BLOCK's says slot 23 "stays on ac_trap23 only
+   because its real body is not sliced yet -- seating it is a follow-up".
+
+   Every one of those six bodies -- _ZN15daObjTatefuda_c15OnGroundPoundedER8dActor_c, 020bb23c, 020bb374,
+   020bb3b8, 020b3788, 020b36dc -- carries the `recovered from vtable slot
+   identity` marker, so seating any of them fails port/tools/
+   inferred_stub_guard.py. So does every other unlinked ov002 body the ROM's own
+   words put in a hosted table's tail. The follow-up those comments describe is
+   not a slice line; it is decompiling six guessed bodies.
+
+   A SECOND CORRECTION TO THE SAME COMMENT. BLACK_BRICK_BLOCK's header rules
+   slot 22 blocked because its body reaches slot 31 through `fn(c)`, a cdecl
+   call, while the seated slot 31 is __fastcall -- and rules slot 23 unblocked
+   because its DISPATCHER is now thiscall. Slot 23's BODY has the same defect as
+   slot 22's: src/_ZN13BigBrickBlock11OnAttacked2ER8dActor_c.cpp declares
+   `struct Vt { int dummy[0x7c/4]; void (*fn)(void*); }` and calls
+   `(*(struct Vt**)c)->fn(c)`, which MSVC emits as a cdecl call through a
+   function pointer onto the __fastcall bbb_kill at slot 31. Seating slot 23 as
+   the comment suggests would introduce exactly the bug the comment attributes
+   to slot 22. Slots 24 (020b36dc) and 27 (020b36b4) use a C++ virtual call and
+   would be convention-clean -- they are held out only by the marker.
+
+2. linkage.py's REPLACEMENT QUEUE CANNOT SEE HOST COPIES THAT DEFINE ONLY THE
+   MSVC-MANGLED NAME.
+
+   The queue matches a map symbol against the set of matched TU stems, and a
+   stem is an Itanium name. A host copy that compiles a real C++ method defines
+   `?Behavior@Player@@UAEHXZ`, which is not any TU's stem, so the pair is never
+   examined. Ten ov002 matched TUs are shadowed that way today:
+
+     _ZN8dMeter_c13InitResourcesEv          HUD_InitResources.cpp
+     _ZN7daPly_c11ChangeStateERNS_5StateE   reverse_bridges.cpp
+     _ZN7daPly_c12St_Jump_MainEv        Player_St_Jump_Main.cpp
+     _ZN7daPly_c12St_Swim_MainEv        method_faces.cpp -> Player_SwimMain.cpp
+     _ZN7daPly_c16CleanupResourcesEv    Player_CleanupResources.cpp
+     _ZN7daPly_c16St_WallJump_MainEv    Player_St_WallJump_Main.cpp
+     _ZN7daPly_c17St_NoControl_InitEv   Player_St_NoControl_Init.cpp
+     _ZN7daPly_c8BehaviorEv             Player_Behavior.cpp
+     _ZN16dPathLiftActor_c12BaseBehaviorEv      PathLift_StateDispatch.cpp
+     _ZN14daObj1UpLogo_c13InitResourcesEv    OneUpLogo_InitResources.cpp
+
+   Each host file's header documents a real host-ABI reason (the mwcc
+   pointer-to-member dispatch over DS code words, the TextureSequence::Prepare
+   argsweep seam, the GetHealth receiver seam), so these are exceptions rather
+   than work.
+
+   THREE OF THE TEN ARE ALREADY IN THE QUEUE, and the queue is not as blind as
+   a first read of this list suggests. ChangeState, St_Swim_Main and
+   CleanupResources each have a companion host object that ALSO defines the
+   Itanium spelling -- Player_ChangeState.cpp, Player_SwimMain.cpp and
+   method_faces.cpp respectively, all three visible in walk_window.map -- so
+   the queue sees them by name and, each being PORT_HOST_ABI tagged, files them
+   under EXCEPTIONS. That is the queue working.
+
+   SEVEN are absent from all three columns, and seven is the actionable number
+   for a demangling fix. It is the same seven this file's own bucket table
+   counts under "HOST-COPY, MSVC name".
+
+   PORT_HOST_ABI TAGS ARE NOT THE MISSING PIECE, and an earlier draft of this
+   file said they were. The tag is not rare in these files: method_faces.cpp
+   carries seven, PathLift_StateDispatch.cpp carries two, and one of those two
+   sits directly above BaseBehavior. It is inert there only because MSVC
+   inlined the forwarder and /OPT:REF dropped the external, which is the
+   folded-away-face case method_faces.cpp's own header warns about at length.
+   So the gap is the queue's name matching, not missing documentation: tagging
+   the other seven changes nothing while a tag is only consulted for a symbol
+   the queue already asked about. The fix is to make the queue demangle, or to
+   have each host copy also carry the Itanium spelling the way the three above
+   do.
+
+3. _ZN7daPly_c19func_ov002_020bd664EPhii's POINTER-TO-MEMBER TABLE IS LIVE AND UNSEATED.
+   UNPROVEN AT RUNTIME -- stated as a shape read off the source and the map,
+   not as an observed fault.
+
+   src/func_ov002_020bd664.cpp is linked (slice_gate10) and reached from
+   src/func_0200e5ac.c, which is also linked. It builds a 14-entry array of
+   mwcc pointers-to-member out of data_ov002_0210a054 .. 0x0210a534 and calls
+   `(self->*table[p[6]])(p + 7, a2, a3)`. Those fourteen objects are mounted
+   ov002 data whose first word is a DS code address, and MSVC's
+   single-inheritance member pointer is that one word, so the call goes to a DS
+   address inside the mapped overlay image. That is the same shape as the
+   walljump crash port/unmatched/Player_St_WallJump_Main.cpp was written
+   against; no port_*_states_seat covers this table.
+
+   The fourteen bodies those records name are all in the unlinked set
+   (_ZN7daPly_c19func_ov002_020bccfcEPhii, 020bcd18, 020bcd38, 020bd20c, 020bd250, 020bd354,
+   020bd3a0, 020bd438, 020bd45c, 020bd480, 020bd4ac, 020bd4c8, 020bd4e0,
+   020bd600), so a seat over this table both closes a latent wild call and
+   links fourteen TUs. It was not taken here: it needs the SignPost/Coin
+   states-seat treatment with per-record byte checks, and it sits next to the
+   level object loader, which is another lane's file this wave.
+
+WHAT IS ONE BINDING AWAY
+------------------------
+Five classes have a trapped slot 17, a matched flat-C D0 body, and every callee
+already linked. The only blocker is that the body spells its own vtable as the
+bare placeholder `VT`, which cxx_aliases binds ONCE, to data_ov002_021081e4.
+Each needs one per-source COMPILE_DEFINITIONS line, which belongs to the actors
+lane this wave. `HEAP` needs nothing -- it is already bound to data_020a0eac,
+which is what all five want.
+
+    src/_ZN10BrickBlockD0Ev.cpp            VT=_ZTV19daObjBlockItemTag_c
+    src/game/actors/d_a_ch_scene.cpp           VT=_ZTV11daChScene_c
+    src/game/actors/d_a_obj_waterfall.cpp    VT=_ZTV16daObjWaterfall_c
+    src/game/actors/d_a_set_se.cpp   VT=_ZTV9daSetSE_c
+    src/_ZN8MugenBgmD0Ev.cpp               VT=_ZTV12daMugenBGM_c
+
+Two more want a host object rather than a -D: src/_ZN10StarSwitchD0Ev.cpp and
+src/game/actors/d_a_obj_cannon_shutter.cpp both store _ZTV10dBgActor_c, the shared base table,
+which nothing in the port defines. Their own class tables are already aliased
+(daObjSwitch_c, daObjCannonShutter_c); dBgActor_c is a real second table and
+wants a mount, not an alias onto one of theirs.
+
+WHAT IS DELIBERATELY LEFT ALONE
+-------------------------------
+_ZN7daPly_cD0Ev is the one hosted slot with a clean body and no binding problem,
+and it stays unlinked on purpose. hal/level_boot.cpp seats slot 17 of
+_ZTV7daPly_c on ps_trap and says why: the ROM's teardown never dispatches
+the deleting form, so a call arriving there means something reached the Player
+through `delete`, "which is a bug worth an abort rather than a double free".
+
+This is the same reasoning gate 204 supersedes for the three soft traps, and it
+survives here for the reason the new rule turns on: ps_trap calls std::abort(),
+so it is a live misuse detector rather than a bounded decline into the
+quarantine net. Losing it costs the first-failure stop; losing a bw_trap17
+costs a diagnostic for a call site the sweep proves does not exist. Lane l5
+made this call before and it stands. +1 on the headline is not worth the trade;
+anyone who wants it should reverse the rule deliberately rather than notice the
+inconsistency and close it the easy way.
+
+THE PLAYER STATE MACHINE, ANSWERED FOR THE COORDINATOR
+------------------------------------------------------
+Five St_ bodies are in the ov002 unlinked remainder. None is a switch case that
+was never wired and none is a state no selftest enters:
+
+  St_Jump_Main, St_WallJump_Main, St_NoControl_Init
+      hal/player_states.inc HAS the case and it calls the MSVC method; the
+      method is defined by the host copy in port/unmatched, so the matched TU
+      would be a duplicate definition. Blocker: the per-character PMF rows hold
+      DS code words and the matched source calls them as plain function
+      pointers.
+  St_Swim_Main
+      same, one level further out: method_faces.cpp defines the MSVC method as
+      a face onto the Itanium name and port/unmatched/Player_SwimMain.cpp
+      defines that, PORT_HOST_ABI tagged for the GetHealth receiver seam.
+  _ZN7daPly_c18St_LevelEnter_MainEv
+      on slice_gate10.txt and /OPT:REF-stripped. The port does not route
+      through this name at all: player_states.inc case 0x020c6f3c calls
+      func_ov002_020c6f3c, because the community Player symbol at that address
+      is the one the port distrusts. A naming question, coordinator-routed, not
+      a wiring gap.
+
+The remaining 167-in-unseated-classes half is also, in part, a naming problem
+rather than a port one. InvisiblePole, InvisibleSecret, Seaweed, WaterfallMist
+and PoppingLavaBubbles all carry config names that belong to a DIFFERENT ROM
+class than the actor the port seats -- hal/actor_classes_bob_world.cpp derives
+the shift by address at its head. So e.g. the seven _ZN13InvisiblePole* TUs are
+not the class the port fills as INVISIBLE_POLE, and they will link when the
+class they really belong to is mounted, not before.
+
+
+
+
+================================================================================
+THE gNumStageStars SPAN CHECK (run rel0215, lane prop15) -- IT WAS SHORT
+================================================================================
+
+Item 1 above ends by naming the per-player carried-star array as live gameplay
+state. The undersized-host-globals trap says a hosted DS global must cover its
+whole ROM span, so it was measured. It did not, and the way it failed is one
+this file has not recorded before: a SPLIT, not a truncation.
+
+THE ROM SPAN IS FOUR BYTES, 0x0209f310..0x0209f313, and three independent
+readings agree:
+
+  * config/arm9/symbols.txt names gNumStageStars (0x0209f310), data_0209f311
+    (0x0209f311) and then data_0209f314 -- so dsd splits the run into a 1-byte
+    head and a 3-byte tail, and the next DIFFERENT object starts at +4.
+    data_0209f314 is the level area table, hosted in hal/camera_bridges.cpp,
+    and it carries six relocations of its own. It is not slack.
+  * the reloc census: 15 loads land on 0x0209f310 (arm9 3, ov002 10, ov075 2)
+    and exactly one on 0x0209f311, which is NumVsStarsObtained's second load.
+    Nothing addresses 0x0209f312 or 0x0209f313 directly -- they are reached by
+    indexing, which is why the symbol table alone cannot size this.
+  * THE DECIDING EVIDENCE IS A MATCHED TU, and it arrived in this same lane.
+    src/func_ov075_021165b0.c -- propagated from main tonight, byte-verified at
+    2004/b56 -- spells the width out literally:
+
+        if (gNumStageStars[0] != 0 || gNumStageStars[1] != 0 ||
+            gNumStageStars[2] != 0 || gNumStageStars[3] != 0 || ...
+
+    and walks the array twice more with `do { ... } while (i < 4)`. Four
+    players, one signed char each. That is the ROM's own answer, not an
+    inference from the symbol bound.
+
+WHAT THE PORT HOSTED. hal/actor_classes_star.cpp defines the pair as two
+grouped sections, .dsstate$hvsstar0000 (gNumStageStars[1]) and $hvsstar0001
+(data_0209f311[31]), on the reasoning that MSVC lays $NNNN contributions out in
+suffix order and would therefore put them adjacent. The suffix-order half is
+true. The ADJACENCY half was never measured, and it was false: read out of the
+0.2.15 release build's own maps, before any change, on all three hosting
+targets --
+
+    walk_window.map        _gNumStageStars 00d280d4   _data_0209f311 00d280d8
+    smoke_player.map       _gNumStageStars 009fd0d0   _data_0209f311 009fd0d4
+    walk_window_hires.map  _gNumStageStars 015980d4   _data_0209f311 015980d8
+
+-- f311 sat FOUR bytes behind f310 where the ROM puts it ONE. The linker gives
+each contribution its default four-byte alignment, so the one-byte head was
+padded out to four. hal/cxx_aliases.cpp's GXBANK macro has carried the missing
+half all along ("align(4) on every member would pad each one to four and put
++0x18 at +0x30"); this pair was written without any align() at all.
+
+
+THE FIX is the GXBANK arrangement: __declspec(align(4)) on the head and
+__declspec(align(1)) on the member, so the linker places f311 at f310+1. AFTER,
+same three targets:
+
+    walk_window.map        _gNumStageStars 00d290d8   _data_0209f311 00d290d9
+    smoke_player.map       _gNumStageStars 009fe0d4   _data_0209f311 009fe0d5
+    walk_window_hires.map  _gNumStageStars 015990d8   _data_0209f311 015990d9
+
+AND IT IS GATED NOW, twice. port_vsstar_layout_check() in
+hal/actor_classes_star.cpp reads the delta back once per process from
+port_scene_fill_vs, and port/tools/gxband_guard.py grew a band, 'vsstar', which
+asserts the config-derived offsets against EVERY hosting target's map at link
+time. Its own post-link line on the fixed build:
+
+    gxband_guard: gxbank 3/24 maps (floor 3), 13 members, 36 deltas; dtcm 3/24
+    maps (floor 3), 1 members, 0 deltas; vsrank 3/24 maps (floor 3), 2 members,
+    3 deltas; vsstar 3/24 maps (floor 3), 2 members, 3 deltas -- layout OK
+
+The runtime check alone would not have been enough -- ppu_gap_audit section 11a
+already measured a runtime layout check reading green over a broken band --
+which is why the link-time band is the real answer and the runtime one is the
+second opinion.
+
+AND IT WAS NOT THE ONLY ONE. Retiring the ov075 faces put _ZN10dScEntry_c17TallyRoundWinnersEv
+in the link, and that one body walks FOUR split-symbol runs. Two more have the
+identical shape:
+
+
+
+
+
+
+WHAT THE PORT DOES NOW. hal/level_boot.cpp's port_load1 lets the ROM's loop run
+at the real player count: player i spawns from entrance record p3 + i and is
+KEPT. The only remaining guard clamps the count to the records the table has
+past p3 (a test boot that outruns the table gets the extra slots from
+port_vs_spawn_extra_players, as before). The four arenas' records, decoded from
+the overlays (ov059/ov051/ov037/ov050): four consecutive player records each,
+raw 0, p3=0 -- level 51's at (-1200,254,6800) (-1387,254,6667) (-987,254,6567)
+(-1587,254,6467). Castle grounds' records 0-3 are those SAME four starts,
+byte-identical to level 51's.
+
+WHAT THE HOLD WAS ACTUALLY HIDING. The orphan shadow-caster that justified it
+was the fc5c stride bug (the split-symbol entry above): the loop spawned a
+real second player, read byte data_0209fc5c[1] as 0 through the int-stride
+seat, and discarded the pointer -- leaving the actor ticking and casting a
+shadow with no body. The entry's original explanation, "record p3+1 is a
+different door / not a Player", was a misread of a correct measurement: EVERY
+entrance record in the game names the player (raw 0), and castle grounds'
+record 1 is a player start with param 0x0000. Both conditional predicates the
+original entry recorded as failures (total-record count; class equality
+between records p3 and p3+1) failed because they were asked to predict which
+spawn the loop would DISCARD, and the discard was the width bug, not a
+property of the records. The 152 -> 216 shadow-census jump in the
+class-equality experiment was the width bug casting its shadow.
+
+
+
+================================================================================
+FOUR PLAYERS: THE BLOCKER WAS SESSION FORMATION, NOT THE Ctrl BAND (run vs4p)
+================================================================================
+The campaign record said three or four players needed the Ctrl split band
+migrated, and item 2 above used to say the same thing. Both were stale. Run
+vs4p measured the whole surface at cons 577b48832 before changing a line, and
+the band turned out to be finished work while the actual cap was somewhere
+nobody had looked.
+
+WHAT ALREADY WORKED, unmodified, at 577b48832. One process, a real arena,
+SM64DS_VS_MAP=0 with SM64DS_VS_PLAYERS=4:
+
+
+
+WHAT DID NOT WORK, and it is one sentence: EVERY CONSOLE SEATED ITS WORLD ON
+THE FIRST PEER. lb_become_parent and on_parent_packet both reach
+kCommsParentConnected as soon as one child is live, comms_wait_for_session
+released on that, and vs_player_count() was read once. Four windows on one
+loopback session:
+
+
+At frame 500 the four windows reported counts 2/2/3/4 and slots 2 and 3 were
+NULL in the windows that had already seated. Forcing SM64DS_VS_PLAYERS=4 on all
+four fixed the count everywhere and proved the rest of the stack -- all four
+pads read correctly (0040/0080/0020/0010) in all four windows -- but the
+windows still disagreed, because they had seated at rounds 0, 0, 54 and 99 and
+so gave slot 3 a different number of input-less frames each. Player 3 was on
+the arena in two windows and fallen out of it in the other two.
+
+THE FIX, both halves in the host layer with src/ untouched:
+  * hal/comms_conductor.cpp holds the world seat until player_count() reaches
+    SM64DS_VS_PLAYERS. Unset is 0 and 0 reduces to the old test exactly, so
+    solo and two-window runs are byte-for-byte what they were. Waiting also
+    keeps the parent's round at 0 while the others knock, which is what makes
+    all four start on the same round.
+
+

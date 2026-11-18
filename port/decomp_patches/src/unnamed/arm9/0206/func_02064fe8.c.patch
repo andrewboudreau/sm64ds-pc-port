@@ -1,0 +1,15 @@
+diff --git a/src/unnamed/arm9/0206/func_02064fe8.c b/src/unnamed/arm9/0206/func_02064fe8.c
+--- a/src/unnamed/arm9/0206/func_02064fe8.c
++++ b/src/unnamed/arm9/0206/func_02064fe8.c
+@@ -10,7 +10,11 @@
+     unsigned char one = 1;
+     unsigned short s = b;
+     MI_CpuCopy8(&one, dst, 1);
++#ifdef _MSC_VER   /* MSVC C has no void * arithmetic; same byte offset */
++    p = (char *)dst + 1;
++#else
+     p = dst + 1;
++#endif
+     MI_CpuCopy8(&s, p, 2);
+     q = p + 2;
+     MI_CpuCopy8(&c, q, 1);

@@ -1,0 +1,18 @@
+diff --git a/include/dCamera_c.h b/include/dCamera_c.h
+--- a/include/dCamera_c.h
++++ b/include/dCamera_c.h
+@@ -228,7 +228,14 @@
+        node. */
+     u8 mPathNode; /* 0x1a7 */
+     dCamera_c() {}
++    #ifdef _MSC_VER
++    /* host two-arm destructor spelling; ruling in include/ModelBase.h */
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~dCamera_c();   /* no slot */
++    #else
+     virtual ~dCamera_c();
++    #endif
+ 
+     /* fBase_c virtual overrides, in their inherited slots. */
+     virtual s32 InitResources();

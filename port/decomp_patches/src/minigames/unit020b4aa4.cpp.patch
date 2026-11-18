@@ -1,0 +1,28 @@
+diff --git a/src/minigames/unit020b4aa4.cpp b/src/minigames/unit020b4aa4.cpp
+--- a/src/minigames/unit020b4aa4.cpp
++++ b/src/minigames/unit020b4aa4.cpp
+@@ -93,6 +93,13 @@
+    screen pixels (Coin_Draw draws at mPos >> 12). */
+ struct Sprite;
+ typedef void (Sprite::*SpriteFn)();
++#ifdef _MSC_VER
++/* MSVC aligns the two-word member pointer to 8, which pads the record to
++   0x28. The array is the ROM's twenty 0x24-byte records and four readers
++   below index its visible bytes as sMgCoinsVisible[i * 0x24], so the host
++   record has to be the ROM's width. */
++#pragma pack(push, 4)
++#endif
+ struct Sprite {
+     Sprite();
+     ~Sprite();
+@@ -104,6 +111,10 @@
+     s16 mDelay;        /* 0x20 frames to wait; also the rise counter */
+     u8 mVisible;       /* 0x22 drawn while nonzero */
+ };
++#ifdef _MSC_VER
++#pragma pack(pop)
++typedef char Sprite_host_size_must_be_0x24[sizeof(Sprite) == 0x24 ? 1 : -1];
++#endif
+ 
+ #ifndef SM64DS_PLATFORM_PC
+ typedef char Sprite_size_must_be_0x24[sizeof(Sprite) == 0x24 ? 1 : -1];

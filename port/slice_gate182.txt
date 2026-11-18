@@ -1,0 +1,148 @@
+# Gate 182: KOOPA (203) and CHUCKYA (190) -- Bob-omb Battlefield's last two
+# unregistered NPCs, both in ov062, the overlay gate 32 already mounted whole
+# per symbol (port/ov062_syms.txt). HAL-only gate: no new mount lines. The
+# transitive matched closure of both classes, swept by the call graph over
+# ov062's own relocs AND the ARM bl edges (disassembled) from every
+# vtable-bound method, both factories and the twenty Chuckya state bodies:
+# 70 ov062 TUs plus one arm9 TU, every one fully matched, no asm-hatch. The
+# fill is hal/actor_classes_koopa_chuckya.cpp.
+#
+# THE NAMES DO NOT CROSS. _Z20daHolhei_c_classInitv (0x02117478, alloc 0x438) installs
+# _ZTV7Chuckya (0x0211d9e0) and _Z27daNknk_c_classInit_NOKONOKOv (0x0211970c, alloc 0x3d0) installs
+# _ZTV5Koopa (0x0211dab4), each as its only vptr write -- real tables, no
+# reseat wrappers. KOOPA_SMALL (204) shares _ZTV5Koopa and is NOT in this gate
+# (the level-6 census names no 204).
+#
+# LEFT OUT ON PURPOSE:
+#  - Chuckya_ChangeState.cpp and _ZN7Chuckya8BehaviorEv.cpp: both form the mwcc
+#    pointer-to-member over a FORWARD-DECLARED struct -- the MSVC
+#    general-representation fault, the KnockDownPlank/MontyMole/Scuttlebug case
+#    -- host copies in port/unmatched/KoopaChuckya_StateDispatch.cpp, with the
+#    twenty source state records seated there before __sinit_d_a_holhei.cpp
+#    copies them (the sinit itself already runs at gate 32 and is NOT re-listed
+#    here). The Behavior copy also absorbs the TU's raw vptr+0xc ModelAnim
+#    dispatch (ROM slot 3, UpdateVerts; the MSVC-ordered host table would land
+#    it on Virtual10).
+#  - _ZN5Koopa6RenderEv.cpp: the ROM-order ModelAnim slot-5 shadow collision
+#    (ModelAnim at +0x300) -- host copy in port/unmatched/Koopa_Render.cpp.
+#  - func_ov062_02117724 (0x270 bytes): KOOPA's state-3 shell-dust Particle
+#    helper, bl'd from three matched Koopa helpers below (02118718/02118b4c/
+#    02118cdc). HOST COPY (PORT_HOST_ABI) in unmatched/KoopaChuckya_StateDispatch.cpp
+#    -- was an abort stub that killed BoB star groups 4-7 at ~frame 9. The
+#    byte-match is a TRUE FLOOR at 5 divergences (nearmiss/db.jsonl,
+#    fanout-glm-5.2): two pure instruction-scheduler reorders in the coordinate-
+#    update branches (the one-slot load-delay-slot fill of mwccarm-codegen.md 6o,
+#    the func_ov060_02113740 family). ~12 source spellings + 5800 decomp-permuter
+#    iterations found no size-correct improvement below 5, so the host copy
+#    reproduces the ROM semantics line for line instead of bannered hand-asm.
+#    CHUCKYA never reaches it.
+#  - func_ov062_0211a740: NOT this gate's -- it is KOOPA_THE_QUICK's state 0
+#    body, already sliced and seated at gate 32 (an earlier reading mistook it
+#    for a Koopa slot-30 override; the Koopa table ends at 0x0211db2c and
+#    0x0211db30 is KTQ's state static).
+#
+# KEPT (against the usual instincts, each verified):
+#  - Both D1/D0 pairs: every one stores the class's OWN real table (relocs
+#    0x02115f24/0x02115f7c -> 0x0211d9e0, 0x02117510/0x02117568 -> 0x0211dab4),
+#    never a shared placeholder -- the LavaBubble/FallBlockWf treatment, no
+#    host thunks. The D0s spell the RTTI aliases _ZTV10daHolhei_c /
+#    _ZTV8daNknk_c, aliased onto the host arrays in the fill file.
+#  - _ZN7Chuckya6RenderEv.c: calls _ZN17dExtSimpleModel_c6RenderEPK7Vector3 by its Itanium C
+#    name directly, no local shadow -- the KingBobOmb case.
+#  - _ZN5Koopa8BehaviorEv.cpp: a plain switch machine, no pointer-to-member.
+#    Its slot-18 self-dispatch (`c->Slot18()` through a 19-virtual local
+#    shadow) goes through the host vtable's own slot 18 thunk -- the port's
+#    standard thunk ABI, safe.
+#  - _ZN5Koopa13OnTurnIntoEggER6Player.cpp (Koopa OnTurnIntoEgg): same local-shadow slot-18
+#    dispatch, same reason.
+#  - The twenty Chuckya state bodies: called by host pointer with `this` as
+#    arg 0 after the seat.
+#
+# ALREADY BUILT (not here): the five ov062 sinits and KOOPA_THE_QUICK's whole
+# closure (gate 32); _ZN12dEnemyBase_cC2Ev / _ZN12dEnemyBase_cD2Ev (gate 16);
+# _ZN14dExtAnmModel_cC1Ev/D1Ev, _ZN11ShadowModelC1Ev/D1Ev, _ZN7dCcAc_cC1Ev/
+# D1Ev, _ZN10dBgCh_ActrC1Ev/D1Ev, _ZN17dExtSimpleModel_c12HideMaterialEii,
+# _ZN14dExtAnmModel_c7SetAnimEP8BCA_Fileiit (and its shadow-mangle face,
+# hal/bob_enemy_shadow_faces.cpp); the Enemy Update* family, DecIfAbove0_Short,
+# Animation::Advance, Memory::Deallocate and G0.
+#
+# ---- CHUCKYA (190): lifecycle, factory, helpers, twenty state bodies -------
+src/game/actors/d_a_holhei.cpp
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/_ZN7Chuckya13InitResourcesEv.cpp
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/_ZN7Chuckya16CleanupResourcesEv.cpp
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/_ZN7Chuckya6RenderEv.cpp
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/_ZN7Chuckya16OnPendingDestroyEv.cpp
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/_ZN7ChuckyaD1Ev.cpp
+# RETIRED at SLICE1: body now in src/_ZN7ChuckyaD1Ev.cpp. MSVC folds the ROM destructor variants into one symbol, so only one of a class two per-function destructor TUs can be compiled.
+#src/_ZN7ChuckyaD0Ev.cpp
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/_ZN7Chuckya16OnAimedAtWithEggEv.cpp
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_02115f84.c
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_02116010.c
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_021161a8.c
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_02116238.c
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_02116274.c
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_021162b8.cpp
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_0211632c.cpp
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_02116368.c
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_021163b0.c
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_02116498.c
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_021164e8.cpp
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_021165e0.c
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_021165e8.c
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_02116784.c
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_021167c0.cpp
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_02116850.c
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_02116894.cpp
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_02116980.c
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_02116a08.c
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_02116b80.cpp
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_02116bf8.c
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_02116c78.cpp
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_02116d28.cpp
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_02116dbc.cpp
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_02116e80.c
+# FOLDED into src/game/actors/d_a_holhei.cpp (row 70): src/func_ov062_02116edc.cpp
+# ---- KOOPA (203): lifecycle, factory, overrides, behavior helpers ----------
+src/game/actors/d_a_nknk.cpp
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/_ZN5Koopa13InitResourcesEv.cpp
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/_ZN5Koopa16CleanupResourcesEv.cpp
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/_ZN5Koopa8BehaviorEv.cpp
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/_ZN5Koopa16OnPendingDestroyEv.cpp
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/_ZN5KoopaD1Ev.cpp
+# RETIRED at SLICE1: body now in src/_ZN5KoopaD1Ev.cpp. MSVC folds the ROM destructor variants into one symbol, so only one of a class two per-function destructor TUs can be compiled.
+#src/_ZN5KoopaD0Ev.cpp
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/_ZN5Koopa13OnYoshiTryEatEv.cpp
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/_ZN5Koopa13OnTurnIntoEggER6Player.cpp
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/_ZN5Koopa16OnAimedAtWithEggEv.cpp
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_02117570.cpp
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_021175c0.c
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_02117994.c
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_021179e4.cpp
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_02117a3c.cpp
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_02117acc.c
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_02117b48.c
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_02117b60.c
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_02117b9c.c
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_02117bf4.cpp
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_02117c98.c
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_02118004.cpp
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_02118058.c
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_021180d4.c
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_0211811c.c
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_021181a0.c
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_02118258.c
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_02118334.c
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_021183e0.c
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_02118588.c
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_02118718.c
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_02118a00.cpp
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_02118a50.c
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_02118b4c.c
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_02118cdc.c
+# FOLDED into src/game/actors/d_a_nknk.cpp (row 106): src/func_ov062_02118de8.cpp
+# ---- the one arm9 TU: Model::ShowMaterial ----------------------------------
+# Koopa_Render.cpp (the host copy) calls the qualified Model::ShowMaterial /
+# Model::HideMaterial; HideMaterial's TU is already sliced, ShowMaterial's was
+# in no slice until now. Same shape as the Hide TU: a real MSVC method against
+# include/Model.h.
+src/engine/model/d_ext_model.cpp

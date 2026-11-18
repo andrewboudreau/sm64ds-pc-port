@@ -1,0 +1,21 @@
+/* HOST ARM recovered by PORTSYNC2 (port/tools/hostarm_recover.py draft, reviewed).
+ * The port line carried this in src/_ZN5ModelD0Ev.cpp under #ifdef _MSC_VER; the
+ * 2026-10 main merge (749f5799a) took main's src/, where that code
+ * now lives in src/engine/model/Model.cpp without the arm. mwccarm never saw the arm,
+ * so nothing here moves a ROM byte.
+ *
+ * WHY IT EXISTS. The host needs the ROM's flat D0 name, and MSVC only makes
+ * one destructor: it folds the Itanium D1/D0/D2 triple into the single
+ * ??1Model@@QAE@XZ that main's dExtSimpleModel_c::~dExtSimpleModel_c() in src/engine/model/Model.cpp
+ * defines (on _MSC_VER include/Model.h declares it non-virtual, with the slots
+ * spelled Destructor1/Destructor0). This spells, in terms of that one host
+ * destructor, what the D0 variant does: destroy through the one host destructor, then the class-specific operator delete.
+ * Logic unchanged from the arm. */
+#include "dExtSimpleModel_c.h"
+
+extern "C" dExtSimpleModel_c *_ZN17dExtSimpleModel_cD0Ev(dExtSimpleModel_c *thiz)
+{
+    thiz->~dExtSimpleModel_c();                /* the D1 body, through the one host symbol */
+    ::operator delete(thiz);  /* D0 ends with _ZdlPv (0x0203cbcc); main retired the class-specific forwarder */
+    return thiz;
+}

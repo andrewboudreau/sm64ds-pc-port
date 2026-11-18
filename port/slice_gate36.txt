@@ -1,0 +1,43 @@
+# Gate 36: the real Stage::InitResources.
+#
+# The port's boot has been port_stage_a_boot, a hand-written subset of this
+# function. The function itself has been sitting in src/ decompiled and unused
+# the whole time: _ZN5Stage13InitResourcesEv.cpp, terminal-floor (4 words
+# diverge from the ROM, a register-rename-only delta, functionally identical).
+# All 45 of its direct callees are matched too. Nothing here is written by
+# hand; this slice is the wiring.
+#
+# What replacing the boot buys, all of it currently blocked on the ROM's
+# teardown having no symmetric build half to undo:
+#   - Stage::CleanupResources can finally run: the twelve level-file
+#     SharedFilePtr releases and the per-area object lists at Stage+0x8bc,
+#     which is the ~50.8KB the port leaks on every level change
+#   - Sound::ResetPlayerVoiceGroup on level change
+#   - Message::ResetAllGlobals on level change
+#   - InitialiseVramGlobals in full, rather than the port_model_vram_reset
+#     slice of it
+#
+# ---- the function itself
+src/game/stages/d_s_stage_methods.cpp
+src/Enable3dEngines.c
+src/UnloadArchive.c
+src/LoadTextNarcs.c
+src/LoadArchive.c
+src/engine/view/Graphics3D.cpp
+src/engine/model/Model4.cpp
+src/engine/collision/d_bg_w.cpp
+src/KuppaScript.cpp
+src/LoadDebugFont.cpp
+src/unnamed/arm9/0203/func_020308a8.c
+src/engine/link/unit0203d7b8.cpp
+src/ui/hud/d_cap_icon.cpp
+src/runtime/graphics/fader/d_fader.cpp
+# FOLDED into src/runtime/graphics/fader/d_fader.cpp (row 38): src/engine/fader/_ZN9FaderWipeD1Ev.cpp
+src/game/stages/d_scene.cpp
+src/engine/heap/Heap.cpp
+# FOLDED into src/game/stages/d_scene.cpp (row 40): src/_ZN2GX15DisableAllBanksEv.cpp
+# FOLDED into src/game/stages/d_scene.cpp (row 40): src/_ZN5Stage12SetVramBanksEv.cpp
+src/engine/gx/GX_Init.cpp
+# FOLDED into src/runtime/graphics/fader/d_fader.cpp (row 38): src/engine/fader/_ZN9FaderWipe14LoadAndSetFileEt.cpp
+src/engine/sound/Sound.cpp
+src/engine/model/d_ext_model.cpp

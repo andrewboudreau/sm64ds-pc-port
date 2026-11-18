@@ -1,0 +1,195 @@
+# Gate 29: the particle subsystem.
+#
+# The last subsystem the boot reported as stubbed. Every function in it is
+# matched src -- 142 of them across two address regions, with NO asm hatch and
+# no unmatched leaf anywhere in the closure -- so this gate is a slice plus a
+# seat, not a reimplementation.
+#
+# The two regions:
+#   0x02021a00..0x02023400   Particle:: -- SysTracker C1/Initialise/Update/D1,
+#                            the ten Callback subclasses, System::New and the
+#                            spawn wrappers the actors and the Player call.
+#   0x02049d00..0x0204dcfc   the engine under it -- Particle::Manager,
+#                            func_0204a4c8 (engine ctor), func_0204a17c (the
+#                            definition-blob parser), func_0204a730 (the
+#                            per-frame update) and the six effect Funcs.
+#
+# WHAT THE DISPATCH TURNED OUT TO BE, because the port has been bitten before
+# by tables of raw DS code addresses: the effect table is NOT one of them. The
+# six Particle::*::Func pointers are not in a .rodata array -- they sit in the
+# ARM literal pool at the tail of func_0204a17c itself (relocs.txt
+# 0x0204a4b0..0x0204a4c4), and the matched source takes their addresses in
+# plain C. MSVC therefore binds the HOST bodies and no mapper is needed. The
+# per-definition Behavior[] array is built at load time by popcounting six
+# flag bits out of the blob, so the blob carries flags, never pointers.
+#
+# The thirteen vtables SysTracker's constructor installs (_ZTVN5dPa_c7level_c16bubbleCallback_cE ..
+# _ZTVN5dPa_c7level_c23cleanParticleCallback_cE) ARE raw ROM words on the DS, and they are the one place this
+# gate had to do something. The port never loads that .data region, so rather
+# than patching ROM words after the fact hal/particle_vtable.cpp DEFINES the
+# thirteen tables outright with host function pointers, in the ROM's own
+# Itanium layout, every pair carrying the relocs.txt from:/to: it came from.
+# Four of the twenty-six slots are __thiscall METHODS, which an alias would
+# link cleanly and then miscall, so those get forwarding faces in
+# hal/particle_bridges.cpp.
+#
+# THOSE TABLES ARE DEAD as of 2026-09-16 (run link100 lane NULLCALL2), and the
+# paragraph above is the record of what was true when this gate was written.
+# Nothing in src/, include/ or port/ installs them any more: the only hits for
+# _ZTVN5dPa_c7level_c outside the file that defines them are declarations in
+# include/decl_common.h. The callback classes are real C++ classes now, so
+# their matched constructors install MSVC's own tables -- walk_window.map puts
+# ??_7simpleCallback_c@level_c@dPa_c@@6B@ at 0x0075035c, and the crash dump of
+# any boot that spawns a particle shows that address in the vptr at
+# SysTracker+0x754. Those tables hold the matched bodies, which are __thiscall:
+# receiver in ECX, `ret 4` at the end.
+#
+# The files gate 10, 13 and 16 already carry (_ZN5dPa_c7level_c5entryEjR7Vector3PK11Vector3_16fPNS0_10callback_cE, FindData,
+# Manager::AddSystem, the New wrappers, NewWeather, NewUnkCallback818 and
+# eleven more) are deliberately NOT repeated here.
+
+# ---- the Particle namespace: tracker lifecycle, the ten Callback classes,
+# the System::New family and the spawn wrappers
+
+src/engine/particle/Particle_SysTracker_Contents.cpp
+# FOLDED into src/engine/particle/Particle_SysTracker_Contents.cpp (row 54): src/_ZN8Particle10SysTracker8Contents5ClearEv.cpp
+# FOLDED into src/engine/particle/Particle_SysTracker_Contents.cpp (row 54): src/_ZN8Particle10SysTracker8Contents6UpdateEv.cpp
+# FOLDED into src/engine/particle/Particle_SysTracker_Contents.cpp (row 54): src/_ZN8Particle10SysTracker8ContentsC1Ev.cpp
+# FOLDED into src/engine/particle/Particle_SysTracker_Contents.cpp (row 54): src/_ZN8Particle10SysTracker8Contents5Entry5ResetEv.cpp
+src/engine/particle/d_pa.cpp
+# FOLDED into src/engine/particle/d_pa.cpp (row 59): src/_ZN5dPa_c7level_c14clipCallback_c8OnUpdateERN8Particle6SystemEb.cpp
+# FOLDED into src/engine/particle/d_pa.cpp (row 59): src/_ZN5dPa_c7level_c18fitWaterCallback_c8OnUpdateERN8Particle6SystemEb.cpp
+# FOLDED into src/engine/particle/d_pa.cpp (row 59): src/_ZN5dPa_c7level_c26checkWaterRippleCallback_c8OnUpdateERN8Particle6SystemEb.cpp
+# FOLDED into src/engine/particle/d_pa.cpp (row 59): src/_ZN5dPa_c7level_c20checkWaterCallback_c8OnUpdateERN8Particle6SystemEb.cpp
+# FOLDED into src/engine/particle/d_pa.cpp (row 59): src/_ZN5dPa_c7level_c20edStarKiraCallback_c8OnUpdateERN8Particle6SystemEb.cpp
+# FOLDED into src/engine/particle/d_pa.cpp (row 59): src/_ZN5dPa_c7level_c20edStarKiraCallback_c14SpawnParticlesERN8Particle6SystemE.cpp
+# FOLDED into src/engine/particle/d_pa.cpp (row 59): src/func_02022260.c
+# FOLDED into src/engine/particle/d_pa.cpp (row 59): src/_ZN5dPa_c7level_c20edStarKiraCallback_cC1Ev.cpp
+# FOLDED into src/engine/particle/d_pa.cpp (row 59): src/_ZN5dPa_c7level_c20checkYoganCallback_c8OnUpdateERN8Particle6SystemEb.cpp
+# FOLDED into src/engine/particle/d_pa.cpp (row 59): src/_ZN5dPa_c7level_c20checkYoganCallback_c14SpawnParticlesERN8Particle6SystemE.cpp
+# FOLDED into src/engine/particle/d_pa.cpp (row 59): src/_ZN5dPa_c7level_c24fitWaterSimpleCallback_c8OnUpdateERN8Particle6SystemEb.cpp
+# FOLDED into src/engine/particle/d_pa.cpp (row 59): src/_ZN5dPa_c7level_c16bubbleCallback_c8OnUpdateERN8Particle6SystemEb.cpp
+# FOLDED into src/engine/particle/d_pa.cpp (row 59): src/_ZN5dPa_c7level_c16splashCallback_c8OnUpdateERN8Particle6SystemEb.cpp
+# FOLDED into src/engine/particle/d_pa.cpp (row 59): src/_ZN5dPa_c7level_c15scaleCallback_c8OnUpdateERN8Particle6SystemEb.cpp
+# FOLDED into src/engine/particle/d_pa.cpp (row 59): src/_ZN5dPa_c7level_c15scaleCallback_c14SpawnParticlesERN8Particle6SystemE.cpp
+# FOLDED into src/engine/particle/d_pa.cpp (row 59): src/_ZN5dPa_c7level_c15scaleCallback_cC1Ev.cpp
+# FOLDED into src/engine/particle/d_pa.cpp (row 59): src/_ZN5dPa_c7level_c16simpleCallback_c8OnUpdateERN8Particle6SystemEb.cpp
+# FOLDED into src/engine/particle/d_pa.cpp (row 59): src/_ZN5dPa_c7level_c16simpleCallback_cC1Ev.cpp
+# RETIRED at ALIAS2 (wave 8, the main -> port sync): MSVC folds the Itanium
+# C1 and C2 constructors into one ??0simpleCallback_c@level_c@dPa_c@@QAE@XZ,
+# so the two per-function TUs became the same symbol and the link reported it
+# twice (LNK2005). The C1 row above is kept, the same C1-wins/D1-wins rule
+# lane SLICE1 applied to the destructor pairs.
+#src/_ZN5dPa_c7level_c16simpleCallback_cC2Ev.cpp
+# FOLDED into src/engine/particle/d_pa.cpp (row 59): src/_ZN5dPa_c7level_c10callback_c8OnUpdateERN8Particle6SystemEb.cpp
+# FOLDED into src/engine/particle/d_pa.cpp (row 59): src/_ZN5dPa_c7level_c10callback_c14SpawnParticlesERN8Particle6SystemE.cpp
+src/engine/particle/Particle.cpp
+# FOLDED into src/engine/particle/Particle.cpp (row 86): src/func_020226fc.c
+# FOLDED into src/engine/particle/Particle.cpp (row 86): src/func_02022774.c
+# FOLDED into src/engine/particle/Particle.cpp (row 86): src/func_020227ec.c
+# FOLDED into src/engine/particle/Particle.cpp (row 86): src/func_02022864.c
+# FOLDED into src/engine/particle/Particle.cpp (row 86): src/func_020228dc.c
+# FOLDED into src/engine/particle/Particle.cpp (row 86): src/func_0202293c.c
+# FOLDED into src/engine/particle/Particle.cpp (row 86): src/_ZN8Particle6System9NewRippleE5Fix12IiES2_S2_.c
+# FOLDED into src/engine/particle/Particle.cpp (row 86): src/_ZN8Particle6System12NewBigSplashE5Fix12IiES2_S2_.c
+# FOLDED into src/engine/particle/Particle.cpp (row 86): src/_ZN8Particle20RunningSlidingDustAtE5Fix12IiES1_S1_.c
+# FOLDED into src/engine/particle/Particle.cpp (row 86): src/func_02022c3c.c
+# FOLDED into src/engine/particle/Particle.cpp (row 86): src/_ZN8Particle6System3NewEjj5Fix12IiES2_S2_PK11Vector3_16fPNS_8CallbackE.c
+# FOLDED into src/engine/particle/Particle.cpp (row 86): src/_ZN8Particle6System12FromUniqueIDEj.cpp
+# FOLDED into src/engine/particle/Particle.cpp (row 86): src/_ZN8Particle6System9NewSimpleEj5Fix12IiES2_S2_.c
+# FOLDED into src/engine/particle/Particle.cpp (row 86): src/_ZN8Particle9RenderAllEv.cpp
+# FOLDED into src/engine/particle/Particle.cpp (row 86): src/_ZN8Particle10SysTracker6UpdateEv.cpp
+# FOLDED into src/engine/particle/Particle.cpp (row 86): src/_ZN8Particle10SysTracker10InitialiseEv.cpp
+# FOLDED into src/engine/particle/Particle.cpp (row 86): src/_ZN8Particle7Texture12AllocPalVramEjb.cpp
+# FOLDED into src/engine/particle/Particle.cpp (row 86): src/_ZN8Particle7Texture12AllocTexVramEjb.cpp
+# FOLDED into src/engine/particle/Particle.cpp (row 86): src/func_02023178.c
+# FOLDED into src/engine/particle/Particle.cpp (row 86): src/_ZN8Particle10SysTrackerD1Ev.cpp
+# FOLDED into src/engine/particle/Particle.cpp (row 86): src/_ZN8Particle10SysTrackerC1Ev.cpp
+src/unnamed/arm9/0202/func_020233f0.c
+
+# ---- Particle::Manager and the engine underneath it: the engine constructor,
+# the definition-blob parser, the per-frame update and the six effect Funcs
+
+src/engine/particle/Particle_Manager.cpp
+src/unnamed/arm9/0204/func_0204a5c8.c
+src/unnamed/arm9/0204/func_0204a730.c
+src/SPLUtil_SetTexture_Stub.c
+src/unnamed/arm9/0204/func_0204af3c.c
+src/unnamed/arm9/0204/func_0204b028.c
+src/unnamed/arm9/0204/func_0204b244.c
+src/SPLDraw_Child_DirectionalBillboard.c
+src/SPLDraw_DirectionalBillboard.c
+src/unnamed/arm9/0204/func_0204bbd8.c
+src/unnamed/arm9/0204/func_0204be40.c
+src/unnamed/arm9/0204/func_0204c0a8.c
+src/unnamed/arm9/0204/func_0204c0e8.c
+src/unnamed/arm9/0204/func_0204c194.c
+src/unnamed/arm9/0204/func_0204c24c.c
+src/unnamed/arm9/0204/func_0204c304.c
+src/unnamed/arm9/0204/func_0204c584.c
+src/SPLAnim_ChildAlpha.c
+src/SPLAnim_ChildScale.c
+src/SPLAnim_Texture.c
+src/SPLAnim_Alpha.c
+src/SPLAnim_Color.c
+src/SPLAnim_Scale.c
+src/engine/particle/Particle_Behavior.cpp
+# FOLDED into src/engine/particle/Particle_Behavior.cpp (row 146): src/_ZN8Particle10LimitPlane4FuncERNS_10EffectDataEPcR7Vector3.cpp
+# FOLDED into src/engine/particle/Particle_Behavior.cpp (row 146): src/_ZN8Particle4Turn4FuncERNS_10EffectDataEPcR7Vector3.cpp
+# FOLDED into src/engine/particle/Particle_Behavior.cpp (row 146): src/_ZN8Particle8Converge4FuncERNS_10EffectDataEPcR7Vector3.cpp
+# FOLDED into src/engine/particle/Particle_Behavior.cpp (row 146): src/_ZN8Particle6Jitter4FuncERNS_10EffectDataEPcR7Vector3.cpp
+# FOLDED into src/engine/particle/Particle_Behavior.cpp (row 146): src/_ZN8Particle12Acceleration4FuncERNS_10EffectDataEPcR7Vector3.cpp
+src/unnamed/arm9/0204/func_0204d8e8.c
+src/SPLRandom_VecFx32_XY.c
+src/SPLRandom_VecFx32.c
+src/unnamed/arm9/0204/func_0204dab4.cpp
+src/unnamed/arm9/0204/func_0204dc84.c
+src/unnamed/arm9/0204/func_0204dcc0.c
+
+# ---- leaves SysTracker::Initialise reaches directly
+
+src/cstd4.cpp
+src/engine/model/Model4.cpp
+# FOLDED into src/engine/model/Model4.cpp (row 162): src/func_02045cf0.c
+# FOLDED into src/engine/model/Model4.cpp (row 162): src/func_02045d10.c
+
+# ---- leaves the effect VM reaches that no other gate carries
+# _ZdaPv rides on gate 24 only; the other three are on no gate at all.
+# MTX_MultVec33 is the billboard transform every particle quad goes through.
+src/MTX_RotX33_.c
+src/VEC_MultAdd.c
+src/MTX_MultVec33.c
+# cstd::div, which nothing had needed before: the effect VM's scale ramp is
+# the only caller in the port so far. It reaches the DS hardware divider
+# through raw MMIO, which is precisely what this gate's hostgen routing is
+# for -- port/ntr/io.cpp emulates DIVCNT/NUMER/DENOM/RESULT.
+src/cstd.cpp
+
+# ---- moved off gate 10's raw list into this hostgen'd one
+# _ZN5dPa_c7level_c9emitter_c5entryEjjR7Vector3PK11Vector3_16fPNS0_10callback_cE is the spawn's tail: it calls Manager::AddSystem and then
+# invokes the effect's Callback. It is the ONE place in the subsystem that
+# reaches a Callback vtable through a C++ `virtual`,
+# `newCallback->SpawnParticles(*system)`. It used to carry a hostgen
+# VIRTUAL_CALL patch that rewrote that call into an explicit cdecl call through
+# vptr[0], to make it dispatch like its peers. RETIRED 2026-09-16 (lane
+# NULLCALL2), for the reason recorded above the file list: the peers it was
+# matched to are hal/particle_vtable.cpp's tables, which nothing installs any
+# more, and the table the constructor really installs is MSVC's own, whose
+# bodies are __thiscall. So the patched site pushed the receiver and the System
+# and then cleaned eight bytes of a stack the callee had already cleaned four
+# of. Four bytes over-popped, and Initialise's epilogue returned through the
+# uniqueID Contents::Create had just pushed: 1 on a level's first
+# callback-bearing spawn, 2 on the second. That is what fourteen levels'
+# "jumped to address 1" and level 31's "jumped to address 2" were reporting,
+# the counter and not a pointer. The line is the matched source's own call
+# again, and the file still rides this gate's hostgen routing like every other
+# file listed here.
+# FOLDED into src/engine/particle/Particle_SysTracker_Contents.cpp (row 54): src/_ZN8Particle10SysTracker8Contents5Entry10InitialiseEjjR7Vector3PK11Vector3_16fPN5dPa_c7level_c10callback_cE.cpp
+
+# ---- NOT HERE: three ARM argument ride-throughs
+# src/func_0204a5bc.c, src/func_0203cbc0.c and
+# src/_ZN5dPa_c7level_c16simpleCallback_c14SpawnParticlesERN8Particle6SystemE.cpp are the
+# emitter veneer, the operator-delete veneer and the callback that feeds them.
+# All three pass arguments they never name, in r0/r1, which no stack ABI can
+# reproduce. port/unmatched/Particle_RideThroughs.cpp is those three bodies
+# with the argument passing made explicit and nothing else changed.

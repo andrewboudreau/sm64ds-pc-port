@@ -1,0 +1,71 @@
+# The ov089 data the castle grounds' DOOR reaches through _Z13LoadKeyModelsi.
+#
+# The gate-18 shape again (see ov085_syms.txt for the long version): an ACTOR
+# overlay mounted PER SYMBOL with --pack, the whole data span, vtables left
+# out because they are host arrays, *_SpawnInfo pinned to 0x1c.
+#
+# WHY A FOURTH OVERLAY FOR ONE CLASS. Two of the castle's three doors are the
+# pair at the front steps, and their entry in ov100's own door table
+# (data_ov100_02148204[12]) carries a key-model index. daDoor_c's
+# InitResources hands that to _Z13LoadKeyModelsi, which walks
+# data_ov089_02132894[] and data_ov089_021328b4[] -- sixteen SharedFilePtr
+# POINTERS into ov089's own bss, constructed by ov089's single static
+# initialiser. The port used to fake those two arrays with sixteen zero bytes
+# each in hal/cxx_aliases.cpp, which was enough while nothing indexed them;
+# the door indexes element 5, walks off the end and hands Model::LoadFile a
+# null SharedFilePtr. Measured that way first: a c0000005 in
+# SharedFilePtr::LoadFile with ecx = 0, on the door's very first init frame.
+#
+# ov089 is the smallest overlay the port has mounted -- 0x54 of rodata,
+# 0x140 of data, 0x100 of bss and ONE sinit -- and mounting it is the same
+# recipe as the other three rather than a special case. Its own two classes
+# (KEY and LAST_STAR) are not registered; only its data and its sinit are
+# needed, which is exactly what an overlay mount is.
+#
+# The rodata/data gap at 0x021328d4..0x02132b00 is the ROM's own; --pack fills
+# it with zeros and the emitted check asserts every offset after it.
+#
+# SHARED-CELL CAVEAT, 0x02111b68 (run linkw wave 6 close, from lane w6-A).
+# ov089's KEY state 3 (func_ov089_0213162c) ends with `data_02111b68 = 1`, a
+# write into the shared level-overlay window that belongs to
+# overlays(8,13,15,17,23,24,33,41,43,47,53,54,55,56) -- THIS overlay among
+# them. hal/actor_classes_ov089.cpp defines host zero storage under the bare C
+# name `data_02111b68` because NO MOUNT DEFINES THAT SPELLING (ov013 mounts the
+# cell as data_ov013_02111b68, ov015 hosts the same address as code under
+# _Z27daObjBk_Botaosi_c_classInitv) and because KEY is reachable only under ov046, where no
+# owner of the cell is loaded. If either stops being true -- a build where an
+# owning overlay and the KEY can both run, or a mount generated under the bare
+# C name -- the ov089 definition MUST GO and the name must resolve to the mount
+# instead, or the port keeps two objects for one DS cell.
+data_ov089_02132880:0x14 data_ov089_02132894:0x20 data_ov089_021328b4:0x20
+data_ov089_02132b00@0x02132b00:0x8 data_ov089_02132b08@0x02132b08:0x8 data_ov089_02132b10@0x02132b10:0x8
+data_ov089_02132b18@0x02132b18:0x8 data_ov089_02132b20@0x02132b20:0x8 data_ov089_02132b28@0x02132b28:0x8
+data_ov089_02132b30@0x02132b30:0x8 data_ov089_02132b38@0x02132b38:0x8 data_ov089_02132b40:0xc
+_ZTI10daObjKey_c:0xc _ZTS10daObjKey_c:0x10 g_profile_OBJ_KEY:0x1c g_profile_LAST_STAR:0x1c
+
+
+data_ov089_02132c80@0x02132c80:0xc
+data_ov089_02132c8c@0x02132c8c:0xc data_ov089_02132c98@0x02132c98:0xc
+data_ov089_02132cb0@0x02132cb0:0xc data_ov089_02132cbc@0x02132cbc:0xc data_ov089_02132cc8@0x02132cc8:0xc
+data_ov089_02132cd4@0x02132cd4:0xc data_ov089_02132ce0@0x02132ce0:0xc 
+
+# RETIRED at PORTSYNC2 (the 2026-10 main merge). Each symbol below was
+# hosted here as a ROM data blob AND is now defined by a translation unit the
+# build compiles (main folded it into the class TU, or the rename by address
+# made a host array's name and this row one name), so the link would report it
+# twice (LNK2005). The src TUs among the definers are on PORT_DSSTATE_FI_SOURCES
+# in port/CMakeLists.txt, so the objects stay inside the captured .dsstate span
+# (hal/dsstate_all.h says why).
+#   data_ov089_02132c40                        now defined by src/game/actors/d_a_obj_key.cpp
+#   data_ov089_02132c48                        now defined by src/game/actors/d_a_obj_key.cpp
+#   data_ov089_02132c50                        now defined by src/game/actors/d_a_obj_key.cpp
+#   gWarioKeyModelFile                        now defined by src/game/actors/d_a_obj_key.cpp
+#   data_ov089_02132c60                        now defined by src/game/actors/d_a_obj_key.cpp
+#   gMarioKeyModelFile                        now defined by src/game/actors/d_a_obj_key.cpp
+#   data_ov089_02132c70                        now defined by src/game/actors/d_a_obj_key.cpp
+#   gLuigiKeyModelFile                        now defined by src/game/actors/d_a_obj_key.cpp
+#   data_ov089_02132ca4                        now defined by src/game/actors/d_a_obj_key.cpp
+# PORTSYNC3 name-only rows (the class TU defines the storage):
+data_ov089_02132cec!
+# PORTSYNC3 name-only rows (extern C definitions in a class TU):
+data_ov089_02132ca4! data_ov089_02132c48! gLuigiKeyModelFile! data_ov089_02132c50! gWarioKeyModelFile! data_ov089_02132c40! gMarioKeyModelFile! data_ov089_02132c60! data_ov089_02132c70!

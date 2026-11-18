@@ -1,0 +1,36 @@
+diff --git a/src/minigames/d_s_mg_hanachan_methods.cpp b/src/minigames/d_s_mg_hanachan_methods.cpp
+--- a/src/minigames/d_s_mg_hanachan_methods.cpp
++++ b/src/minigames/d_s_mg_hanachan_methods.cpp
+@@ -615,8 +615,10 @@
+         t.res = GetFrame(i);
+         px = s.pos.y >> 12;
+         py = s.pos.x >> 12;
++        a2i = GetFlag(i);
++        t.urot = (unsigned short)rot;
+         OAM::Render(
+-            1, (OamAttr *)sWigglerSprites[(a2i = GetFlag(i), (t.urot = (unsigned short)rot), a2i)],
++            1, (OamAttr *)sWigglerSprites[a2i],
+             py, px, t.res, -1, 0x1000, t.urot);
+ 
+         if (i == 0) {
+@@ -2003,6 +2005,10 @@
+ }
+ 
+ extern "C" {
++#ifdef _MSC_VER
++}  /* host: Hana_LoadBackground keeps the C++ linkage decl_common.h gives it; MSVC refuses
++      the extern "C" redefinition (C2732), mwccarm takes the later linkage. */
++#endif
+ void Hana_LoadBackground(void) {
+     void *ncg = LoadFile(ASSET_D_2D_MG_BG_HANA_SAGASE1_NCG_BIN);
+     void *nsc = LoadFile(ASSET_D_2D_MG_BG_HANA_SAGASE1_NSC_BIN);
+@@ -2032,6 +2038,9 @@
+     Deallocate(nsc);
+     Deallocate(ncl);
+ }
++#ifdef _MSC_VER
++extern "C" {
++#endif
+ 
+ /* The OamAttr* table OAM::Render indexes: the five scalar attributes, the
+  * two sHanaBackgroundPartsB entries, then every third pointer out of the

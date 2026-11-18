@@ -1,0 +1,18 @@
+diff --git a/include/nitro/hw/mmap_global.h b/include/nitro/hw/mmap_global.h
+--- a/include/nitro/hw/mmap_global.h
++++ b/include/nitro/hw/mmap_global.h
+@@ -36,7 +36,14 @@
+ #define HW_REG_BASE  0x04000000
+ #define HW_CTRDG_ROM 0x08000000
+ 
++#ifdef _MSC_VER
++/* Host: MSVC cannot give a symbol an absolute address, so the ROM link's
++   value stands in (0x023c0000, the DTCM autoload base, extracted dtcm.yaml).
++   The port maps main RAM at its DS addresses, so the address is real there. */
++#define HW_DTCM      0x023c0000u
++#else
+ #define HW_DTCM      ((u32)SDK_AUTOLOAD_DTCM_START)
++#endif
+ #define HW_DTCM_SIZE 0x4000
+ #define HW_DTCM_END  (HW_DTCM + HW_DTCM_SIZE)
+ 

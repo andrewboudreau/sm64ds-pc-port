@@ -1,0 +1,156 @@
+diff --git a/src/game/player/d_a_ply_methods.cpp b/src/game/player/d_a_ply_methods.cpp
+--- a/src/game/player/d_a_ply_methods.cpp
++++ b/src/game/player/d_a_ply_methods.cpp
+@@ -466,8 +466,15 @@
+ }
+ 
+ extern void func_02035860(dBgCh_Actr *, const Vector3 *);
++#if defined(_MSC_VER)
++/* host: d_a_yegg.cpp defines 020edca4 void and d_bg_actor.cpp defines 020eedc0 int;
++   MSVC decorates the return type, so the declarations follow the definitions */
++extern void func_ov002_020edca4(daYegg_c *);
++extern int func_ov002_020eedc0(dBgCh_Actr *, dActor_c *);
++#else
+ extern int func_ov002_020edca4(daYegg_c *);
+ extern void func_ov002_020eedc0(dBgCh_Actr *, dActor_c *);
++#endif
+ extern "C" {
+ extern u8 gMeterShownHealth;
+ extern unsigned char gShowRaceTimer[];
+@@ -729,15 +736,25 @@
+ 
+ /* Free handlers are stored as their actual function pointers; the union gives
+  * them the PMF spelling the descriptor tables use. */
+-extern "C" void func_ov002_020c9de4(char *);
+-extern "C" void func_ov002_020e200c(char *);
+-extern "C" void func_ov002_020c72a4(void *);
++#ifdef _MSC_VER
++/* host: the tables are called as member pointers, which MSVC does with the
++ * object in ecx and nothing on the stack. A plain C function would read its
++ * argument from the stack, so it would get whatever the caller left there;
++ * __fastcall makes it take that first argument from ecx, the same as on the
++ * DS where the object arrives in r0 either way. */
++#define PLY_PMF_FREE __fastcall
++#else
++#define PLY_PMF_FREE
++#endif
++extern "C" void PLY_PMF_FREE func_ov002_020c9de4(char *);
++extern "C" void PLY_PMF_FREE func_ov002_020e200c(char *);
++extern "C" void PLY_PMF_FREE func_ov002_020c72a4(void *);
+ union PlayerFreeCharPmf {
+-    void (*free)(char *);
++    void (PLY_PMF_FREE *free)(char *);
+     void (daPly_c::*pmf)();
+ };
+ union PlayerFreeVoidPmf {
+-    void (*free)(void *);
++    void (PLY_PMF_FREE *free)(void *);
+     void (daPly_c::*pmf)();
+ };
+ union PlayerStateFn {
+@@ -759,7 +776,7 @@
+ 
+ /* func_ov002_020e1e70 stays a free C-linkage body; the table slot is a PMF. */
+ union PlayerFreeCleanupTarget {
+-    void (*code)(char *);
++    void (PLY_PMF_FREE *code)(char *);
+     void (daPly_c::*pmf)();
+ };
+ extern "C" {
+@@ -768,7 +785,7 @@
+ AnimScriptStep data_ov002_0210a3dc[] = {{1, 0}};
+ int data_ov002_0210a424[] = {19, 21};
+ AnimScriptStep data_ov002_0210a434[] = {{188, 0}};
+-void func_ov002_020e1e70(char *);
++void PLY_PMF_FREE func_ov002_020e1e70(char *);
+ PlayerFreeCleanupTarget data_ov002_0210a47c = {func_ov002_020e1e70};
+ AnimScriptStep data_ov002_0210a4bc[] = {{191, 0}};
+ 
+@@ -5928,7 +5945,7 @@
+ /* recovered: shared common types, declarations from a shared header */
+ /* recovered: shared common types */
+ extern "C" {
+-void func_ov002_020c72a4(void* thisptr)
++void PLY_PMF_FREE func_ov002_020c72a4(void* thisptr)
+ {
+     unsigned char* r4 = (unsigned char*)thisptr;
+     daPly_c *player = (daPly_c *)r4;
+@@ -7257,7 +7274,7 @@
+ }
+ 
+ extern "C" {
+-void func_ov002_020c9de4(char* c){
++void PLY_PMF_FREE func_ov002_020c9de4(char* c){
+     ((daPly_c *)(c))->func_ov002_020bdd9c();
+     ((daPly_c *)(c))->func_ov002_020bdef0();
+     ((daPly_c *)(c))->func_ov002_020bdd2c();
+@@ -9023,6 +9040,10 @@
+ 
+ int daPly_c::St_Swim_Main() {
+     extern int *func_02037dc4(int);
++#if defined(_MSC_VER)
++    /* host: d_bg_ch_actr.cpp defines it int func_02037dc4(int); same register, other decoration */
++#pragma comment(linker, "/alternatename:?func_02037dc4@@YAPAHH@Z=?func_02037dc4@@YAHH@Z")
++#endif
+     extern ControllerInput data_0209f498[];
+     /* Raw on purpose: data_0209ee90 (untyped arm9 .bss, 8 TUs) has no recovered layout. */
+     extern char data_0209ee90[];
+@@ -9852,7 +9873,11 @@
+ 
+ int daPly_c::St_OnWall_Main() {
+     extern ControllerInput data_0209f498[];
++#if defined(_MSC_VER)
++    int func_ov002_020eee3c(char *, char *);  /* host: d_bg_actor.cpp defines it int */
++#else
+     extern void func_ov002_020eee3c(char *, char *);
++#endif
+     u16 f = mStateFlags;
+     u16 b0 = f & 1;
+     if (b0 != 0) {
+@@ -17156,7 +17181,11 @@
+  */
+ 
+ int daPly_c::St_GroundPound_Main() {
++#if defined(_MSC_VER)
++    int func_ov002_020ef2a4(dBgCh_Actr * c, dActor_c * arg);  /* host: d_bg_actor.cpp defines it int; MSVC decorates the return type */
++#else
+     void func_ov002_020ef2a4(dBgCh_Actr * c, dActor_c * arg);
++#endif
+     void PlayerNewSimpleHold14(unsigned int id, int x, int y, int z);
+     extern dCamera_c *gCamera;
+     extern char data_0209f4a0[];
+@@ -19200,7 +19229,7 @@
+ }
+ 
+ extern "C" {
+-void func_ov002_020e1e70(char *c) {
++void PLY_PMF_FREE func_ov002_020e1e70(char *c) {
+     extern unsigned char data_0209f49c[];
+     daPly_c *player = (daPly_c *)c;
+     player->mVertAccel = -0x4000;
+@@ -19234,7 +19263,7 @@
+ }
+ 
+ extern "C" {
+-void func_ov002_020e200c(char* c){
++void PLY_PMF_FREE func_ov002_020e200c(char* c){
+     extern unsigned char data_0209f49c[];
+     daPly_c *player = (daPly_c *)c;
+     player->mVertAccel = player->func_ov002_020bf27c(-0x4000);
+@@ -19939,7 +19968,16 @@
+     }
+     {
+         if (mTrailPos != 0)
++#if defined(_MSC_VER)
++            /* Host: __cxa_vec_new (hal/actor_vtables.cpp) put the 8-byte DS
++               cookie in front of the array, and MSVC's delete[] would free
++               base - 4, one word into that block: the heap corruption at
++               the first level change. Vector3's destructor does nothing, so
++               this is the free half of the ROM's __cxa_vec_delete(p, 0xc, 8). */
++            ::operator delete((char *)mTrailPos - 8);
++#else
+             delete[] mTrailPos;
++#endif
+         if (mTrailFlags != 0)
+             ::operator delete[](mTrailFlags);
+         if (mHeldObjQueue != 0)

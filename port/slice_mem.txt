@@ -1,0 +1,284 @@
+# Lane MEM of run mg6: dScMgMemory2_c, the "Memory Master" minigame.
+#
+# actor id 0x16b (scene 363), spawn symbol _Z24dScMgMemory2_c_classInitv (0x020f75d4),
+# SpawnInfo 0x0213d288, vtable _ZTV14dScMgMemory2_c. Every one of those was
+# re-read out of the ROM by this lane rather than taken from the handover: the
+# doubled-id word 0x016b016b sits at file offset 0x7d3cc of
+# extracted/overlays/overlay_0006.bin (base 0x020bfec0), which puts the record
+# at 0x0213d288 with the factory in the word before it, and the record reads
+#
+#     0213d288  d4 75 0f 02   0x020f75d4   the factory
+#               6b 01 6b 01   363, 363     the id, twice
+#
+# The class name is src/minigames/d_s_mg_memory2.cpp's recovered header,
+# dScMgMemory2_c, and it agrees with what the destructors write: slot 17
+# (src/minigames/d_s_mg_memory2.cpp) stores _ZTV14dScMgMemory2_c into the object's
+# first word before unwinding, which is the strongest single confirmation that
+# 0x0213d4d4 is the right table for this id.
+#
+# ---- THE HIERARCHY IS THREE DEEP, AND THE HANDOVER DID NOT SAY SO ----------
+#
+#     Scene -> dScMgBase_c         data_ov004_020bc0c0  36  (the framework's)
+#           -> dScMgSingle3DBase_c _ZTV19dScMgSingle3DBase_c  36  ovr 8, mark 6, nosrc 0
+#           -> dScMgMemory2_c      _ZTV14dScMgMemory2_c  36  ovr 14, mark 12, nosrc 0
+#
+# port/mg_fanout_costs.txt section 3's 0x16b block lists one vtable and says
+# nothing about an intermediate base, so a lane that filled one derived table
+# would have left SIX of its own slots (2, 5, 7, 10, 26, 33) holding raw DS
+# words. Both edges are read off code:
+#
+#   src/minigames/d_s_mg_memory2.cpp calls _ZN11dScMgBase_cC2Ev(p), writes
+#   _ZTV19dScMgSingle3DBase_c into p[0], constructs Particle::SysTracker at +0x471c,
+#   then writes _ZTV14dScMgMemory2_c over it.
+#   src/minigames/d_s_mg_memory2.cpp (slot 17, D0) unwinds in the opposite order,
+#   0x0213d4d4 first and 0x0213e448 second.
+#
+# It is the SAME middle table dScMgFlower_c (0x186) and dScMgCup_c (0x169) sit
+# under; port/slice_flw.txt and port/slice_mga361.txt derived it independently
+# and this lane's read agrees with both word for word.
+#
+# ---- THE WIDTH IS 36 ON BOTH NEW TABLES, CHECKED THREE WAYS ---------------
+#
+# port/mg_fanout_costs.txt section 11's checks, because twelve widths in that
+# file's own section 3 table were phantoms:
+#
+#   1. SPAN. config/arm9/overlays/ov006/symbols.txt puts the next symbol after
+#      _ZTV14dScMgMemory2_c at sMCarloPickAllowed, exactly 0x90 = 36 words on,
+#      so a 37th slot cannot exist inside the table. The middle table's next
+#      symbol is sSlot1Payouts, also exactly 0x90 on.
+#   2. TERMINAL SLOT. Slot 35 of both tables holds 0x020ad660, the word every
+#      dScMgBase_c-derived table holds there.
+#   3. WHAT THE WORD PAST IT IS. Index 36 of 0x0213d4d4 reads 0x00000001 and
+#      index 36 of 0x0213e448 reads 0x050a0a0f; neither is an address in any
+#      module, and each is the first word of the next config symbol. Section 11
+#      independently names 0x16b's as 0x00000001.
+#
+# ---- FOURTEEN OVERRIDES, TWELVE MARKERS, ZERO WITHOUT A SOURCE ------------
+#
+# port/tools/vtablerows.py --vtable 0x0213d4d4 --width 36 prints ovr 14,
+# mark 12, nosrc 0, which is what section 3's row predicts. ALL TWELVE MARKERS
+# WERE ALREADY RULED REAL_DECOMP against the ROM by run link60 lane MGB, with
+# per-body evidence in port/tools/inferred_stub_adjudicated.txt, so this lane
+# owed no adjudication and invented none. The two unmarked overrides are slot 16
+# (_ZN14dScMgMemory2_cD1Ev) and slot 33 (_ZN19dScMgSingle3DBase_c11InitEnginesEv).
+#
+# Six of the fourteen (slots 2, 5, 7, 10, 26, 33) are the MIDDLE base's bodies,
+# which this class does not override; the eight that are its own are slots
+# 0, 6, 9, 16, 17, 18, 19 and 21.
+#
+# ---- HOW THIS LIST WAS DERIVED --------------------------------------------
+#
+# A relocation closure over config/arm9{,/overlays/ovNNN}/relocs.txt and
+# delinks.txt, module-resident (ov002, ov003, ov006 and ov007 share an address
+# window, so a reloc's own module: field decides, never the address), rooted at
+#
+#   - every word of BOTH new vtables, read out of the shipped overlay image
+#   - the factory at 0x020f75d4
+#   - the twenty-nine state code words, read out of the image at the pair
+#     addresses this class's overlay constructor names
+#   - the .init range 0x021314e4..0x021318a0, which is the constructor itself
+#
+# and it reaches 79 ov006, 122 ov004, 658 arm9 and 6 itcm text blocks. The
+# listing is lane MEM's report (run mg6). THE arm9 HALF IS NOT REPEATED
+# HERE for port/slice_mg1.txt's reason: those TUs are already compiled into the
+# build and come back through /OPT:REF the moment ov004 or ov006 references
+# them, so listing them would be lines that change nothing. Only the ov006 and
+# ov004 delta is below, plus whatever the link asked for after it.
+#
+# THE STATE BODIES ARE NOT IN THAT CLOSURE AND ARE ADDED BY HAND. They are
+# reached only through mounted DATA words -- the pair tables -- so no text
+# relocation names them, which is the row port/mg_fanout_costs.txt section 10
+# calls "they arrive with the dispatch, not with the closure". Ten of this
+# lane's lines are that: 0x020f6904 and the nine model sub-object bodies
+# unmatched/MgMemory2_FieldPmf.cpp routes.
+#
+# ---- SEVEN TUs ARE HOST-COPIED AND ARE COMMENTED OUT BELOW ----------------
+#
+# The mwcc POINTER-TO-MEMBER wall. Their bodies are in port/unmatched/
+# MgMemory2_StateDispatch.cpp (the four table dispatchers) and port/unmatched/
+# MgMemory2_FieldPmf.cpp (the three that read the pointer out of an object
+# field), each verbatim but for the table or field declaration and the call.
+#
+# ONLY TWO OF THE SEVEN WOULD EVER BE NAMED BY A LINK, and this lane swept for
+# `::*` across its whole 869-file closure rather than trusting an LNK1120, which
+# is the rule port/mg_fanout_costs.txt section 4 states. The sweep
+# (lane MEM, run mg6) found fourteen: these seven and the seven
+# ov004 ones MG1/MG2/BASESET already host-copied.
+#
+#   LINK-VISIBLE
+#     _ZN14dScMgMemory2_c9StatePlayEv   ?sMemory2RoundTable@@3PAUEntry@@A
+#     _ZN14dScMgMemory2_c11UpdateCardsEv   ?sMemory2CardTable@@3PAP8C77@@AEXH@ZA
+#   SILENT -- the table is declared inside extern "C", so it mangles as the
+#   plain C name the ov006 mount already defines and the linker is satisfied
+#   while the stride is wrong
+#     _ZN14dScMgMemory2_c8BehaviorEv   (vtable slot 6, the Behavior)
+#     _ZN14dScMgMemory2_c11StateResultEv
+#   SILENT -- the member pointer is an object FIELD, so no symbol is emitted for
+#   it in any linkage and no link anywhere can name it
+#     _ZN6Dealer6UpdateEv   the model sub-object's tick, at this+0x4f38
+#     _ZN12MascotWalker6UpdateEv   reached from it, and the one whose src STRUCT is
+#                           wrong at four bytes: its pad is spelled
+#                           `0xc8 - 0xb4 - 8`, so MSVC would put every field
+#                           after the pointer four bytes early
+#     _Z11Coin_UpdateP6Sprite   THE FIND. Reached every frame through
+#                           _Z14MgCoins_Updatev, which vtable slot 6 calls; six
+#                           lines; in NO lane's host-copy set and in no wired
+#                           slice. See MgMemory2_FieldPmf.cpp section 4.
+#
+# ---- ONE STATE HAS A src TU AND NO DELINK BLOCK, AND IT IS NOT A FLOOR -----
+#
+# 0x020f6904 is slot 5 of sMemory2RoundTable. The delink block before it ends
+# at 0x020f6904 and the next starts at 0x020f6a00, so port/tools/stategen.py
+# cannot emit a case for it -- but src/minigames/d_s_mg_memory2.cpp EXISTS, bannered
+# NONMATCHING (div=29, logic verified vs ROM). NONMATCHING TUs are routinely
+# sliced and built by this port, so the cost is the slice line below plus one
+# hand-written switch arm. THIS CLASS HAS NO HARD STATE FLOOR: all twenty-nine
+# addresses reach a real src body, which is what port/mg_fanout_costs.txt
+# section 3's own correction to itself already said and what this lane confirms.
+#
+# ---- ONE TABLE HAS NO DISPATCHER AND IS CARRIED, NOT ROUTED ---------------
+#
+# sMemory2PlayerTable's three pairs (0x020f58d0, 0x020f5744, 0x020f5740) have
+# exactly one relocation pointing at the table in the whole overlay, from inside
+# this class's own .init. Their src TUs are sliced below -- they are real bodies
+# -- but no switch arm names them and none is invented. If a computed dispatch
+# ever reaches one, the framework's UNHANDLED line names the address.
+#
+# ---- ONE SHARED HOST COPY IS REUSED RATHER THAN REWRITTEN -----------------
+#
+# src/minigames/d_s_mg_single3d_base.cpp (slot 2, AfterInitResources) is NOT below.
+# port/unmatched/MgFlower_Slot2.cpp already defines the repaired body as
+# port_mg_flower_after_init and its header says "THE NEXT LANE TO SEAT 361 OR
+# 363 SHOULD CALL THIS RATHER THAN WRITE A SECOND". This seat calls it.
+# src/Mg_GetSavedRecord0.c is absent for the same reason -- port/unmatched/
+# MgFlower_InitScore.cpp defines that symbol, and slot 0 InitResources calls it.
+
+# ---- ov006: dScMgMemory2_c's own closure, plus the model sub-object -------
+src/minigames/d_s_mg_memory2.cpp
+src/minigames/unit020bfec0.cpp
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/MascotWalker_StartPause.c
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/MascotWalker_StateWalk.c
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/MascotWalker_StartNextPath.cpp
+# HOST-COPIED (mg6 lane MEM): src/MascotWalker_UpdateMatrix.cpp -- the same
+#   local-shadow-class defect as 020c1804 one call deeper, and the worse one:
+#   its `->m()` is the ROM's vtable byte +0xc (UpdateVerts) and MSVC's fourth
+#   word (Virtual10), which is __thiscall with ONE stack parameter and so
+#   `ret 4`s four bytes the caller never pushed. The stack imbalance shifted
+#   every frame above it and _ZN12MascotWalker4DrawEv's own ret jumped into the DS
+#   heap. See port/unmatched/MgMemory2_ShadowSlot_020c06dc.cpp.
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/MascotWalker_Draw.c
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/MascotWalker_Load.cpp
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/MascotWalker_Destruct.c
+# _ZN12MascotWalkerC1Ev is back (run linkfull, lane RS4PORT). It was host-copied
+#   (mg6 lane MEM) because its three SharedFilePtr file ids were spelled as
+#   placeholder globals g0/g1/g2; main #3107 passes the pool's 0x205, 0x206 and
+#   0x207, so this is main's blob and port/unmatched/MgMemory2_SubObjCtor.cpp
+#   is retired.
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/MascotWalker_Construct.c
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/Camera_InitDealerView.c
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/Dealer_ResetMatrices.c
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/Dealer_StateWin.c
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/Dealer_PlayWin.cpp
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/Dealer_StateLose.c
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/Dealer_PlayLose.cpp
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/Dealer_StateSwap.cpp
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/Dealer_StateReveal.cpp
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/Dealer_StateCollect.cpp
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/Dealer_StartCollect.cpp
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/Dealer_StateDeal.cpp
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/Dealer_StartDeal.c
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/Dealer_IsIdle.c
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/Dealer_StateIdle.c
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/Dealer_PlayIdle.cpp
+# HOST-COPIED (mg6 lane MEM): src/Dealer_Draw.cpp -- TWO defects in
+#   one TU, both the host's rather than the decomp's. It draws the model
+#   sub-object through a LOCAL SHADOW CLASS at two call sites, so its `f5(0)`
+#   counts in the ROM's vtable numbering (byte +0x14 = the sixth word =
+#   Render) while the host's model vtables are MSVC-shaped, where that byte is
+#   Virtual18 -- the call handed Virtual18 a null matrix and Model::Virtual10
+#   read address 0, which is exactly the fault this lane's first boot took.
+#   And it stores two packed light vectors to 0x040004c8 (LIGHT_VECTOR), which
+#   from a plain src build lands in the I/O window and never reaches the
+#   geometry engine. See port/unmatched/MgMemory2_ModelRender_020c1804.cpp;
+#   the same pair port/unmatched/MgFlower_ModelRender_020c3bf4.cpp carries for
+#   the flower's sub-object.
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/Dealer_Load.c
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/Dealer_Destruct.c
+# FOLDED into src/minigames/unit020bfec0.cpp (row 158): src/Dealer_Construct.c
+# QUARANTINED at the main->port sync (origin/main 9c7f38a24): this row is the raw
+# consolidated TU, and slice_flw.txt substitutes a hostgen'd copy of the WHOLE TU so
+# its fourteen MMIO writes reach the geometry engine instead of latching in the I/O
+# window (the "Yoshi is a black silhouette" fix, run mg5 lane YTEX). Taking the raw
+# copy here as well would be a duplicate symbol, and taking it INSTEAD would put the
+# defect back. SLICE_FLW_SOURCES feeds the same three targets this slice does, so the
+# bodies still arrive; see port/CMakeLists.txt's FLW_HOSTGEN_SRCS block.
+#src/minigames/d_s_mg_single3d_base.cpp
+# THE CLASS'S ONE HARD FLOOR, DECOMPILED (run mg7 lane MEMCARDS). It is the
+#   sixth call vtable slot 9 (Render) makes, and it is the ONLY thing in the
+#   whole class that draws a card. config/arm9/overlays/ov006/symbols.txt names
+#   it and sizes it 0xa8, and there is still NO delink block covering it, so
+#   the ROM build does not carve it out; the port compiles the src TU.
+#   src/func_ov002_020f5b98.c is a DIFFERENT function at the same address in a
+#   different overlay -- the module-residency trap -- and is NOT a substitute
+#   and must never be the file that satisfies this symbol.
+# HOST-COPIED (mg6 lane MEM): src/MascotWalker_Update.cpp -- object-FIELD member
+#   pointer, and its src struct pads for eight bytes
+# HOST-COPIED (mg6 lane MEM): src/Dealer_Update.cpp -- object-FIELD
+# HOST-COPIED (mg6 lane MEM): src/minigames/d_s_mg_memory2.cpp -- the arity-1 table
+# HOST-COPIED (mg6 lane MEM): src/minigames/d_s_mg_memory2.cpp
+# HOST-COPIED (mg6 lane MEM): src/minigames/d_s_mg_memory2.cpp
+# HOST-COPIED (mg6 lane MEM): src/minigames/d_s_mg_memory2.cpp -- vtable slot 6
+# NOT HERE: src/minigames/d_s_mg_single3d_base.cpp, defined by
+#   port/unmatched/MgFlower_Slot2.cpp as port_mg_flower_after_init
+
+# ---- ov004: the delta over slice_mg1.txt, including the twenty-record
+#      member-pointer array _Z14MgCoins_Updatev walks -----------------------
+src/minigames/d_s_mg_base.cpp
+# FOLDED into src/minigames/d_s_mg_base.cpp (row 236): src/Mg_GetSavedRecord1.c
+# FOLDED into src/minigames/d_s_mg_base.cpp (row 236): src/Mg_GetScoringMode.c
+# FOLDED into src/minigames/d_s_mg_base.cpp (row 236): src/Mg_LoseCredits.c
+# FOLDED into src/minigames/d_s_mg_base.cpp (row 236): src/Mg_SubCredits.c
+# FOLDED into src/minigames/d_s_mg_base.cpp (row 236): src/Mg_DrawCredits.c
+src/minigames/unit020b4aa4.cpp
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/Coin_PlacePayout.c
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/Coin_MoveThenRefund.c
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/Coin_RiseSpent.c
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/Coin_MoveThenRiseSpent.c
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/Coin_Rise.c
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/Coin_MoveThenRise.c
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/Coin_SendOff.c
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/Coin_Launch.c
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/Coin_MoveThenBank.c
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/Coin_Move.cpp
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/Coin_Draw.c
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/MgCoins_StepPayoutFinish.c
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/MgCoins_StepPayoutNext.c
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/MgCoins_StepPayoutLayout.cpp
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/MgCoins_StartPayout.c
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/MgCoins_StepHoldThenFinish.cpp
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/MgCoins_StepLoseOneMore.cpp
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/MgCoins_StartLoseOneMore.c
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/MgCoins_StepLaunchQuick.cpp
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/MgCoins_StepLaunch.c
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/MgCoins_AddBetCoin.cpp
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/MgCoins_PlaceBet.c
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/MgCoins_Draw.c
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/MgCoins_DrawDelta.c
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/MgCoins_Update.c
+# FOLDED into src/actors/unit020b4aa4.cpp (row 242): src/MgCoins_Reset.c
+src/minigames/d_mg_state.cpp
+# FOLDED into src/actors/dMgState_c.cpp (row 269): src/Mg_SetPerfectBanner.c
+# FOLDED into src/actors/dMgState_c.cpp (row 269): src/Mg_PlaceBannersOnTopScreen.c
+# HOST-COPIED (mg6 lane MEM): src/Coin_Update.cpp -- the seventh ov004
+#   pointer-to-member dispatcher, found by the sweep and by no link
+# NOT HERE: src/Mg_GetSavedRecord0.c, defined by
+#   port/unmatched/MgFlower_InitScore.cpp
+
+# ---- arm9: the two the link asked for -------------------------------------
+# The arm9 half of the closure comes back through /OPT:REF and is not listed
+# (port/slice_mg1.txt's rule). These two had no other caller in the build, so
+# /OPT:REF had already dropped them -- the same exception curling's wave 2 hit
+# for twenty of them.
+src/engine/model/d_ext_model.cpp
+src/engine/model/Model4.cpp
+src/unnamed/arm9/0203/func_0203d630.c

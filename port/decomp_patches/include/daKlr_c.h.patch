@@ -1,0 +1,18 @@
+diff --git a/include/daKlr_c.h b/include/daKlr_c.h
+--- a/include/daKlr_c.h
++++ b/include/daKlr_c.h
+@@ -41,7 +41,14 @@
+     dActor_c *mLauncher; /* 0x3dc */
+ 
+     /* Inline is load-bearing: out-of-line emits D0 before D1. */
++    #ifdef _MSC_VER
++    /* host two-arm destructor spelling; ruling in include/ModelBase.h */
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~daKlr_c() {}   /* no slot */
++    #else
+     virtual ~daKlr_c() {}
++    #endif
+ 
+     virtual int OnAimedAtWithEgg();
+ 

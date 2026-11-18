@@ -1,0 +1,43 @@
+diff --git a/include/dScMgRoulette_c.h b/include/dScMgRoulette_c.h
+--- a/include/dScMgRoulette_c.h
++++ b/include/dScMgRoulette_c.h
+@@ -69,6 +69,9 @@
+  * destructor of its own: the compiler's implicit ones build and destroy
+  * mWheel and mBall, and inline into the scene's. The RouletteBoard_ helpers
+  * in d_s_mg_roulette_methods.cpp run its state. */
++#ifdef _MSC_VER
++#pragma pack(push, 4) /* host only: MSVC aligns pointer-to-member fields to 8, mwccarm to 4 */
++#endif
+ struct RouletteBoard {
+     RouletteBoardState mState; /* 0x00 -- RouletteBoard_StateSpin, then StateSlow */
+     BMD_File *mWheelFile;      /* 0x08 -- file 0x21d */
+@@ -94,6 +97,9 @@
+     s16 pad_ce;                /* 0xce */
+     s32 mBraking;              /* 0xd0 -- phase 2 sets it; the spin then eases to 0 */
+ };
++#ifdef _MSC_VER
++#pragma pack(pop)
++#endif
+ 
+ #ifndef SM64DS_PLATFORM_PC
+ typedef char RouletteBoard_size_must_be_0xd4[sizeof(RouletteBoard) == 0xd4 ? 1 : -1];
+@@ -101,7 +107,18 @@
+ 
+ struct dScMgRoulette_c : dScMgSingle3DBase_c {
+     /* Inline and declared first: see the file banner. */
+-    virtual ~dScMgRoulette_c() {}
++    /* The destructor pair spelled as two plain virtuals on the host, plus
++       the non-virtual destructor declaration the src/ definitions need; the
++       whole ruling is in include/ModelBase.h. An override takes its base's
++       slots, so these carry the SAME TWO NAMES the base declares -- a fresh
++       name would append a slot instead of claiming one. */
++#ifdef _MSC_VER
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~dScMgRoulette_c() {}   /* no slot */
++#else
++    virtual ~dScMgRoulette_c() {}   /* D1 and D0 */
++#endif
+ 
+     /* --- this class's own vtable slots, named from the table ---
+        Re-overrides of slots fBase_c already owns, NOT new virtuals: the

@@ -1,0 +1,31 @@
+diff --git a/src/runtime/actor/d_cap_enemy_arm9.cpp b/src/runtime/actor/d_cap_enemy_arm9.cpp
+--- a/src/runtime/actor/d_cap_enemy_arm9.cpp
++++ b/src/runtime/actor/d_cap_enemy_arm9.cpp
+@@ -50,9 +50,15 @@
+     self->~dCapEnemy_c();
+ }
+ 
++/* Host: src/runtime/actor/d_cap_enemy.cpp defines the out-of-line
++   destructor too, and MSVC refuses an inline and an out-of-line definition of
++   the same member in one program (they are one symbol to it). The host keeps
++   d_cap_enemy.cpp's; PinD1 above only steers mwcc's section order. */
++#ifndef _MSC_VER
+ #pragma never_inline on
+ inline dCapEnemy_c::~dCapEnemy_c() {}
+ #pragma never_inline off
++#endif
+ 
+ void dCapEnemy_c::UnloadCapModel()
+ {
+@@ -84,7 +90,11 @@
+         mCapId = 6;
+         /* Release is void. The value it leaves in r0 is AddCap's result. */
+         data_ov002_020ff028[mCapId]->Release();
++#ifdef _MSC_VER
++        return 0;   /* host: C++ needs a value; both callers (d_a_krb.cpp, d_a_trs.cpp) drop it */
++#else
+         return;
++#endif
+     }
+ 
+     *(int *)(&mFlags) &= ~1;

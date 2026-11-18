@@ -1,0 +1,19 @@
+diff --git a/include/daTgz_c.h b/include/daTgz_c.h
+--- a/include/daTgz_c.h
++++ b/include/daTgz_c.h
+@@ -59,7 +59,14 @@
+     u8 mDespawnTimer;                    /* 0x3e9 */
+     u8 pad_3ea[2];                       /* 0x3ea */
+ 
+-    virtual ~daTgz_c();                  /* slots 16 (D1), 17 (D0) */
++    #ifdef _MSC_VER
++    /* host two-arm destructor spelling; ruling in include/ModelBase.h */
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~daTgz_c();   /* no slot */
++    #else
++    virtual ~daTgz_c();
++    #endif                  /* slots 16 (D1), 17 (D0) */
+ 
+     virtual int   OnYoshiTryEat();               /* slot 18 */
+     virtual void OnTurnIntoEgg(daPly_c &player); /* slot 19 */

@@ -1,0 +1,28 @@
+diff --git a/src/game/actors/d_a_kpa.cpp b/src/game/actors/d_a_kpa.cpp
+--- a/src/game/actors/d_a_kpa.cpp
++++ b/src/game/actors/d_a_kpa.cpp
+@@ -357,14 +357,22 @@
+ 
+ /* Empty body: the member/base teardown and the D1/D0 pair are compiler-
+  * generated. */
+-#ifndef _MSC_VER
++#ifdef _MSC_VER
++/* Host: include/daKpa_c.h's host arm declares ~daKpa_c() with no body and no slot.
++   hostgen MSC_ARMS_BOTH compiles the ROM arm below on the host as well, which
++   defines it (the slot 16 bridge reaches it as ??1daKpa_c@@QAE@XZ). */
++#else
+ daKpa_c::~daKpa_c()
+ {
+ }
+ #endif
+ 
+ /* Empty body, as for Bowser's. */
+-#ifndef _MSC_VER
++#ifdef _MSC_VER
++/* Host: include/daKpaTail_c.h's host arm declares ~daKpaTail_c() with no body and no slot.
++   hostgen MSC_ARMS_BOTH compiles the ROM arm below on the host as well, which
++   defines it (the slot 16 bridge reaches it as ??1daKpaTail_c@@QAE@XZ). */
++#else
+ daKpaTail_c::~daKpaTail_c()
+ {
+ }

@@ -1,0 +1,18 @@
+diff --git a/include/daTor_c.h b/include/daTor_c.h
+--- a/include/daTor_c.h
++++ b/include/daTor_c.h
+@@ -120,7 +120,14 @@
+                                      0x370, so this is the last word. */
+     /* Out of line in d_a_tor.cpp: the key function, so that TU emits
+      * _ZTV/_ZTI/_ZTS7daTor_c. */
++    #ifdef _MSC_VER
++    /* host two-arm destructor spelling; ruling in include/ModelBase.h */
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~daTor_c();   /* no slot */
++    #else
+     virtual ~daTor_c();
++    #endif
+ 
+     virtual int InitResources();       /* slot  0 */
+     virtual int CleanupResources();    /* slot  3 */

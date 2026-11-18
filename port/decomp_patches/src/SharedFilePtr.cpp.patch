@@ -1,0 +1,156 @@
+diff --git a/src/SharedFilePtr.cpp b/src/SharedFilePtr.cpp
+--- a/src/SharedFilePtr.cpp
++++ b/src/SharedFilePtr.cpp
+@@ -52,10 +52,15 @@
+ #include "nitro/os/cache.h"
+ #include "nitro/mi/memory.h"
+ #include "nitro/os/system.h"
+-#ifndef _MSC_VER
++#if !defined(_MSC_VER) || defined(SM64DS_SFP_LOAD_ROM)
+ #include "nitro/fs/file.h"
+ #endif
+ 
++/* PC port: every body in this file builds on the host. SharedFilePtr::Load
++   (the card half) builds only where SM64DS_SFP_LOAD_ROM is set (the game
++   targets, which link the ROM's Load); elsewhere port/hal/fs.cpp seats it. Main kept
++   the forwarders, destructors and loaders ARM-only; they are plain C++ with
++   no hardware in them, and nothing else on the host defines them. */
+ extern "C" {
+ /* The last file ID any handle touched: every entry point stores it first,
+    so a crash mid-load names the file. */
+@@ -80,7 +85,10 @@
+     func_02017e0c(void *self, unsigned int fileID);
+ unsigned int TrimModelFile(void *file);
+ 
+-#ifndef _MSC_VER
++/* Host: lifted out of the ARM-only block. These are plain forwarders and
++   loaders with no card hardware in them, and nothing else on the host
++   defines them (SharedFilePtr::Load, the card half, builds only under
++   SM64DS_SFP_LOAD_ROM; elsewhere port/hal/fs.cpp seats it). */
+ void *func_02017e48(void *self, unsigned int fileID) {
+     func_02017e0c(self, fileID);
+     return self;
+@@ -90,7 +98,6 @@
+     data_0209d3bc = static_cast<SharedFilePtr *>(self)->fileID;
+     return self;
+ }
+-#endif
+ 
+ /* Stamps a fresh handle: no file, no holders, and the FAT file ID that
+    func_02018a24 resolves from the overlay-0 file ID. */
+@@ -101,7 +108,7 @@
+     handle->fileID = func_02018a24(fileID);
+ }
+ 
+-#ifndef _MSC_VER
++#if !defined(_MSC_VER) || defined(SM64DS_SFP_LOAD_ROM)
+ /* Resolve fileID to its bytes, either already resident in the overlay-file
+    table or streamed from the card, decompress them if they are LZ-tagged,
+    and stash and return the buffer. */
+@@ -206,7 +213,6 @@
+     func_02017c24(this);
+ }
+ 
+-#ifndef _MSC_VER
+ void *func_02017b4c(void *self, unsigned int fileID) {
+     func_02017e48(self, fileID);
+     return self;
+@@ -216,7 +222,6 @@
+     func_02017e34(reinterpret_cast<void *>(self));
+     return self;
+ }
+-#endif
+ 
+ #if !defined(_MSC_VER) || defined(SM64DS_PORT_GATE8)
+ /* Loads a KCL collision file; the first holder rebases its offsets. */
+@@ -234,7 +239,6 @@
+ }
+ #endif
+ 
+-#ifndef _MSC_VER
+ void *func_02017ae4(void *self, unsigned int fileID) {
+     func_02017e48(self, fileID);
+     return self;
+@@ -255,6 +259,7 @@
+     return self;
+ }
+ 
++#if !defined(_MSC_VER) || defined(SM64DS_PORT_GATE4B) /* host: needs the model loaders' callees, like dExtSimpleModel_c::LoadFile */
+ /* Gives the model file back the heap space past its real size. */
+ void SharedFilePtr::ReallocateModelFile() {
+     TrimModelFile(filePtr);
+@@ -277,7 +282,6 @@
+ }
+ #endif
+ 
+-#ifndef _MSC_VER
+ void *func_02017a24(void *self, unsigned int fileID) {
+     func_02017ae4(self, fileID);
+     return self;
+@@ -288,6 +292,7 @@
+     return self;
+ }
+ 
++#if !defined(_MSC_VER) || defined(SM64DS_PORT_GATE4B) /* host: needs the model loaders' callees, like dExtSimpleModel_c::LoadFile */
+ /* Loads a BMD through the handle and gives it to a dExtModel_c. If SetFile
+    refuses it, the reference is handed back. */
+ int func_020179b4(SharedFilePtr *filePtr, dExtModel_c *model, int arg) {
+@@ -303,7 +308,13 @@
+     }
+     return result;
+ }
++#endif
+ 
++
++/* Host: lifted out of the ARM-only block. These are plain forwarders and
++   loaders with no card hardware in them, and nothing else on the host
++   defines them (SharedFilePtr::Load, the card half, builds only under
++   SM64DS_SFP_LOAD_ROM; elsewhere port/hal/fs.cpp seats it). */
+ /* Hands the handle back so the caller can chain. */
+ SharedFilePtr &SharedFilePtr::Construct(unsigned int fileID) {
+     func_02017e48(this, fileID);
+@@ -314,7 +325,6 @@
+     func_02017e34(reinterpret_cast<void *>(self));
+     return self;
+ }
+-#endif
+ 
+ #if !defined(_MSC_VER) || defined(SM64DS_PORT_GATE4B)
+ /* Loads a BCA animation; the first holder rebases its offsets. */
+@@ -332,7 +342,10 @@
+ }
+ #endif
+ 
+-#ifndef _MSC_VER
++/* Host: lifted out of the ARM-only block. These are plain forwarders and
++   loaders with no card hardware in them, and nothing else on the host
++   defines them (SharedFilePtr::Load, the card half, builds only under
++   SM64DS_SFP_LOAD_ROM; elsewhere port/hal/fs.cpp seats it). */
+ extern "C" void *SharedFilePtr_Construct_TexSeq(void *self, unsigned int fileID) {
+     func_02017e48(self, fileID);
+     return self;
+@@ -343,6 +356,7 @@
+     return self;
+ }
+ 
++#if !defined(_MSC_VER) || defined(SM64DS_PORT_GATE4B) /* host: needs the model loaders' callees, like dExtSimpleModel_c::LoadFile */
+ /* Loads a BTP texture animation; the first holder rebases its offsets. */
+ BTP_File *dExtAnmTexPat_c::LoadFile(SharedFilePtr &ptr) {
+     BTP_File *filePtr;
+@@ -353,6 +367,7 @@
+     }
+     return filePtr;
+ }
++#endif
+ 
+ void *func_020178cc(void *self, unsigned int fileID) {
+     func_02017ae4(self, fileID);
+@@ -364,6 +379,8 @@
+     return self;
+ }
+ 
++
++#if !defined(_MSC_VER) || defined(SM64DS_PORT_GATE4B) /* host: needs the model loaders' callees, like dExtSimpleModel_c::LoadFile */
+ /* A BMD LoadFile that rebases the file but, unlike dExtSimpleModel_c::LoadFile, neither
+    registers it in the common model data array nor trims its allocation. */
+ extern "C" void *func_0201787c(SharedFilePtr *ptr) {

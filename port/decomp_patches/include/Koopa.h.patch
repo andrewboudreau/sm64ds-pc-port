@@ -1,0 +1,28 @@
+diff --git a/include/Koopa.h b/include/Koopa.h
+--- a/include/Koopa.h
++++ b/include/Koopa.h
+@@ -62,8 +62,24 @@
+     u8              mLandingDustTimer;       /* 0x3ce */
+     u8              pad_3cf;                 /* 0x3cf */
+ 
++#ifdef _MSC_VER
++    /* Host only. The anonymous union holding a Vector3 (which has a user
++       constructor) deletes MSVC's implicit default constructor, so the
++       factory's `new daNknk_c()` cannot compile. fBase_c::operator new
++       clears the block before construction, so an empty constructor builds
++       exactly what the implicit one does. */
++    daNknk_c() {}
++#endif
++
+     /* --- vtable --- */
++    #ifdef _MSC_VER
++    /* host two-arm destructor spelling; ruling in include/ModelBase.h */
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~daNknk_c() {}   /* no slot */
++    #else
+     virtual ~daNknk_c() {}
++    #endif
+ 
+     virtual s32   OnYoshiTryEat();         /* slot 18 */
+     virtual void OnTurnIntoEgg(daPly_c &player); /* slot 19 */

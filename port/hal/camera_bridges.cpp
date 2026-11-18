@@ -1,0 +1,692 @@
+// Gate 13: the real Camera actor -- vtable, method faces, the two comms
+// blocks the angle chain publishes through, and the engine globals the
+// camera's own boot reads.
+//
+// Nothing here is behaviour. Camera::InitResources, Behavior and Render are
+// the matched src files; this is the seam they need to reach the host.
+#include "port_d16.h"
+
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+#include "fBase_c.h"
+#include "dBase_c.h"
+#include "dCamera_c.h"
+#include "PathPtr.h"
+#include "dsstate_seg.h"
+#include "ntr/ppu.h"   /* ntr::SCREEN_W/SCREEN_H for the widescreen frustum seam */
+
+/* The assembled-triangle counter, for the widescreen probe below and nothing
+   else. FORWARD-DECLARED rather than #included. The widescreen seam is compiled
+   unconditionally now (the aspect is a runtime choice, not a compile tier), so
+   there is no tier guard left to sit inside. Same shape hal/player_bridges.cpp
+   uses for the same call. */
+#include <cstddef>
+namespace ntr { struct GxTriangle; const GxTriangle *gx_polygons(std::size_t &n); }
+
+/* Camera::Render calls View::Render() as a METHOD; src defines the body at C
+   linkage, so this is the face that gives the method its MSVC decoration.
+   MAIN -> PORT SYNC (lane SYNC5): the two-member shadow that used to stand
+   here is gone. include/View.h now declares the real class (dBase_c base, a
+   viewMat member, a virtual destructor and `virtual s32 Render()`), which the
+   include chain below reaches, so the shadow was a C2011 redefinition of a
+   type the header already has. The face is spelled against the real
+   declaration instead -- same face, same flat callee, no second View. */
+extern "C" int _ZN7dView_c6RenderEv(void *self);
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync): src/_ZN4View6RenderEv.cpp is a real virtual View member since main langmode migration and emits ?Render@View@@UAEHXZ itself, so this face was the second definition (LNK2005).
+   The body is kept below under #if 0 rather than deleted, so the
+   evidence in it stays readable. */
+#if 0
+s32 View::Render() { return _ZN7dView_c6RenderEv(this); }
+#endif
+
+extern "C" {
+
+int _ZNK9dCamera_c12IsUnderwaterEv(const void *self);
+int _ZN9dCamera_c16CleanupResourcesEv(void *self);
+void *_ZN9dCamera_cD1Ev(void *self);
+void *_ZN9dCamera_cD0Ev(void *self);
+void *dCamera_c_classInit(void *self);
+
+/* method faces (the definitions are MSVC methods; every caller and the
+   vtable want C names) */
+int _ZN9dCamera_c13InitResourcesEv(void *self)
+{ return ((dCamera_c *)self)->dCamera_c::InitResources(); }
+int _ZN9dCamera_c8BehaviorEv(void *self)
+{ return ((dCamera_c *)self)->dCamera_c::Behavior(); }
+int _ZN9dCamera_c6RenderEv(void *self)
+{ return ((dCamera_c *)self)->dCamera_c::Render(); }
+void _ZN9dCamera_c16OnPendingDestroyEv(void *self)
+{ ((dCamera_c *)self)->dCamera_c::OnPendingDestroy(); }
+
+/* ---- the vtable -------------------------------------------------------
+   ROM SLOT ORDER, the ArrowSignRight layout (hal/actor_vtables.cpp): the
+   Camera's own overrides at 0, 3, 6, 9, 12 and 16/17, the ActorBase and
+   ActorDerived defaults everywhere else. Filled at runtime rather than
+   statically because the slot bodies are __fastcall thunks over qualified
+   calls, exactly like the ArrowSignRight table.
+
+   The one slot that actually dispatches on host is 9: Camera::InitResources
+   ends in `return this->v9()`, a virtual call through the vptr the ctor just
+   installed. So the table has to be up BEFORE InitResources runs (R9). */
+void *_ZTV9dCamera_c[20];
+/* transiently installed by the ctor/dtor chain and never dispatched
+   through; storage only, same rule as the base tables in actor_vtables. */
+void *_ZTV7dView_c[20];
+
+}  /* extern "C" */
+
+static int __fastcall cs_init(void *s, void *)
+{ return _ZN9dCamera_c13InitResourcesEv(s); }
+static int __fastcall cs_binit(void *s, void *)
+{ return ((fBase_c *)s)->fBase_c::BeforeInitResources(); }
+static void __fastcall cs_ainit(void *s, void *, unsigned a)
+{ ((dBase_c *)s)->dBase_c::AfterInitResources(a); }
+static int __fastcall cs_cleanup(void *s, void *)
+{ return _ZN9dCamera_c16CleanupResourcesEv(s); }
+static int __fastcall cs_bclean(void *s, void *)
+{ return ((fBase_c *)s)->fBase_c::BeforeCleanupResources(); }
+static void __fastcall cs_aclean(void *s, void *, unsigned a)
+{ ((fBase_c *)s)->fBase_c::AfterCleanupResources(a); }
+static int __fastcall cs_behavior(void *s, void *)
+{ return _ZN9dCamera_c8BehaviorEv(s); }
+static int __fastcall cs_bbeh(void *s, void *)
+{ return ((fBase_c *)s)->fBase_c::BeforeBehavior(); }
+static void __fastcall cs_abeh(void *s, void *, unsigned a)
+{ ((fBase_c *)s)->fBase_c::AfterBehavior(a); }
+static int __fastcall cs_render(void *s, void *)
+{ return _ZN9dCamera_c6RenderEv(s); }
+static int __fastcall cs_bren(void *s, void *)
+{ return ((fBase_c *)s)->fBase_c::BeforeRender(); }
+static void __fastcall cs_aren(void *s, void *, unsigned a)
+{ ((fBase_c *)s)->fBase_c::AfterRender(a); }
+static int __fastcall cs_pdes(void *s, void *)
+{ _ZN9dCamera_c16OnPendingDestroyEv(s); return 0; }
+/* Slots 13/14 trap, the ArrowSignRight rule: they are the two heap-creating
+   virtuals, reached only from the actor-processing lifecycle the port does
+   not run. Wiring them would drag the solid-heap family in for a path
+   nothing calls. */
+static void __fastcall cs_trap13(void *, void *)
+{ std::fprintf(stderr, "FATAL: dCamera_c vtable slot 13 trap\n"); std::abort(); }
+static void __fastcall cs_trap14(void *, void *)
+{ std::fprintf(stderr, "FATAL: dCamera_c vtable slot 14 trap\n"); std::abort(); }
+static int __fastcall cs_heap(void *s, void *)
+{ return ((fBase_c *)s)->fBase_c::OnHeapCreated(); }
+static void *__fastcall cs_d1(void *s, void *) { return _ZN9dCamera_cD1Ev(s); }
+static void *__fastcall cs_d0(void *s, void *) { return _ZN9dCamera_cD0Ev(s); }
+
+extern "C" void hal_fill_camera_vtable(void)
+{
+    _ZTV9dCamera_c[0] = (void *)cs_init;
+    _ZTV9dCamera_c[1] = (void *)cs_binit;
+    _ZTV9dCamera_c[2] = (void *)cs_ainit;
+    _ZTV9dCamera_c[3] = (void *)cs_cleanup;
+    _ZTV9dCamera_c[4] = (void *)cs_bclean;
+    _ZTV9dCamera_c[5] = (void *)cs_aclean;
+    _ZTV9dCamera_c[6] = (void *)cs_behavior;
+    _ZTV9dCamera_c[7] = (void *)cs_bbeh;
+    _ZTV9dCamera_c[8] = (void *)cs_abeh;
+    _ZTV9dCamera_c[9] = (void *)cs_render;
+    _ZTV9dCamera_c[10] = (void *)cs_bren;
+    _ZTV9dCamera_c[11] = (void *)cs_aren;
+    _ZTV9dCamera_c[12] = (void *)cs_pdes;
+    _ZTV9dCamera_c[13] = (void *)cs_trap13;
+    _ZTV9dCamera_c[14] = (void *)cs_trap14;
+    _ZTV9dCamera_c[15] = (void *)cs_heap;
+    _ZTV9dCamera_c[16] = (void *)PORT_D16(cs_d1);
+    _ZTV9dCamera_c[17] = (void *)cs_d0;
+}
+
+/* ---- who drives the camera's frame ---------------------------------------
+   Gate 16 put the ROM's own processing lists back in charge of the actor
+   frame, and the Camera is on both of them -- behaviour priority 0x14c,
+   render priority 0, which puts it at the head of the render bucket exactly
+   where a camera belongs.
+
+   The harness still drives Camera::Behavior and Camera::Render by hand,
+   though, because neither call is alone in the window's frame loop: Behavior
+   has to be followed by func_0203e0ac (the single-player echo of the heading
+   record), and Render has to happen before the actor bucket rather than
+   inside it -- the bucket's own models compose against the view matrix
+   Render publishes. Left dispatchable, the list passes would run each a
+   second time, and a second Render mid-bucket would republish the view
+   matrix underneath models already drawn against it.
+
+   (Until the scene-unit migration there was a third reason: Render was
+   followed by the R6 unit shim, and a list-driven second Render rebuilt the
+   view matrix without it, putting every model at an eighth of its
+   translation. The shim is gone; the ordering reason is not.)
+
+   So the two slots go quiet and say so. This is the same bargain the Player's
+   Render slot takes; both come back the day the frame itself is the ROM's
+   (stage C's Scene::Render).
+
+   THE DAY CAME FOR THE ACTOR FRAME (run linkfull, lane K1LOOP). The level
+   loop calls the ROM's _Z13func_02044120v whole at phase 4 now
+   (hal/actor_registry.cpp port_actor_frame), and on those frames it does not
+   drive the Camera by hand: the two slots dispatch the ROM's own bodies, so
+   Camera::Behavior runs in the behaviour walk at its priority 0x14c and
+   Camera::Render at the head of the render walk, before every model that
+   composes against the view it publishes -- the ordering reason above,
+   satisfied by the ROM's own priorities rather than by a hand call. The echo
+   (func_0203df40 -> func_0203e0ac) stays in the level loop after phase 4,
+   which is nearer the ROM's own point for it (phase 0x15) than it was.
+
+   What rides Camera::Render's face is the host rig and nothing of the ROM's:
+   the level loop's hook (port_level_camera_render_hook, installed by
+   tests/walk_window.cpp) steps the analog pivot, re-pushes the rig's view in
+   the analog and free modes, and widens the object cull for widescreen --
+   the three statements that sat right after the by-hand Camera::Render, in
+   the same order, still ahead of every other Render.
+
+   Every frame that is NOT the ROM's actor frame keeps the bargain above
+   exactly: the teardown convergence walks in hal/level_change.cpp, the host's
+   frozen and replayed frames and the dev arms still walk the host split with
+   these slots quiet, and the level loop still makes its two hand calls on
+   those frames. A frame runs one shape or the other, so neither body can run
+   twice. */
+extern "C" int port_actor_frame_camera_rom(void);   /* hal/actor_registry.cpp */
+extern "C" void (*port_level_camera_render_hook)(void *cam);
+void (*port_level_camera_render_hook)(void *cam);
+/* CAMTAGS C1: the host's seat just AFTER Camera::Behavior on a ROM frame (a DS camera turn below the ROM's step is scaled there) */
+extern "C" void (*port_level_camera_behavior_hook)(void *cam);
+void (*port_level_camera_behavior_hook)(void *cam);
+
+/* LLLARROW1: the turn arrow and whoosh of the stepped camera let go with the turn input.
+   The stepped camera (CamMode data_0208733c, _ZN9dCamera_c21Mode8DirectionsCameraEP10CamViewObj: the Lethal Lava Land start and levels 28 32 37 39) sets
+   cam+0x154 bit 0x20 or 0x40 on a turn press and clears it only when the eye's ApproachLinear (0x40000 a tick) reaches
+   its target (_ZN9dCamera_c21Mode8DirectionsCameraEP10CamViewObj:126-128); Camera::Behavior skips its per-tick clear of those bits in this one mode
+   (d_camera.cpp:267-270). On a fast shell ride the eye never catches up, so one short press kept the top-screen arrow
+   (Camera::Render, d_camera.cpp:418-422) and the turn whoosh 0x43 (_ZN9dCamera_c13func_02009e70Ev's _Z21Sound_PlayIfNotActiveiiis) on for the
+   whole ride. The cartridge does the same (LLLSHELL1's romtrace rows); the port lets them go on purpose.
+   The bits themselves are NOT touched: _ZN9dCamera_c21Mode8DirectionsCameraEP10CamViewObj:69 reads them to hold off the next step, so the camera moves
+   exactly as on the cartridge. Only the arrow draw and the whoosh start ask this: 1 when the camera is in the stepped
+   mode, a bit is latched, no camera input is held (Ctrl held & 0x4300, the ROM's own camera-input mask: turn 0x100/0x200
+   from keys, pad, stick and the touch arrows, recentre 0x4000) and no recentre swing is still running (cam+0x1a0).
+   SM64DS_LLLARROW_OLD=1: tests only, the cartridge's latch. */
+extern "C" unsigned char data_0208733c[];
+extern "C" unsigned char data_0209f49c[];
+extern "C" unsigned char gActivePlayerSlot;
+extern "C" int port_cam_turn_quiet(void *cam)
+{
+    static int old = -1;
+    if (old < 0) old = getenv("SM64DS_LLLARROW_OLD") ? 1 : 0;
+    if (old || !cam) return 0;
+    const char *c = (const char *)cam;
+    if (*(void *const *)(c + 0x140) != (void *)data_0208733c) return 0;
+    if (!(*(const unsigned *)(c + 0x154) & 0x60u)) return 0;
+    if (*(const unsigned short *)(data_0209f49c + gActivePlayerSlot * 0x18) & 0x4300) return 0;
+    if (*(const unsigned short *)(c + 0x1a0) != 0) return 0;
+    return 1;
+}
+
+static int __fastcall cs_frame_behavior(void *s, void *)
+{
+    if (port_actor_frame_camera_rom()) {
+        const int r = _ZN9dCamera_c8BehaviorEv(s);
+        if (port_level_camera_behavior_hook)
+            port_level_camera_behavior_hook(s);
+        return r;
+    }
+    return 1;
+}
+static int __fastcall cs_frame_render(void *s, void *)
+{
+    if (port_actor_frame_camera_rom()) {
+        /* LLLARROW1: the stepped camera's latched turn bits are hidden from this one Render (the arrow draw) and put back */
+        unsigned *const cf = (unsigned *)((char *)s + 0x154);
+        const unsigned hide = port_cam_turn_quiet(s) ? (*cf & 0x60u) : 0u;
+        *cf &= ~hide;
+        const int r = _ZN9dCamera_c6RenderEv(s);
+        *cf |= hide;
+        if (port_level_camera_render_hook)
+            port_level_camera_render_hook(s);
+        return r;
+    }
+    return 1;
+}
+
+/* lane P7-CAMSEAT: THE SAME TWO SEATS ON THE COMPILED TABLE. dCamera_c is a native class on this line
+   (src/engine/view/d_camera.cpp: dCamera_c_classInit is `new dCamera_c`), so the Camera carries ??_7dCamera_c@@6B@ and
+   nothing dispatches through _ZTV9dCamera_c above, which 1.0.7's factory stored in the object. Without these two cells
+   the behaviour and render walks called dCamera_c::Behavior and dCamera_c::Render bare: the two hooks below never ran
+   (CAMTAGS' turn scale, the analog pivot, the rig's view re-push, the 16:9 cull widen, and the custom side's camera
+   seats behind them), LLLARROW1's arrow hide was gone, and a frame the level loop drives by hand ran both bodies twice.
+   Slots 6 and 9 of the compiled table now hold cs_frame_behavior and cs_frame_render, as the host table's do; every
+   other compiled slot is the same body the host table's face forwards to, and the object's vptr and RTTI stay as
+   built. Same shape as hal/level_boot.cpp's compiled daPly_c seat. Each cell is checked to hold the compiled body
+   first, and opened for its one write (the table is read-only data). */
+#if defined(_WIN32) && defined(_MSC_VER) && defined(_M_IX86)
+extern "C" void *wide_dcamera_vtable[];
+extern "C" int wide_dcamera_behavior_sym(void);
+extern "C" int wide_dcamera_render_sym(void);
+extern "C" __declspec(dllimport) int __stdcall VirtualProtect(void *, size_t, unsigned long, unsigned long *);
+#pragma comment(linker, "/alternatename:_wide_dcamera_vtable=??_7dCamera_c@@6B@")
+#pragma comment(linker, "/alternatename:_wide_dcamera_behavior_sym=?Behavior@dCamera_c@@UAEHXZ")
+#pragma comment(linker, "/alternatename:_wide_dcamera_render_sym=?Render@dCamera_c@@UAEHXZ")
+#endif
+static void hal_seat_compiled_camera_vtable(void)
+{
+#if defined(_WIN32) && defined(_MSC_VER) && defined(_M_IX86)
+    static bool done = false;
+    if (done) return;
+    done = true;
+    static const struct { int slot; void *body; void *seat; } rows[2] = {
+        { 6, (void *)&wide_dcamera_behavior_sym, (void *)cs_frame_behavior },
+        { 9, (void *)&wide_dcamera_render_sym, (void *)cs_frame_render } };
+    int seated = 0;
+    for (int k = 0; k < 2; ++k) {
+        void **cell = &wide_dcamera_vtable[rows[k].slot];
+        if (*cell != rows[k].body) {
+            std::fprintf(stderr, "[camvt] compiled dCamera_c slot %d does not hold its own body: not seated\n",
+                         rows[k].slot);
+            continue;
+        }
+        unsigned long old = 0;
+        if (!VirtualProtect(cell, sizeof(void *), 0x04 /* PAGE_READWRITE */, &old)) {
+            std::fprintf(stderr, "[camvt] cannot open compiled dCamera_c slot %d\n", rows[k].slot);
+            continue;
+        }
+        *cell = rows[k].seat;
+        VirtualProtect(cell, sizeof(void *), old, &old);
+        ++seated;
+    }
+    std::fprintf(stderr, "[camvt] compiled dCamera_c table: %d of 2 slots (6 Behavior, 9 Render) -> cs_frame_* seats\n",
+                 seated);
+#endif
+}
+
+extern "C" void hal_camera_slots_harness_owned(void)
+{
+    _ZTV9dCamera_c[6] = (void *)cs_frame_behavior;   /* ROM frame: Behavior */
+    _ZTV9dCamera_c[9] = (void *)cs_frame_render;     /* ROM frame: Render + rig */
+    hal_seat_compiled_camera_vtable();
+}
+
+/* ---- the local/per-player comms blocks --------------------------------
+   Camera::Behavior publishes its heading into the LOCAL record
+   data_020a1040 (func_0203dafc writes data_020a1040[8], = 0x020a1050), and
+   func_0203e0ac shuffles that record down four per-player records at
+   data_020a1154, stride 0x24. GetAngleToCamera(i) then reads
+   data_020a1164 + i*0x24 -- record 0's +0x10 field.
+
+   Both blocks are ONE object each on the DS with several named symbols
+   inside; func_0203e0ac reads three of them (data_020a117c / 11a0 / 11c4)
+   AND the same bytes through data_020a1154 + offset, in the same statement.
+   Separate host arrays would make the copy read one place and write
+   another, and the published angle would never move. Grouped sections put
+   them back in ROM order -- see CONTIG in port/tools/romdata.py for the
+   mechanism; sizes here are the symbol deltas, all even, so align(2) packs
+   with no interior padding. */
+#define COMM(sec, name, size) \
+    __pragma(section(sec, read, write))                          \
+    extern "C" __declspec(allocate(sec)) __declspec(align(2))    \
+    unsigned char name[size] = {0}
+
+/* 0x020a1040 .. 0x020a1064: the local record (0x24) */
+COMM(".dsstate$camcomm0000", data_020a1040, 4);
+COMM(".dsstate$camcomm0001", data_020a1044, 2);
+COMM(".dsstate$camcomm0002", data_020a1046, 2);
+COMM(".dsstate$camcomm0003", data_020a1048, 4);
+COMM(".dsstate$camcomm0004", data_020a104c, 2);
+COMM(".dsstate$camcomm0005", data_020a104e, 2);
+COMM(".dsstate$camcomm0006", data_020a1050, 2);
+COMM(".dsstate$camcomm0007", data_020a1052, 0x12);
+
+/* 0x020a1154 .. 0x020a11e4: four per-player records (0x24 each) on the DS.
+   THE HOST GIVES THE RUN SIXTEEN RECORDS -- run vs16, hosted-conductor
+   follow-up. The ROM's readers index these records BY SLOT with no bound of
+   their own (func_0203d950(i) reads +0xC*, GetAngleToCamera(i) reads +0x10,
+   func_0203dabc(i) hands out +0x04 -- all at data_020a1154 + i*0x24), so a
+   session whose slots go past 3 needs records 4..15 to exist CONTIGUOUSLY at
+   the same stride; a side array would satisfy the wide conductor and leave
+   every one of those readers reading garbage. Grown the only legal way for a
+   grouped band: the TAIL member, so every interior offset the layout check
+   asserts is exactly where it was. The cartridge's own extent stays what the
+   comment above says it is; bytes 0x90..0x240 are the port's, zeroed at
+   session-open by the seam (hal/comms_seam.cpp, func_020408b0) the same way
+   src/func_0203db64.c:64 zeroes the first 0x90 at session start. */
+COMM(".dsstate$camrec0000", data_020a1154, 0xc);
+COMM(".dsstate$camrec0001", data_020a1160, 2);
+COMM(".dsstate$camrec0002", data_020a1162, 2);
+COMM(".dsstate$camrec0003", data_020a1164, 2);
+COMM(".dsstate$camrec0004", data_020a1166, 0x12);
+COMM(".dsstate$camrec0005", data_020a1178, 4);
+COMM(".dsstate$camrec0006", data_020a117c, 0x24);
+COMM(".dsstate$camrec0007", data_020a11a0, 0x24);
+COMM(".dsstate$camrec0008", data_020a11c4, 0x20 + 28 * 0x24);   /* HUB32: 32 records */
+
+#undef COMM
+
+extern "C" {
+/* romdata.py emits these next to the .cammod run */
+extern unsigned cammod_run_base, cammod_run_end, cammod_run_span;
+extern unsigned char data_02086fcc[];
+extern unsigned char data_0208715c[];
+extern unsigned char data_0208738c[];
+
+/* Grouped sections are a LINKER promise; assert it once at bring-up rather
+   than debugging a camera that reads a neighbouring mode's numbers. */
+int hal_camera_check_layout(void)
+{
+    int ok = 1;
+    unsigned span = cammod_run_end - cammod_run_base;
+    if (span != cammod_run_span) {
+        std::fprintf(stderr,
+                     "  [cam] MODE TABLE NOT CONTIGUOUS: %u bytes linked, "
+                     "%u expected\n", span, cammod_run_span);
+        ok = 0;
+    }
+    if (data_0208715c - data_02086fcc != 0x190 ||
+        data_0208738c - data_02086fcc != 0x3c0) {
+        std::fprintf(stderr, "  [cam] MODE TABLE ORDER WRONG: +%d / +%d\n",
+                     (int)(data_0208715c - data_02086fcc),
+                     (int)(data_0208738c - data_02086fcc));
+        ok = 0;
+    }
+    if (data_020a1164 - data_020a1154 != 0x10 ||
+        data_020a117c - data_020a1154 != 0x28 ||
+        data_020a11c4 - data_020a1154 != 0x70 ||
+        data_020a1050 - data_020a1040 != 0x10) {
+        std::fprintf(stderr, "  [cam] COMMS BLOCKS NOT CONTIGUOUS\n");
+        ok = 0;
+    }
+    /* Run vs16: the record run must reach sixteen 0x24 records, because the
+       wide conductor and the ROM's own slot-indexed readers walk that far.
+       The tail member's own size is a compile-time fact in this TU, so this
+       is really checking that nobody shrank it back without reading the
+       band comment above. */
+    if ((data_020a11c4 - data_020a1154) + (long)sizeof(data_020a11c4)
+            != 32 * 0x24) {
+        std::fprintf(stderr, "  [cam] COMMS RECORD RUN IS NOT SIXTEEN WIDE\n");
+        ok = 0;
+    }
+    return ok;
+}
+
+/* ---- engine globals the camera boot reads ------------------------------
+   The camera is the first actor the port spawns that walks the area and
+   view-object tables, so the two POINTERS those tables hang off need real
+   storage. Both are empty on purpose: with zero view objects
+   (gNumViewObjs = 0) InitResources skips its whole scan, and the camera
+   stays in mode 10 -- the correct minimal behaviour for a level whose
+   Stage loader has not run (R14). */
+DSSTATE_BEGIN
+static char hal_area_table[64 * 12];
+static char hal_viewobj_table[64 * 0xe];
+void *data_0209f314 = hal_area_table;
+void *sViewObjs = hal_viewobj_table;
+/* gNumViewObjs (the view-object count) is src/game/stages/d_s_stage_methods.cpp's own u8. */
+/* gLocalPlayerId is Player_InitResources.cpp's; gPlayers cxxname_bridge's */
+int data_0209b000;
+
+/* 0x0209b3ec is the view matrix CopyToViewMat writes; 0x0209b41c is the
+   INVERSE it derives, which Camera::Behavior feeds MTX_MultVec43 to place
+   weather particles in camera space. */
+int data_0209b41c[12];
+
+/* scaleW: Camera::Render reads data_0209ee90[0x44/4] and hands it to
+   PerspectiveW_ as the W scale. The symbol was int[8] in auto_bss, so
+   index 17 was off the end -- a read of whatever followed. Real extent is
+   0x348 bytes (delta to the next symbol), and 0x1000 is the identity
+   scale the perspective divide expects. */
+int data_0209ee90[0x348 / 4];
+
+/* Clipper: the object Camera's frustum test runs against. 0x5c bytes,
+   zeroed here but LIVE from the first Render on: Camera::Render ends in
+   _ZN9dCamera_c11SetFovAngleEs, which calls Clipper::Func_020156DC (near/far planes from
+   the camera's own +0xfc/+0x100) and through it Func_0201559C (the four
+   side planes from the fov table). Actor::BeforeBehavior reads it every
+   frame -- an actor whose SpawnInfo carries 0x10000 skips its Behavior
+   whenever the test fails, which on the castle grounds is the AUTHENTIC
+   dormancy of the ambient set (bird/butterfly/fish), not a port gap. */
+extern "C" int data_0209f43c[];   /* the global dClipper: d_s_stage_methods.cpp */
+DSSTATE_END
+
+/* WIDESCREEN OBJECT-CULL FRUSTUM (16:9), the host seam the first pass could not
+   reach. data_0209f43c above is the global Clipper the object Camera tests every
+   ambient actor against: Camera::Render ends in _ZN9dCamera_c11SetFovAngleEs, which seeds the
+   clipper through Clipper::Func_020156DC with the camera's own aspect
+   (camera[0xf8], 0x1555 = 4:3), and Func_0201559C then builds the four SIDE
+   planes with a horizontal half-extent c = (m4c * b) >> 12 -- m4c is byte 0x4c,
+   the aspect term. On the 1024x576 frame the 3D field is widened Hor+
+   (ntr/gx.cpp scales clip.x by (4/3)*SCREEN_H/SCREEN_W = 0.75), so the CULL
+   frustum has to widen by the inverse or the birds, butterflies and fish that
+   sit just past the old 4:3 edge stay in the authentic dormancy the byte-frozen
+   src gives them -- Actor::BeforeBehavior skips a 0x10000-flagged actor's
+   Behavior whenever this test fails.
+
+   THE SEAM WIDENS m4c AND REBUILDS THE PLANES, both host-side and both gated on
+   the tier: scale m4c by target/native = (SCREEN_W/SCREEN_H)/(4/3), which is the
+   exact inverse of gx.cpp's 0.75, then re-run Func_0201559C so the side planes
+   come back off the wider aspect. _ZN9dCamera_c11SetFovAngleEs reseeds m4c from 0x1555 every
+   Render, so this is called AFTER the render seeds it and BEFORE the actor
+   buckets read it (hal drives both by hand; see the frame loop in
+   tests/walk_window.cpp), and it never accumulates: each frame starts from the
+   src's own value and is widened once. Scaling the value that is THERE rather
+   than a literal 0x1555 keeps a camera or cutscene that seeds a different aspect
+   correct. Empty and uncalled on the 4:3 targets. */
+/* Compiled unconditionally now, and CALLED only when ntr::widescreen is set
+   (the frame loop guards the one call site). The scale is target/native =
+   (active_w/active_h)/(4/3), which is 1.333 at 16:9 and EXACTLY 1.0 at 4:3, so
+   even if it were called on a 4:3 run it would be a no-op; the call guard keeps
+   the 4:3 clipper untouched regardless. */
+void _ZN8dClipper19UpdateFrustumPlanesEv(void *self);
+
+/* SM64DS_WIDEN_PROBE=1: PHASE-1 REACHABILITY COUNTER, and the only reason it
+   exists is that the call to this function is made BY HAND from one frame loop
+   (tests/walk_window.cpp). Any render path that does not run that loop seeds
+   the object Clipper from the camera's own 4:3 aspect and never widens it, so
+   ambient actors at the new 16:9 margins stay culled as off-screen while the
+   raster draws the world behind them. "Is that loop the only loop" cannot be
+   answered by reading -- a scene, a minigame and a cutscene each get a camera
+   rendered somewhere -- so it is answered by counting.
+
+   The count is a single static increment, unconditional and untimed; NOTHING is
+   printed unless SM64DS_WIDEN_PROBE is set to something other than 0. The
+   progress line every 64 calls is deliberate belt and braces: a run that dies on
+   a fault or is killed by a timeout never reaches a static destructor, and a
+   reachability answer that only exists at a clean exit is no answer at all. */
+static unsigned long g_widen_calls;
+/* scene frames the widen DECLINED; see hal_camera_widen_frustum_scene below */
+static unsigned long g_widen_skips;
+namespace {
+int widen_probe_on()
+{
+    static int on = -1;
+    if (on < 0) {
+        const char *e = std::getenv("SM64DS_WIDEN_PROBE");
+        on = (e && *e && *e != '0') ? 1 : 0;
+    }
+    return on;
+}
+struct WidenProbeReport {
+    ~WidenProbeReport()
+    {
+        if (widen_probe_on())
+            std::fprintf(stderr, "[widen] total calls %lu, scene frames "
+                                 "declined %lu\n",
+                         g_widen_calls, g_widen_skips);
+    }
+};
+WidenProbeReport g_widen_probe_report;
+}  // namespace
+
+/* INTROCAST092: the object Clipper as the ROM seeded it THIS frame, kept before
+   the widen scales it. The opening's cast bodies ask the ROM to cull them
+   (flags 0x2) and wait un-animated (a bind pose, a T pose) at their start
+   marks until the script's cue; the DS tests them against the 4:3 planes and
+   never draws them, the widened planes pass them, so a 16:9 view saw them
+   through the moat arch. hal_actor_off_native_view answers the 4:3 test. */
+static int g_clip_native[0x5c / 4];
+static int g_clip_native_ok;
+extern "C" unsigned char data_0209f274;   /* doubles the far-away threshold */
+int _ZN8dClipper10ClipSphereER7Vector3iPh(char *thisp, void *v,
+                                                    int radius, unsigned char *out);
+
+void hal_camera_widen_frustum(void)
+{
+    std::memcpy(g_clip_native, data_0209f43c, sizeof g_clip_native);
+    g_clip_native_ok = 1;
+    ++g_widen_calls;
+    if (widen_probe_on() && (g_widen_calls == 1 || g_widen_calls % 64 == 0))
+        std::fprintf(stderr, "[widen] call %lu m4c %d\n", g_widen_calls,
+                     data_0209f43c[0x4c / 4]);
+    long long m4c = data_0209f43c[0x4c / 4];
+    data_0209f43c[0x4c / 4] =
+        (int)((m4c * (ntr::active_w * 3)) / (ntr::active_h * 4));
+    _ZN8dClipper19UpdateFrustumPlanesEv(&data_0209f43c);
+}
+
+/* 1 when the actor (a dActor_c: camera-space position at +0x74, clip radius
+   +0xb8, clip distance +0xbc) is off screen by the clipper's 4:3 answer, the
+   widen undone for the duration of the call. 0 when no widen ran this frame
+   (4:3 targets: nothing to undo) or the actor has no clip volume. */
+int hal_actor_off_native_view(void *actor)
+{
+    if (!g_clip_native_ok) return 0;
+    char *c = (char *)actor;
+    const int radius = *(int *)(c + 0xb8);
+    if (radius == 0) return 0;
+    int widened[0x5c / 4];
+    std::memcpy(widened, data_0209f43c, sizeof widened);
+    std::memcpy(data_0209f43c, g_clip_native, sizeof widened);
+    unsigned char out = 0;
+    const int r = _ZN8dClipper10ClipSphereER7Vector3iPh(
+        (char *)&data_0209f43c, c + 0x74, radius, &out);
+    std::memcpy(data_0209f43c, widened, sizeof widened);
+    int thresh = *(int *)(c + 0xbc);
+    if (data_0209f274) thresh <<= 1;
+    return r > thresh;
+}
+
+/* SM64DS_WIDEN_PROBE, PHASE 2: THE SCENE PATH'S OWN LINE. Same variable, same
+   inert-when-unset rule, and inside the same tier guard, so the 4:3 and hires
+   targets do not see a byte of it. Two numbers per frame, and each one answers
+   a question the phase-1 counter above could not:
+
+     m4c   -- the object Clipper's aspect term AS THE FRAME LEFT IT. The level
+              path's widen is safe ONLY because Camera::Render reseeds this word
+              from 0x1555 every frame, so scaling it never compounds (measured
+              on level 1, 300 frames: m4c reads 5461 at every sampled call). The
+              scene path drives no camera by hand, so whether it HAS that reseed
+              is not something reading the file can answer -- a widen dropped on
+              a path with no reseed multiplies the same word by 4/3 three
+              hundred times and overflows it. This line settles that before the
+              call is placed, and keeps watching it afterwards.
+     tris  -- triangles submitted this frame, which is the ONLY thing an object
+              cull can move. A frustum that lets more through submits more.
+              Per frame rather than a histogram because ppu_audit keeps six
+              distinct values per slot and the busiest scenes have more than
+              six, so no mean can be taken off it.
+
+   Unbuffered and per frame for the reason the phase-1 counter is: a run that
+   faults or is killed never reaches a static destructor, and a number that only
+   exists at a clean exit is no number at all. */
+void hal_widen_probe_scene_frame(int frame, const char *where)
+{
+    if (!widen_probe_on()) return;
+    std::size_t tris = 0;
+    ntr::gx_polygons(tris);
+    std::fprintf(stderr, "[widen] scene f%d %s m4c %d tris %lu\n", frame, where,
+                 data_0209f43c[0x4c / 4], (unsigned long)tris);
+}
+
+/* THE SCENE PATH'S WIDEN, and it is a SEPARATE ENTRY POINT rather than the same
+   call in a second place, because the scene path does not come with the one
+   precondition the level path gets for free.
+
+   The level loop calls hal_camera_widen_frustum immediately after its by-hand
+   hal_camera_render, so the Clipper it scales has JUST been seeded by
+   _ZN9dCamera_c11SetFovAngleEs -> Clipper::Func_020156DC and the aspect term is known to be the
+   src's own 0x1555. That is the whole reason a non-idempotent scale is safe
+   there: every frame starts from 5461 and is widened exactly once. Measured on
+   level 1, 300 frames -- m4c reads 5461 at every sampled call.
+
+   THE SCENE PATH DRIVES NO CAMERA BY HAND, and measuring it with
+   SM64DS_WIDEN_PROBE over all 27 hosted scene ids found not two shapes but
+   THREE, which is why this is a guard and not a second call site:
+
+     NEVER SEEDED   SCENE_STAR_SELECT (4), SCENE_MG_CURLING (374) and the 2D
+                    minigames. m4c reads 0 on frame 0 and on frame 299. Nothing
+                    ever built an object cull for these scenes, so there is
+                    nothing to widen, and Func_0201559C over an all-zero Clipper
+                    would build four side planes out of a zero aspect -- a state
+                    the ROM never puts that structure in.
+     RESEEDED       SCENE_MG_MEMORY2 (363), SCENE_MG_JUMP2 (373) and the rest.
+                    Their Camera actor rides the ROM's own render bucket, so
+                    port_actor_render rewrites m4c to 5461 every frame. This is
+                    the level path's contract and a per-frame widen is right.
+     SEEDED ONCE    SCENE_MG_CUP (361), SCENE_MG_BOOMBOX (367). m4c is written
+                    at spawn and NEVER AGAIN. A per-frame widen on these
+                    multiplies the same word by 4/3 three hundred times:
+                    measured, before this guard existed, 5461 -> 7281 -> 9708 ->
+                    ... -> 1540606696 by frame 299, an overflowed aspect feeding
+                    four garbage side planes. That is the failure the level
+                    path's structure makes impossible and the scene path's does
+                    not.
+
+   SO THE RULE IS ONCE PER SEED, NOT ONCE PER FRAME. Remember the value this seam
+   last wrote; if the word still holds it, the ROM has not reseeded since and the
+   frustum is already the widened one, so decline. A reseed lands a different
+   value, is noticed, and is widened. On a RESEEDED scene that is a widen every
+   frame, identical to the level path; on a SEEDED ONCE scene it is one widen
+   that then persists, which is the correct answer for a Clipper written once;
+   on a NEVER SEEDED scene it is nothing at all.
+
+   THE ONE AMBIGUITY IS NAMED RATHER THAN HIDDEN. A reseed that happens to write
+   exactly the value the last widen produced is indistinguishable from no reseed,
+   and this declines it -- so that frame keeps the aspect it already has. The
+   direction is deliberate: declining is a no-op, and widening a second time
+   corrupts. The skip counter makes every declined frame a NUMBER rather than an
+   assumption about which scenes reseed. */
+static int g_widen_scene_written;   /* what this seam last wrote; 0 = nothing */
+void hal_camera_widen_frustum_scene(void)
+{
+    const int m4c = data_0209f43c[0x4c / 4];
+    if (m4c == 0) {
+        /* the scene tore its Clipper down, or never built one: forget the
+           memory so the next scene's first seed is widened rather than
+           mistaken for a value this seam had already written */
+        g_widen_scene_written = 0;
+        ++g_widen_skips;
+        if (widen_probe_on() && g_widen_skips == 1)
+            std::fprintf(stderr, "[widen] scene DECLINED: the object Clipper has "
+                                 "no aspect term (m4c 0), so no Render seeded it "
+                                 "and there is no cull to widen\n");
+        return;
+    }
+    if (m4c == g_widen_scene_written) {
+        ++g_widen_skips;
+        return;
+    }
+    hal_camera_widen_frustum();
+    g_widen_scene_written = data_0209f43c[0x4c / 4];
+}
+
+/* Camera::SaveCameraStateBeforeTalk is called ARGLESS by both its callers
+   (_Z13func_02005324Pv and _ZN9dCamera_c13func_02009a8cEv, which the community names func_0200cc5c):
+   another ARM r0 ride-through -- the camera is already in r0 because it is
+   the caller's own argument. The face supplies the singleton, which is what
+   r0 held. */
+extern void *gCamera;
+void _ZN9dCamera_c25SaveCameraStateBeforeTalkEv(void)
+{
+    if (gCamera)
+        ((dCamera_c *)gCamera)->dCamera_c::SaveCameraStateBeforeTalk();
+}
+
+int _ZNK7PathPtr5LoopsEv(void *self)
+{ return ((PathPtr *)self)->PathPtr::Loops() ? 1 : 0; }
+
+int hal_camera_behavior(void *cam) { return _ZN9dCamera_c8BehaviorEv(cam); }
+int hal_camera_render(void *cam) { return _ZN9dCamera_c6RenderEv(cam); }
+int hal_camera_init_resources(void *cam)
+{ return _ZN9dCamera_c13InitResourcesEv(cam); }
+void *hal_camera_new(void) { return dCamera_c_classInit(0); }
+
+}  /* extern "C" */
+
+/* catchup1 round 3: d_s_stage_methods.cpp defines the global dClipper. The C name reaches that storage: */
+#pragma comment(linker, "/alternatename:_data_0209f43c=?data_0209f43c@@3UdClipper@@A")

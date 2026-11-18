@@ -1,0 +1,56 @@
+diff --git a/src/engine/os/OS_Interrupt.cpp b/src/engine/os/OS_Interrupt.cpp
+--- a/src/engine/os/OS_Interrupt.cpp
++++ b/src/engine/os/OS_Interrupt.cpp
+@@ -14,9 +14,13 @@
+  * (src/engine/os/OS_IrqTable.cpp) dispatch.
+  *
+  * PC port: smoke_gx builds OSi_EnterDmaCallback from this file through
+- * port/tools/hostgen.py, which emits the whole file. port/ntr/runtime.cpp
+- * supplies the host's interrupt registry (OS_EnableIrqMask and the rest), so
+- * everything except OSi_EnterDmaCallback sits under #ifndef _MSC_VER.
++ * port/tools/hostgen.py, which emits the whole file. On the targets that link
++ * the plain ntr library port/ntr/runtime.cpp supplies the host's interrupt
++ * registry (OS_EnableIrqMask and the rest), so everything except
++ * OSi_EnterDmaCallback compiles only for the ARM build or where
++ * PORT_ROM_IRQ_TABLE is defined: the two game targets, whose ntr library
++ * (NTR_ROM_IRQ_TABLE) delivers from OS_IRQTable and so runs these bodies as
++ * written.
+  */
+ 
+ #include "nitro/os/interrupt.h"
+@@ -29,7 +33,7 @@
+ extern OSThreadQueue OSi_IrqThreadQueue; /* os_irqHandler.c, in DTCM */
+ }
+ 
+-#ifndef _MSC_VER
++#if !defined(_MSC_VER) || defined(PORT_ROM_IRQ_TABLE)
+ 
+ // OS_InitThreadQueue(&OSi_IrqThreadQueue): this SDK's thread queue is a u16
+ // mask of thread ids, so emptying it is a store of 0.
+@@ -89,7 +93,7 @@
+     OSi_IrqCallbackInfo[dmaNo].enable = OS_EnableIrqMask(imask) & imask;
+ }
+ 
+-#ifndef _MSC_VER
++#if !defined(_MSC_VER) || defined(PORT_ROM_IRQ_TABLE)
+ 
+ // Installs a timer's overflow callback and enables its interrupt. The SDK
+ // indexes the entry as OSi_IrqCallbackInfo[timerNo + OSi_IRQCALLBACK_NO_TIMER0];
+@@ -140,8 +144,17 @@
+ extern "C" OSIrqMask OS_ResetRequestIrqMask(OSIrqMask mask) {
+     u16 ime = REG_IME;
+     REG_IME = 0;
++#ifdef _MSC_VER
++    /* Host: the literal spelling lets hostgen route the store into
++       port/ntr/io.cpp, whose IF is write-one-to-clear as the DS's is; the
++       header's REG_IF macro is invisible to its textual pass, and a plain
++       store would set the acknowledged bits and wipe the pending ones. */
++    OSIrqMask old = *(volatile u32 *)0x04000214;
++    *(volatile u32 *)0x04000214 = mask;
++#else
+     OSIrqMask old = REG_IF;
+     REG_IF = mask;
++#endif
+     (void)REG_IME;
+     REG_IME = ime;
+     return old;

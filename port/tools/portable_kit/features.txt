@@ -1,0 +1,5 @@
+# Features this game build has, one per line. tools/assemble_bundle.ps1 (launcher
+# repo) copies them into version.json "Features" for the launcher to test.
+# modpalettes: the game reads the per-character colour and loves-me-swap
+# LovesMeCharacter keys when they are on.
+modpalettes

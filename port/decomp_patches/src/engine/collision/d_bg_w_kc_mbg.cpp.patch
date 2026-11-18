@@ -1,0 +1,29 @@
+diff --git a/src/engine/collision/d_bg_w_kc_mbg.cpp b/src/engine/collision/d_bg_w_kc_mbg.cpp
+--- a/src/engine/collision/d_bg_w_kc_mbg.cpp
++++ b/src/engine/collision/d_bg_w_kc_mbg.cpp
+@@ -29,8 +29,10 @@
+ /* The scratch line's lineEnd and dBgPi base (both inside data_020a0d0c,
+    below), and the scratch scaled matrix.
+    local extern: no header in include/ declares them. */
++#ifndef _MSC_VER
+ extern Vector3 data_020a0d60;
+ extern dBgPi data_020a0d1c;
++#endif
+ }
+ 
+ /* The shared scratch line, in collider space. A namespace-scope dBgCh_Lin,
+@@ -38,6 +40,14 @@
+    ~dBgCh_Lin() (was the handwritten __sinit_0207501c). dBgW_KcMbgSclY
+    borrows it by this address name. */
+ dBgCh_Lin data_020a0d0c;
++#ifdef _MSC_VER
++/* PC port: on the ROM these two names are addresses inside data_020a0d0c
++   (its dBgPi base at +0x10, its lineEnd at +0x54), so DetectClsn's result
++   is read back through them. The host links separate objects under those
++   names, which DetectClsn never writes, so read the subobjects directly. */
++#define data_020a0d60 (data_020a0d0c.lineEnd)
++#define data_020a0d1c ((dBgPi &)data_020a0d0c)
++#endif
+ 
+ /* Flat storage for matrix/vector copies in SetFile and Transform. The shared
+  * Matrix4x3 contains a Vector3 with a destructor; copying its words through

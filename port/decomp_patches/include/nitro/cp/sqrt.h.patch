@@ -1,0 +1,52 @@
+diff --git a/include/nitro/cp/sqrt.h b/include/nitro/cp/sqrt.h
+--- a/include/nitro/cp/sqrt.h
++++ b/include/nitro/cp/sqrt.h
+@@ -17,7 +17,7 @@
+  * them, so only the files that drive the square-root unit include this. */
+ 
+ #include "types.h"
+-#include "nitro/hw/registers.h"
++#include "nitro/cp/divider.h" /* CP_REG_STORE */
+ 
+ #define CP_SQRT_32BIT_MODE 0
+ #define CP_SQRT_64BIT_MODE 1
+@@ -25,7 +25,7 @@
+ static inline void CP_SetSqrtImm64(u64 param) {
+     u16 ime = REG_IME;
+     REG_IME = 0;
+-    *(volatile u64 *)REG_SQRT_PARAM_ADDR = param;
++    CP_REG_STORE(u64, REG_SQRT_PARAM_ADDR, param);
+     (void)REG_IME;
+     REG_IME = ime;
+ }
+@@ -33,7 +33,7 @@
+ static inline void CP_SetSqrtImm32(u32 param) {
+     u16 ime = REG_IME;
+     REG_IME = 0;
+-    *(volatile u32 *)REG_SQRT_PARAM_ADDR = param;
++    CP_REG_STORE(u32, REG_SQRT_PARAM_ADDR, param);
+     (void)REG_IME;
+     REG_IME = ime;
+ }
+@@ -41,8 +41,8 @@
+ static inline void CP_SetSqrt64(u64 param) {
+     u16 ime = REG_IME;
+     REG_IME = 0;
+-    REG_SQRTCNT = CP_SQRT_64BIT_MODE;
+-    *(volatile u64 *)REG_SQRT_PARAM_ADDR = param;
++    CP_REG_STORE(u16, 0x040002b0, CP_SQRT_64BIT_MODE);
++    CP_REG_STORE(u64, REG_SQRT_PARAM_ADDR, param);
+     (void)REG_IME;
+     REG_IME = ime;
+ }
+@@ -50,8 +50,8 @@
+ static inline void CP_SetSqrt32(u32 param) {
+     u16 ime = REG_IME;
+     REG_IME = 0;
+-    REG_SQRTCNT = CP_SQRT_32BIT_MODE;
+-    *(volatile u32 *)REG_SQRT_PARAM_ADDR = param;
++    CP_REG_STORE(u16, 0x040002b0, CP_SQRT_32BIT_MODE);
++    CP_REG_STORE(u32, REG_SQRT_PARAM_ADDR, param);
+     (void)REG_IME;
+     REG_IME = ime;
+ }

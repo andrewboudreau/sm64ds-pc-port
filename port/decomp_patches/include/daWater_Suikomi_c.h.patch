@@ -1,0 +1,18 @@
+diff --git a/include/daWater_Suikomi_c.h b/include/daWater_Suikomi_c.h
+--- a/include/daWater_Suikomi_c.h
++++ b/include/daWater_Suikomi_c.h
+@@ -37,7 +37,14 @@
+     s32 unk_314; /* 0x314 */
+ 
+     /* --- vtable --- */
++    #ifdef _MSC_VER
++    /* host two-arm destructor spelling; ruling in include/ModelBase.h */
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~daWater_Suikomi_c();   /* no slot */
++    #else
+     virtual ~daWater_Suikomi_c();
++    #endif
+ 
+     int Behavior();
+     int CleanupResources();

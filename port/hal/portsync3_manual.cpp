@@ -1,0 +1,107 @@
+/* hal/portsync3_manual.cpp -- the hand-written leftovers of the 2026-10-14 main
+ * sync. Every block says what it stands for and what is deliberately inert.
+ */
+#include "fBase_c.h"
+#include "daDemo_c.h"
+#include "dBgCh_Lin.h"
+#include <cstdio>
+
+/* ---- loud stub for ROM bodies the host has no definition for --------------
+ * port_unmatched_hit prints once per site. Used where a compiler vtable lists
+ * a virtual whose ROM body has no config name and no host copy; the port seats
+ * hand tables for these objects, so a hit means the compiler vtable was
+ * dispatched, which is a finding, not a state to hide. */
+static void port_unmatched_hit(const char *what)
+{
+    static int said[64];
+    static const char *seen[64];
+    for (int i = 0; i < 64; ++i) {
+        if (seen[i] == what) {
+            if (said[i]) return;
+            said[i] = 1;
+            break;
+        }
+        if (!seen[i]) { seen[i] = what; said[i] = 1; break; }
+    }
+    std::fprintf(stderr, "  [portsync3] UNMATCHED virtual entered: %s\n", what);
+    std::fflush(stderr);
+}
+
+/* ---- the daDemo_c model helpers: src/engine/model/d_ext_model.cpp defines
+ * dExtModel_c and its two subclasses itself now (catchup1 Stage C round 2,
+ * SLICE4 list); the unmatched stand-ins that stood here are gone. */
+
+/* ---- dBgCh_Lin::GetClsnPos, the flat spelling ------------------------------
+ * func_02008cb4.c calls the ROM's struct-return convention (return slot first,
+ * receiver second); main's member returns by value. */
+/* Returns the result slot in EAX, as every MSVC struct-returning function does: the caller
+   (a C TU compiled as C++) declares `Vector3 f(...)` and reads the slot back through EAX. */
+extern "C" Vector3 *_ZN9dBgCh_Lin10GetClsnPosEv(Vector3 *ret, void *self)
+{
+    *ret = ((dBgCh_Lin *)self)->GetClsnPos();
+    return ret;
+}
+
+/* ---- port_vs_body_0211478c -------------------------------------------------
+ * hal/vs_data_patch.inc points the VS menu's .data record at this name. The
+ * old build compiled ov075's own body under it with a -D rename (the window
+ * address 0x0211478c is also a WorkElevator vtable word in another overlay).
+ * Main names the body UnknownVsPlayer::func_ov075_0211478c, so the rename is
+ * unnecessary: the flat face the ledger now carries (faces_sync.txt, R row) is
+ * the entry, and this name aliases it. */
+#pragma comment(linker, "/alternatename:_port_vs_body_0211478c=__ZN15UnknownVsPlayer15MoveWaitForExitEv")
+
+/* ---- fBase_c::Process, the flat spelling ----------------------------------
+ * func_0204322c.cpp calls it by its Itanium name with the three member
+ * pointers as eight-byte pairs on the stack (the port compiles /vmg /vmm so an
+ * MSVC pointer to member is the same eight bytes). facegen refuses a
+ * pointer-to-member parameter; the face is written by hand. */
+extern "C" int _ZN7fBase_c7ProcessEMS_FivEMS_FbvEMS_FvjE(fBase_c *self,
+    fBase_c::ProcessFunction action, fBase_c::BeforeProcessFunction before,
+    fBase_c::AfterProcessFunction after)
+{
+    return self->Process(action, before, after);
+}
+
+/* ---- dBgCh_Actr::GetWallResult / GetFloorResult, the flat spellings -------
+ * Both are inline members of include/dBgCh_Actr.h now (they return the sphere
+ * collider's result pointer), so there is no out-of-line member to reach; the
+ * flat names the ROM-shaped callers spell are defined here from the header. */
+#include "dBgCh_Actr.h"
+extern "C" int _ZNK10dBgCh_Actr13GetWallResultEv(const void *self)
+{ return (int)(size_t)((const dBgCh_Actr *)self)->GetWallResult(); }
+extern "C" int _ZNK10dBgCh_Actr14GetFloorResultEv(const void *self)
+{ return (int)(size_t)((const dBgCh_Actr *)self)->GetFloorResult(); }
+
+/* ---- daDonketu_c::CleanupResources / Render --------------------------------
+ * include/daDonketu_c.h re-declares both so the class names them, but the ROM
+ * gives daDonketu_c no body of its own: its vtable slots 3 and 9 point at
+ * daOts_c's (the header comment records the addresses). MSVC needs a definition
+ * for the declared override, and the faithful one is the inherited call. */
+#include "daDonketu_c.h"
+int daDonketu_c::CleanupResources() { return daOts_c::CleanupResources(); }
+int daDonketu_c::Render() { return daOts_c::Render(); }
+
+/* ---- daObjYajirusi_c, the host factory ------------------------------------
+ * Main's two classInit factories are `new daObjYajirusi_c`. Under _MSC_VER the
+ * class is the flat view (include/daObjYajirusi_c.h: no base class, no vptr),
+ * so `new` builds neither dBgActor_c nor the vtable. hostgen respells those two
+ * lines to call this, which does what the cartridge's factory does: allocate
+ * 0x380 through fBase_c::operator new, run dBgActor_c's base constructor, seat
+ * the class vtable, construct the shadow model at +0x320. */
+extern "C" {
+void *_ZN7fBase_cnwEm(unsigned size);
+void *_ZN10dBgActor_cC2Ev(void *self);
+void _ZN17dExtShadowModel_cC1Ev(void *self);
+extern void *_ZTV15daObjYajirusi_c[32];
+int *port_new_daObjYajirusi_c(void)
+{
+    int *p = (int *)_ZN7fBase_cnwEm(0x380);
+    if (p) {
+        _ZN10dBgActor_cC2Ev(p);
+        p[0] = (int)(size_t)_ZTV15daObjYajirusi_c;
+        _ZN17dExtShadowModel_cC1Ev((char *)p + 0x320);
+    }
+    return p;
+}
+}

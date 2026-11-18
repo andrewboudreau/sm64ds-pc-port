@@ -1,0 +1,97 @@
+# Gate 192: ov081, a 100% matched ACTOR overlay (113/113 chaos-db) carrying
+# five classes -- SPINDRIFT (312), MR_BLIZZARD (223), SNOWBALL (unhosted),
+# MONEYBAG (unhosted), ICE_BLOCK (18). Fresh per-symbol mount, the
+# ov079/ov080 convention: WHOLE data span (every data + bss symbol) MINUS
+# the three classes this gate hosts' own vtables (host arrays
+# hal/actor_classes_ov081.cpp fills) MINUS dsd's five .p__sinit_* pointer
+# entries (not C identifiers; the port calls the three sinits it runs by
+# name directly). ovdata.py's --pack mode pads the resulting address gaps
+# automatically, reproducing the ROM's own relative offsets.
+#
+# THE THREE VTABLES LEFT OUT: _ZTV9Spindrift (0x0212887c, 32 words, the full
+# Enemy shape with own Kill at 31), _ZTV10MrBlizzard (0x021289f0, 32 words,
+# own OnPendingDestroy at 12 -- NOT the shared default), _ZTV8IceBlock ==
+# _ZTV15daObjIceBlock_c (0x02128cc4, 32 words, the full Platform+Kill shape,
+# own Kill at 31). Every slot read with relocations applied (not just the
+# scope report's named subset):
+#
+#   SPINDRIFT (daHuwa_c):
+#     0 Init 0x02123ed0, 3 Cleanup 0x02123bec, 6 Behavior 0x02123c6c,
+#     9 Render 0x02123c1c, 12 OnPendingDestroy SHARED, 16 D1 0x02123740,
+#     17 D0 0x02123788, 18 OnYoshiTryEat 0x02124038, 19 OnTurnIntoEgg
+#     0x02123fd8, 29 OnAimedAtWithEgg 0x021237e4, 31 Kill 0x02124e64 (own).
+#
+#   MR_BLIZZARD (daYuki_c): a REAL 10-cell (5 states x enter/tick) PMF
+#     dispatch, sinit-copied as DS code addresses from data_ov081_0212893x
+#     range statics into data_ov081_02128e14..ea4 (10 x 8 bytes). Own slots:
+#     0 Init 0x02125ba0, 3 Cleanup 0x021257b0, 6 Behavior 0x0212588c,
+#     9 Render 0x02125820, 12 OnPendingDestroy 0x0212581c (OWN, not shared),
+#     16 D1 0x02124090, 17 D0 0x021240d8, 29 OnAimedAtWithEgg 0x02125eb8,
+#     31 Kill 0x021261b8.
+#
+#   ICE_BLOCK (daObjIceBlock_c, a Platform): 0 Init 0x02127ff0, 3 Cleanup
+#     0x02127d98, 6 Behavior 0x02127e1c, 9 Render 0x02127ddc, 12
+#     OnPendingDestroy SHARED, 16 D1 0x02127b34, 17 D0 0x02127b80, 27
+#     OnHitByMegaChar 0x02127ccc, 31 Kill 0x02127cf4 (own, per the report).
+#     InitResources calls MovingMeshCollider::SetFile with a CLPS_Block read
+#     from ov002 (data_ov002_0210d8d4, added to port/ov002_syms.txt).
+#
+# SNOWBALL and MONEYBAG stayed UNREGISTERED at gate 192, and their vtable
+# words rode along as plain packed data because nothing installed them. LANE
+# w3-b (run rel0215) REGISTERS BOTH, so both tables have to leave the mount:
+# a registered class's factory stores the table into slot 0 of a live object,
+# and the mounted bytes are the ROM's own words holding DS code addresses.
+# _ZTV8Snowball (0x02128abc, 31 slots) and _ZTV8Moneybag (0x02128c04, 31
+# slots) are now HOST ARRAYS hal/actor_classes_ov081.cpp declares and fills,
+# the same rule this list already applies to the trio's three tables. Each
+# vtable's own RTTI-alias spelling (_ZTV12daSnowball_c == _ZTV8Snowball,
+# _ZTV8daGmch_c == _ZTV8Moneybag) shares the identical address, so dropping
+# the one listed name drops BOTH spellings from the link -- which is what
+# lets that file route the RTTI spelling with an /alternatename whose LHS is
+# undefined everywhere, the IceBlock/daObj1UpLogo_c shape rather than the
+# Spindrift/MrBlizzard one two lines up (those two keep the RTTI spelling
+# MOUNTED, so their D0's first store lands on the ROM's raw words; inert
+# because it is immediately followed by the teardown, but not a shape to
+# copy).
+#
+# --pack pads the two resulting gaps (0x7c bytes each, the exact table
+# widths) by itself. The two SpawnInfo records that PRECEDE the removed
+# tables are pinned :0x24 -- their real ROM span, the delta to the table
+# that used to follow them -- so the mount emits the same bytes it did
+# before rather than letting the next-symbol floor stretch each record over
+# the hole the removal left (trap T3, in the direction that oversizes).
+#
+# ovdata.py's --pack size floor is max(4, next-symbol-delta): two adjacent
+# 2-byte fields (data_ov081_021289a4/a6, part of MrBlizzard's SpawnInfo
+# record) need explicit :0x2 overrides or the floor makes the first one
+# overlap the second.
+#
+# IDs cross-checked via arm9 relocs (12576/12781/12870, the scope report):
+# IceBlock SpawnInfo 0x02128ca0 / vtable 0x02128cc4; MrBlizzard SpawnInfo
+# 0x021289cc / vtable 0x021289f0; Spindrift SpawnInfo 0x02128858 / vtable
+# 0x0212887c.
+data_ov081_021280d8 _ZTS8daHuwa_c _ZTI8daHuwa_c g_profile_HUWAHUWA data_ov081_021288f8@0x021288f8 data_ov081_02128900@0x02128900 data_ov081_02128908@0x02128908 data_ov081_02128910@0x02128910 data_ov081_02128918@0x02128918 data_ov081_02128920@0x02128920 data_ov081_02128928@0x02128928 data_ov081_02128930@0x02128930 data_ov081_02128938@0x02128938 data_ov081_02128940@0x02128940 data_ov081_02128948@0x02128948 data_ov081_02128950@0x02128950 data_ov081_02128958@0x02128958 data_ov081_02128960@0x02128960 data_ov081_02128968@0x02128968 data_ov081_02128970@0x02128970 data_ov081_02128978@0x02128978 data_ov081_02128980@0x02128980 data_ov081_02128988@0x02128988 data_ov081_02128990@0x02128990 data_ov081_02128998 data_ov081_021289a4:0x2 data_ov081_021289a6:0x2 data_ov081_021289a8 _ZTI11daSnowman_c _ZTS11daSnowman_c g_profile_SNOWMAN data_ov081_02128a6c@0x02128a6c data_ov081_02128a74@0x02128a74 _ZTI12daSnowball_c _ZTS12daSnowball_c g_profile_SNOWBALL:0x24 data_ov081_02128b38@0x02128b38 data_ov081_02128b40@0x02128b40 data_ov081_02128b48@0x02128b48 data_ov081_02128b50@0x02128b50 data_ov081_02128b58@0x02128b58 data_ov081_02128b60@0x02128b60 data_ov081_02128b68@0x02128b68 data_ov081_02128b70@0x02128b70 data_ov081_02128b78@0x02128b78 data_ov081_02128b80@0x02128b80 data_ov081_02128b88@0x02128b88 data_ov081_02128b90@0x02128b90 data_ov081_02128b98@0x02128b98 data_ov081_02128ba0@0x02128ba0 data_ov081_02128ba8@0x02128ba8 data_ov081_02128bb0@0x02128bb0 data_ov081_02128bb8@0x02128bb8 data_ov081_02128bc0@0x02128bc0 _ZTS8daGmch_c _ZTI8daGmch_c _ZTI15daObjIceBlock_c _ZTS15daObjIceBlock_c g_profile_ICE_BLOCK_LL data_ov081_02128d70@0x02128d70 data_ov081_02128d7c@0x02128d7c data_ov081_02128dc0@0x02128dc0 data_ov081_02128dcc@0x02128dcc data_ov081_02128dd8@0x02128dd8 data_ov081_02128de4@0x02128de4 data_ov081_02128df0@0x02128df0 data_ov081_02128dfc@0x02128dfc data_ov081_02128e08@0x02128e08 data_ov081_02128eec@0x02128eec data_ov081_02128f04@0x02128f04 data_ov081_02128f10@0x02128f10 data_ov081_02128f1c@0x02128f1c data_ov081_02128f28@0x02128f28 data_ov081_02128f34@0x02128f34 data_ov081_02128fe0@0x02128fe0 data_ov081_02128fec@0x02128fec
+
+# RETIRED at PORTSYNC2 (the 2026-10 main merge). Each symbol below was
+# hosted here as a ROM data blob AND is now defined by a translation unit the
+# build compiles (main folded it into the class TU, or the rename by address
+# made a host array's name and this row one name), so the link would report it
+# twice (LNK2005). The src TUs among the definers are on PORT_DSSTATE_FI_SOURCES
+# in port/CMakeLists.txt, so the objects stay inside the captured .dsstate span
+# (hal/dsstate_all.h says why).
+#   _ZTV11daSnowman_c                          now defined by port/hal/actor_classes_ov081.cpp
+#   _ZTV8daHuwa_c                              now defined by port/hal/actor_classes_ov081.cpp
+#   data_ov081_02128fd0                        now defined by src/game/actors/d_a_obj_ice_block.cpp
+#   data_ov081_02128fd8                        now defined by src/game/actors/d_a_obj_ice_block.cpp
+# PORTSYNC3 name-only rows (the class TU defines the storage):
+gHuwahuwaModelModelFile! gHuwahuwaMoveAnimationFile! gSnowmanJumpStAnimationFile! gSnowmanWaitAnimationFile! gSnowmanJumpEdAnimationFile! data_ov081_02128da8! data_ov081_02128db0! data_ov081_02128db8! gGamaguchiJumpEndAnimationFile! gGamaguchiJumpAnimationFile! data_ov081_02128ed4! data_ov081_02128edc! gGamaguchiWalkEndAnimationFile! data_ov081_02128ef8!
+# PORTSYNC3 name-only rows (extern C definitions in a class TU):
+data_ov081_02128fd0! data_ov081_02128fd8!
+
+# catchup1 Stage D (PLY4 blocker 1): name-only rows. A linked decomp TU defines each
+# of these objects, so the mount carries no storage for them, but the NAME stays in the
+# list so tools/ovdata.py still rebases ROM pointers into them onto the TU object
+# (SYM4 f1916fd9b2f had deleted the tokens outright, which sent those pointers to gap
+# blocks or left raw DS addresses).
+g_profile_GAMAGUCHI:0x24! data_ov081_02128d90! data_ov081_02128e14! data_ov081_02128e24! data_ov081_02128e34! data_ov081_02128e44! data_ov081_02128e54! data_ov081_02128e64!
+data_ov081_02128e74! data_ov081_02128e84! data_ov081_02128e94! data_ov081_02128ea4! data_ov081_02128eb4! data_ov081_02128f40!

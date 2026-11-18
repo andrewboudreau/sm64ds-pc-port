@@ -1,0 +1,799 @@
+/* smoke_settings: the control-binding and camera-mode half of settings.json,
+   proved without a window, a pad or a ROM.
+
+   hal/host_settings.cpp reads the file ONCE per process, so every case here
+   is its own process: the parent makes an empty working directory, writes
+   (or does not write) a settings.json into it, and runs itself again with a
+   case name, chdir'd into that directory. The child asks the getters and
+   exits non-zero on the first wrong answer, and the parent fails if any child
+   does. What is pinned:
+
+     defaults    no file at all: every key and pad default the header
+                 promises, RunButtonKey/RunButtonPad agreeing with
+                 KeyRun/PadRun, CameraMode ds, RunMode analog.
+     remap       a file that moves jump, attack, the walk keys, a pad button
+                 and the camera mode, and leaves everything else alone --
+                 the moved ones move, the rest stay at their defaults, an
+                 out-of-range value reads as its default. Its PadJump is Y,
+                 the look default's button, so PadLook starts unbound.
+     look_042    a whole 0.4.2 launcher file (every Key* and Pad* it wrote,
+                 no KeyLook / PadLook): Look comes up on Z and pad Y.
+     look_taken  a file whose jump is Z and whose run is pad Y (the old
+                 RunButtonPad spelling): both halves of Look start unbound.
+     look_named  a file that names KeyLook and PadLook: obeyed as written,
+                 even onto a button another action holds.
+     alias_old   only RunButtonKey / RunButtonPad in the file: read exactly
+                 as before, and the new names answer the same.
+     alias_both  both spellings present and disagreeing: KeyRun / PadRun win.
+     alias_badnew the new spelling present but out of range: the valid old
+                 spelling beside it wins, because "present" is not "parsed".
+     save        the run save writes BOTH spellings and the camera save
+                 writes CameraMode, and a key this program never heard of
+                 survives the write untouched.
+     padlayouts  the PadLayouts array: two objects parse and answer by
+                 vid:pid, a field out of range reads as the generic
+                 fallback's value, an object with no usable vid:pid is
+                 dropped, a sign of 0 is refused, and an unknown pad is 0.
+     padlayouts_save
+                 a learned layout saved into a file that already has one
+                 for another pad: both are in the array afterwards, a
+                 re-save of the same vid:pid replaces rather than appends,
+                 the launcher's own key survives, and the file re-reads in
+                 a child to the same values.
+     padlayouts_backslash
+                 a name carrying a backslash pair: the fields after it and
+                 the keys after the array still read, and a save drops the
+                 backslash rather than escaping it.
+     padlayouts_bad
+                 a PadLayouts that is not an array, and one that is an array
+                 with nothing usable in it, both read as no layouts and every
+                 other key in the file still parses.
+     padtranslate
+                 hal/pad_backend.cpp's translation on a synthetic report
+                 through a learned row (port_pad_selftest).
+
+   find_settings looks beside the exe first, then SM64DS_ASSET_ROOT, then the
+   working directory. The parent refuses to run if a settings.json is beside
+   the exe -- a developer's own file would make every case below meaningless
+   -- and clears SM64DS_ASSET_ROOT from the child's environment so the
+   working directory is the file that is read. */
+
+#include "hal/host_settings.h"
+#include "hal/pad_backend.h"
+
+#include <direct.h>
+#include <process.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+
+extern "C" int host_setting_run_mode(void);
+extern "C" int host_setting_run_key(void);
+extern "C" int host_setting_run_pad(void);
+extern "C" int host_setting_save_run(int mode, int key, int pad);
+
+static int fails;
+
+static void check(int cond, const char *what)
+{
+    if (cond) return;
+    ++fails;
+    fprintf(stderr, "  FAIL %s\n", what);
+}
+
+static void check_eq(int got, int want, const char *what)
+{
+    if (got == want) return;
+    ++fails;
+    fprintf(stderr, "  FAIL %s: got 0x%x want 0x%x\n", what, (unsigned)got,
+            (unsigned)want);
+}
+
+static const int KEY_DFLT[HOST_KEY_COUNT] = {
+    0x57, 0x53, 0x41, 0x44, 0x26, 0x28, 0x25, 0x27,
+    0x20, 0x58, 0x11, 0x10, 0x0d, 0x08, 0x5a,
+    0x43, 0x51, 0x45, 0x70,         /* camera: centre C, left Q, right E, mode F1 */
+    0x52, 0x46, 0, 0,               /* camera: tilt up R, down F, zoom in / out unbound */
+};
+static const int PAD_DFLT[HOST_PAD_COUNT] = {
+    0x1000, 0x2000, 0x20000, 0x4000, 0x0010, 0,   /* crouch = RT pseudo-mask */
+    0x8000,                                       /* look = Y, the DS X */
+    0x10000, 0x0100, 0x0200, 0x0080,              /* camera: centre LT, LB, RB, stick click */
+    0, 0, 0, 0,                                   /* camera: tilt up / down, zoom in / out unbound */
+};
+
+static void check_defaults_except(const int *skip_key, int nskip_key,
+                                  const int *skip_pad, int nskip_pad)
+{
+    for (int i = 0; i < HOST_KEY_COUNT; ++i) {
+        int skip = 0;
+        for (int k = 0; k < nskip_key; ++k) if (skip_key[k] == i) skip = 1;
+        if (!skip) check_eq(host_setting_key(i), KEY_DFLT[i],
+                            host_setting_key_name(i));
+    }
+    for (int i = 0; i < HOST_PAD_COUNT; ++i) {
+        int skip = 0;
+        for (int k = 0; k < nskip_pad; ++k) if (skip_pad[k] == i) skip = 1;
+        if (!skip) check_eq(host_setting_pad(i), PAD_DFLT[i],
+                            host_setting_pad_name(i));
+    }
+}
+
+static char *slurp(const char *path)
+{
+    FILE *f = fopen(path, "rb");
+    if (!f) return 0;
+    static char buf[65536];
+    size_t n = fread(buf, 1, sizeof buf - 1, f);
+    fclose(f);
+    buf[n] = '\0';
+    return buf;
+}
+
+static int child(const char *which)
+{
+    if (!strcmp(which, "defaults")) {
+        check_defaults_except(0, 0, 0, 0);
+        check_eq(host_setting_run_key(), 0x10, "run key");
+        check_eq(host_setting_run_pad(), 0x4000, "run pad");
+        check_eq(host_setting_key(HOST_KEY_RUN), host_setting_run_key(),
+                 "KeyRun agrees with RunButtonKey");
+        check_eq(host_setting_pad(HOST_PAD_RUN), host_setting_run_pad(),
+                 "PadRun agrees with RunButtonPad");
+        check_eq(host_setting_camera_mode(), 3, "CameraMode ds (HYBRIDCAM1: ds with no CameraHybrid is hybrid)");
+        check_eq(host_setting_run_mode(), 1, "RunMode analog");
+        check_eq(host_setting_key(-1), 0, "out of range key is unbound");
+        check_eq(host_setting_pad(99), 0, "out of range pad is unbound");
+    } else if (!strcmp(which, "remap")) {
+        const int sk[] = { HOST_KEY_JUMP, HOST_KEY_ATTACK, HOST_KEY_UP,
+                           HOST_KEY_LEFT, HOST_KEY_DOWN, HOST_KEY_RIGHT,
+                           HOST_KEY_UP_ALT, HOST_KEY_SELECT };
+        const int sp[] = { HOST_PAD_JUMP, HOST_PAD_SELECT, HOST_PAD_LOOK };
+        check_defaults_except(sk, 8, sp, 3);
+        check_eq(host_setting_key(HOST_KEY_JUMP), 0x4a, "KeyJump J");
+        check_eq(host_setting_key(HOST_KEY_ATTACK), 0x4b, "KeyAttack K");
+        check_eq(host_setting_key(HOST_KEY_UP), 0x49, "KeyUp I");
+        check_eq(host_setting_key(HOST_KEY_LEFT), 0x4a, "KeyLeft J (two "
+                 "actions on one key is legal)");
+        check_eq(host_setting_key(HOST_KEY_DOWN), 0x4b, "KeyDown K");
+        check_eq(host_setting_key(HOST_KEY_RIGHT), 0x4c, "KeyRight L");
+        check_eq(host_setting_key(HOST_KEY_UP_ALT), 0, "KeyUpAlt unbound");
+        /* 0x1234 is outside 0..0xff: a typo, so the default */
+        check_eq(host_setting_key(HOST_KEY_SELECT), 0x08,
+                 "KeySelect out of range reads as default");
+        check_eq(host_setting_pad(HOST_PAD_JUMP), 0x8000, "PadJump Y");
+        check_eq(host_setting_pad(HOST_PAD_SELECT), 0x0020, "PadSelect BACK");
+        check_eq(host_setting_pad(HOST_PAD_LOOK), 0, "PadLook unbound: "
+                 "the file's PadJump already holds Y");
+        check_eq(host_setting_camera_mode(), 3, "CameraMode ds (HYBRIDCAM1: ds with no CameraHybrid is hybrid)");
+        /* the run pair was not in the file, so both spellings answer the
+           default */
+        check_eq(host_setting_run_key(), 0x10, "run key untouched");
+    } else if (!strcmp(which, "look_042")) {
+        /* the file a 0.4.2 launcher leaves: every binding it knows, at the
+           defaults, and nothing about Look -- which then comes up on its
+           defaults, the way an updating player gets the button */
+        check_defaults_except(0, 0, 0, 0);
+        check_eq(host_setting_key(HOST_KEY_LOOK), 0x5a, "KeyLook Z");
+        check_eq(host_setting_pad(HOST_PAD_LOOK), 0x8000, "PadLook Y");
+    } else if (!strcmp(which, "look_taken")) {
+        /* jump already on Z, run already on pad Y by its OLD spelling: the
+           new defaults would double up those choices, so both halves of
+           Look start unbound */
+        check_eq(host_setting_key(HOST_KEY_JUMP), 0x5a, "KeyJump Z");
+        check_eq(host_setting_pad(HOST_PAD_RUN), 0x8000, "PadRun Y (old name)");
+        check_eq(host_setting_key(HOST_KEY_LOOK), 0, "KeyLook unbound");
+        check_eq(host_setting_pad(HOST_PAD_LOOK), 0, "PadLook unbound");
+    } else if (!strcmp(which, "look_named")) {
+        /* named in the file: obeyed as written, even onto the button jump
+           holds (two actions on one key is legal) */
+        check_eq(host_setting_key(HOST_KEY_LOOK), 0x56, "KeyLook V");
+        check_eq(host_setting_pad(HOST_PAD_LOOK), 0x1000, "PadLook A as written");
+        check_eq(host_setting_pad(HOST_PAD_JUMP), 0x1000, "PadJump A");
+    } else if (!strcmp(which, "cam_042")) {
+        /* a whole pre-camera-binding file (no KeyCam* / PadCam*): all four
+           camera actions read their defaults, centre on C and LT */
+        check_defaults_except(0, 0, 0, 0);
+        check_eq(host_setting_pad(HOST_PAD_CAM_CENTER), 0x10000, "PadCamCenter LT");
+        check_eq(host_setting_key(HOST_KEY_CAM_CENTER), 0x43, "KeyCamCenter C");
+    } else if (!strcmp(which, "cam_taken")) {
+        /* crouch already on LT and jump already on C: centre starts unbound
+           on both halves. Since LLLSHELL1 (782b5f56f27) the turn defaults give
+           way to a gameplay action too, so PadCamLeft, whose LB default
+           PadAttack now holds, starts unbound; the other two keep theirs */
+        check_eq(host_setting_pad(HOST_PAD_CROUCH), 0x10000, "PadCrouch LT");
+        check_eq(host_setting_key(HOST_KEY_CAM_CENTER), 0, "KeyCamCenter unbound");
+        check_eq(host_setting_pad(HOST_PAD_CAM_CENTER), 0, "PadCamCenter unbound");
+        check_eq(host_setting_pad(HOST_PAD_ATTACK), 0x0100, "PadAttack LB");
+        check_eq(host_setting_pad(HOST_PAD_CAM_LEFT), 0, "PadCamLeft yields LB to PadAttack");
+        check_eq(host_setting_pad(HOST_PAD_CAM_RIGHT), 0x0200, "PadCamRight RB");
+        check_eq(host_setting_key(HOST_KEY_CAM_LEFT), 0x51, "KeyCamLeft Q");
+    } else if (!strcmp(which, "mouse_default")) {
+        /* CAMPACK1: no mouse keys in the file: right button holds the look, stick zoom off. CLICK1 (f357201eb84):
+           left click is Attack when the file never names MouseAttack; everything else unbound */
+        check_defaults_except(0, 0, 0, 0);
+        check_eq(host_setting_mouse(HOST_MOUSE_CAM_HOLD), 2, "MouseCamHold right");
+        for (int i = HOST_MOUSE_CAM_CENTER; i < HOST_MOUSE_COUNT; ++i)
+            check_eq(host_setting_mouse(i), i == HOST_MOUSE_ATTACK ? 1 : 0, host_setting_mouse_name(i));
+        check_eq(host_setting_camera_stick_zoom(), 0, "CameraStickZoom off");
+    } else if (!strcmp(which, "mouse_named")) {
+        check_eq(host_setting_mouse(HOST_MOUSE_CAM_HOLD), 4, "MouseCamHold middle");
+        check_eq(host_setting_mouse(HOST_MOUSE_CAM_CENTER), 5, "MouseCamCenter X1");
+        check_eq(host_setting_mouse(HOST_MOUSE_CAM_LEFT), 1, "MouseCamLeft left: the left button binds to any action but the look");
+        check_eq(host_setting_mouse(HOST_MOUSE_CAM_ZOOM_IN), 6, "MouseCamZoomIn X2");
+        check_eq(host_setting_mouse(HOST_MOUSE_LOOK), 0, "MouseLook 3 is not a button we take");
+        check_eq(host_setting_key(HOST_KEY_CAM_ZOOM_IN), 0x49, "KeyCamZoomIn I");
+        check_eq(host_setting_key(HOST_KEY_CAM_UP), 0x52, "KeyCamUp default");
+        check_eq(host_setting_camera_stick_zoom(), 1, "CameraStickZoom on");
+    } else if (!strcmp(which, "mouse_left_hold")) {
+        /* MOUSELOCK1: left is refused on the look button only; the file's 1 reads as the default right */
+        check_eq(host_setting_mouse(HOST_MOUSE_CAM_HOLD), 2, "MouseCamHold left refused, right kept");
+        check_eq(host_setting_mouse(HOST_MOUSE_CAM_CENTER), 1, "MouseCamCenter left");
+    } else if (!strcmp(which, "cam_named")) {
+        /* named in the file: obeyed as written, onto LB and on to V, and a
+           rotate rebound to the right stick click */
+        check_eq(host_setting_pad(HOST_PAD_CAM_CENTER), 0x0100, "PadCamCenter LB");
+        check_eq(host_setting_pad(HOST_PAD_CAM_LEFT), 0x0100, "PadCamLeft LB too");
+        check_eq(host_setting_key(HOST_KEY_CAM_CENTER), 0x56, "KeyCamCenter V");
+        check_eq(host_setting_pad(HOST_PAD_CAM_RIGHT), 0x0001, "PadCamRight d-pad up");
+        check_eq(host_setting_key(HOST_KEY_CAM_MODE), 0, "KeyCamMode unbound");
+        check_eq(host_setting_pad(HOST_PAD_CAM_MODE), 0x0080, "PadCamMode default");
+    } else if (!strcmp(which, "camera_number")) {
+        check_eq(host_setting_camera_mode(), 1, "CameraMode 1 is freecam");
+    } else if (!strcmp(which, "alias_old")) {
+        check_eq(host_setting_run_key(), 0x52, "RunButtonKey R");
+        check_eq(host_setting_run_pad(), 0x8000, "RunButtonPad Y");
+        check_eq(host_setting_key(HOST_KEY_RUN), 0x52, "KeyRun follows old");
+        check_eq(host_setting_pad(HOST_PAD_RUN), 0x8000, "PadRun follows old");
+    } else if (!strcmp(which, "alias_both")) {
+        check_eq(host_setting_run_key(), 0x51, "KeyRun Q wins");
+        check_eq(host_setting_run_pad(), 0x0200, "PadRun RB wins");
+        check_eq(host_setting_key(HOST_KEY_RUN), 0x51, "KeyRun Q");
+        check_eq(host_setting_pad(HOST_PAD_RUN), 0x0200, "PadRun RB");
+    } else if (!strcmp(which, "alias_badnew")) {
+        /* the new spelling is there but out of range: a typo, so the valid
+           old spelling beside it must still win */
+        check_eq(host_setting_run_key(), 0x52, "RunButtonKey R beats KeyRun 999");
+        check_eq(host_setting_run_pad(), 0x8000, "RunButtonPad Y beats PadRun -1");
+        check_eq(host_setting_key(HOST_KEY_RUN), 0x52, "KeyRun follows old");
+        check_eq(host_setting_pad(HOST_PAD_RUN), 0x8000, "PadRun follows old");
+    } else if (!strcmp(which, "save")) {
+        check(host_setting_save_run(1, 0x51, 0x0200), "save_run wrote");
+        check(host_setting_save_camera_mode(1), "save_camera_mode wrote");
+        check_eq(host_setting_run_key(), 0x51, "live run key moved");
+        check_eq(host_setting_key(HOST_KEY_RUN), 0x51, "live KeyRun moved");
+        check_eq(host_setting_camera_mode(), 1, "live camera moved");
+        const char *t = slurp("settings.json");
+        check(t != 0, "settings.json exists after save");
+        if (t) {
+            check(strstr(t, "\"RunButtonKey\": 81") != 0, "RunButtonKey 81");
+            check(strstr(t, "\"KeyRun\": 81") != 0, "KeyRun 81");
+            check(strstr(t, "\"RunButtonPad\": 512") != 0, "RunButtonPad 512");
+            check(strstr(t, "\"PadRun\": 512") != 0, "PadRun 512");
+            check(strstr(t, "\"RunMode\": \"analog\"") != 0, "RunMode analog");
+            check(strstr(t, "\"CameraMode\": \"freecam\"") != 0,
+                  "CameraMode freecam");
+            check(strstr(t, "\"Volume\": 37") != 0,
+                  "the launcher's own key survived the write");
+        }
+    } else if (!strcmp(which, "padlayouts")) {
+        HostPadLayout L, D;
+        host_pad_layout_default(&D);
+        check_eq(host_setting_pad_layout_count(), 2, "two layouts parsed");
+        check(host_setting_pad_layout(1118, 654, &L), "1118:654 found");
+        check_eq(L.a, 2, "a"); check_eq(L.b, 1, "b"); check_eq(L.x, 3, "x");
+        check_eq(L.y, 0, "y"); check_eq(L.lb, 4, "lb"); check_eq(L.rb, 5, "rb");
+        check_eq(L.back, 8, "back"); check_eq(L.start, 9, "start");
+        check_eq(L.lt_btn, 6, "lt_btn"); check_eq(L.rt_btn, -1, "rt_btn -1");
+        check_eq(L.rt_axis, 3, "rt_axis"); check_eq(L.lx_axis, 2, "lx_axis");
+        check_eq(L.lx_sign, -1, "lx_sign"); check_eq(L.ly_axis, 5, "ly_axis");
+        check_eq(L.ly_sign, 1, "ly_sign"); check_eq(L.rx_axis, 0, "rx_axis");
+        check(!strcmp(L.name, "USB Gamepad"), "name");
+        /* the second object: y is 99 (out of range), lthumb is "abc",
+           rx_sign is 0 -- each of those reads as the fallback; the rest of
+           the object is honoured */
+        check(host_setting_pad_layout(0x1234, 0x5678, &L), "4660:22136 found");
+        check_eq(L.a, 7, "second a");
+        check_eq(L.y, D.y, "y out of range reads as fallback");
+        check_eq(L.lthumb, D.lthumb, "lthumb not a number reads as fallback");
+        check_eq(L.rx_sign, D.rx_sign, "rx_sign 0 reads as fallback");
+        check_eq(L.ly_sign, -1, "second ly_sign kept");
+        check(!host_setting_pad_layout(1, 2, &L), "unknown pad is 0");
+        /* the object with vid 0 and the one with no pid were dropped */
+        check(!host_setting_pad_layout(0, 5, &L), "vid 0 dropped");
+        check(!host_setting_pad_layout(77, 0, &L), "no pid dropped");
+        check_eq(D.a, 0, "fallback a"); check_eq(D.ly_sign, -1, "fallback ly_sign");
+    } else if (!strcmp(which, "padlayouts_save")) {
+        HostPadLayout L;
+        host_pad_layout_default(&L);
+        L.vid = 0x2345; L.pid = 0x6789;
+        L.a = 3; L.b = 2; L.x = 1; L.y = 0; L.lx_axis = 3; L.lx_sign = -1;
+        L.rt_btn = -1; L.rt_axis = 4;
+        snprintf(L.name, sizeof L.name, "Say \"hi\" pad");
+        check(host_setting_save_pad_layout(&L), "save wrote");
+        check_eq(host_setting_pad_layout_count(), 2, "two after the save");
+        /* the same pad again with one change: replaces, does not append */
+        L.b = 9;
+        check(host_setting_save_pad_layout(&L), "re-save wrote");
+        check_eq(host_setting_pad_layout_count(), 2, "still two after re-save");
+        /* out of range on the way in is clamped to the fallback before the
+           write, so the file never carries a value a reader would refuse */
+        L.vid = 0x1111; L.pid = 0x2222; L.y = 200; L.ly_sign = 0;
+        check(host_setting_save_pad_layout(&L), "third save wrote");
+        check_eq(host_setting_pad_layout_count(), 3, "three");
+        check(host_setting_pad_layout(0x1111, 0x2222, &L), "third found");
+        check_eq(L.y, 3, "y 200 clamped to fallback");
+        check_eq(L.ly_sign, -1, "ly_sign 0 clamped to fallback");
+        HostPadLayout bad;
+        host_pad_layout_default(&bad);
+        check(!host_setting_save_pad_layout(&bad), "vid 0 refused");
+        const char *t = slurp("settings.json");
+        check(t != 0, "settings.json exists after save");
+        if (t) {
+            check(strstr(t, "\"Volume\": 37") != 0, "the launcher's key survived");
+            check(strstr(t, "\"vid\": 1118") != 0, "the earlier pad survived");
+            check(strstr(t, "\"vid\": 9029") != 0, "the saved pad is there");
+            check(strstr(t, "\"b\": 9") != 0, "the re-save's value is there");
+            check(strstr(t, "\"b\": 2,") == 0, "the replaced value is gone");
+            check(strstr(t, "Say \\\"hi\\\" pad") != 0, "the name is escaped");
+        }
+    } else if (!strcmp(which, "padlayouts_backslash")) {
+        /* a name carrying a backslash pair, then more fields in the same
+           object and a key after the array: all of it must still read */
+        HostPadLayout L;
+        check_eq(host_setting_pad_layout_count(), 1, "one layout");
+        check(host_setting_pad_layout(1118, 654, &L), "found past the name");
+        check(!strcmp(L.name, "Pad \\ Co"), "name with the backslash");
+        check_eq(L.b, 5, "field after the name read");
+        check_eq(host_setting_key(HOST_KEY_JUMP), 0x4a, "key after the array read");
+        check_eq(host_setting_camera_mode(), 3, "second key after the array read (HYBRIDCAM1: ds with no CameraHybrid is hybrid)");
+        /* and a save of a name with a backslash writes it without one */
+        snprintf(L.name, sizeof L.name, "Back\\slash \"q\"");
+        check(host_setting_save_pad_layout(&L), "save wrote");
+        const char *t = slurp("settings.json");
+        check(t != 0, "file exists");
+        if (t) {
+            check(strstr(t, "Backslash \\\"q\\\"") != 0, "backslash dropped, quote escaped");
+            check(strstr(t, "\"KeyJump\": 74") != 0, "KeyJump survived");
+        }
+    } else if (!strcmp(which, "padlayouts_reread")) {
+        /* the file the save case left behind, read fresh by this process */
+        HostPadLayout L;
+        check_eq(host_setting_pad_layout_count(), 3, "three re-read");
+        check(host_setting_pad_layout(0x2345, 0x6789, &L), "saved pad re-read");
+        check_eq(L.b, 9, "re-read b"); check_eq(L.lx_axis, 3, "re-read lx_axis");
+        check_eq(L.lx_sign, -1, "re-read lx_sign"); check_eq(L.rt_axis, 4, "re-read rt_axis");
+        check_eq(L.rt_btn, -1, "re-read rt_btn");
+        check(!strcmp(L.name, "Say \"hi\" pad"), "re-read name unescaped");
+        check_eq(host_setting_key(HOST_KEY_JUMP), 0x20, "the other keys still default");
+    } else if (!strcmp(which, "padlayouts_bad")) {
+        check_eq(host_setting_pad_layout_count(), 0, "unusable PadLayouts is none");
+        check_eq(host_setting_key(HOST_KEY_JUMP), 0x4a, "KeyJump J still parsed");
+        check_eq(host_setting_camera_mode(), 3, "CameraMode ds still parsed (HYBRIDCAM1: ds with no CameraHybrid is hybrid)");
+    } else if (!strcmp(which, "quality_defaults")) {
+        /* no file at all: the three picture keys are the shipped picture.
+           0 is the explicit sentinel for "the multiplier the port picks
+           today" and is NOT 1, which is a real choice (the DS's own
+           256x192). The pack directory answers even with the pack off,
+           because it is "where would it be", not "is it on". */
+        check_eq(host_setting_render_scale(), 0, "RenderScale default 0");
+        check_eq(host_setting_smooth_models(), 0, "SmoothModels default 0");
+        /* run hd2's two: nearest sampling and no smoothing pass are the
+           picture the port shipped with, so no file at all must read as both
+           off and NOT as "some filtering, probably" */
+        check_eq(host_setting_texture_filter(), 0, "TextureFilter default 0");
+        check_eq(host_setting_anti_aliasing(), 0, "AntiAliasing default 0");
+        /* run hd2 lane GPU1's three: the ordinary Windows present path, its
+           own nearest scaler and no vsync are what the port shipped with, so
+           no file at all must read as all three off */
+        check_eq(host_setting_present_backend(), 0, "PresentBackend default 0");
+        check_eq(host_setting_present_filter(), 0, "PresentFilter default 0");
+        check_eq(host_setting_vsync(), 0, "VSync default 0");
+        /* run hd2 lane GPU2: the software rasteriser is what the port shipped
+           with and is the only path with a byte-exact reference, so no file at
+           all must read as off and never as "the card, probably" */
+        check_eq(host_setting_renderer(), 0, "Renderer default 0");
+        /* SaveMenuOnTop is the second key in this file whose ABSENT is ON,
+           so "no file at all" is the one case that has to say so out loud. */
+        check_eq(host_setting_save_menu_on_top(), 1,
+                 "SaveMenuOnTop absent is ON");
+    } else if (!strcmp(which, "quality")) {
+        check_eq(host_setting_render_scale(), 3, "RenderScale 3");
+        check_eq(host_setting_smooth_models(), 2, "SmoothModels 2");
+        check_eq(host_setting_texture_filter(), 1, "TextureFilter 1 bilinear");
+        check_eq(host_setting_anti_aliasing(), 1, "AntiAliasing 1");
+        /* the keys around them still parse: a new key must not move an old
+           one, which is the whole reason this case carries CameraMode */
+        check_eq(host_setting_camera_mode(), 3, "CameraMode ds still parsed (HYBRIDCAM1: ds with no CameraHybrid is hybrid)");
+    } else if (!strcmp(which, "present")) {
+        /* run hd2 lane GPU1: all three set, each to a value that is not the
+           default, read from a file */
+        check_eq(host_setting_present_backend(), 1, "PresentBackend 1");
+        check_eq(host_setting_present_filter(), 2, "PresentFilter 2 sharp");
+        check_eq(host_setting_vsync(), 1, "VSync 1");
+        /* the keys around them still parse: a new key must not move an old
+           one, the rule the quality case carries CameraMode for */
+        check_eq(host_setting_render_scale(), 3, "RenderScale beside them");
+        check_eq(host_setting_camera_mode(), 3, "CameraMode ds still parsed (HYBRIDCAM1: ds with no CameraHybrid is hybrid)");
+        /* AND THE RENDERER IS STILL OFF. The two settings are independent and
+           a file that only asked for the card to PRESENT must not be read as
+           one that asked it to DRAW. */
+        check_eq(host_setting_renderer(), 0, "Renderer absent beside them is 0");
+    } else if (!strcmp(which, "present_bool")) {
+        /* the launcher serialises a C# bool, so true means on for both
+           toggles, and the middle value of the filter is read from a file
+           rather than only through a clamp */
+        check_eq(host_setting_present_backend(), 1, "PresentBackend true is on");
+        check_eq(host_setting_vsync(), 1, "VSync true is on");
+        check_eq(host_setting_present_filter(), 1, "PresentFilter 1 smooth");
+    } else if (!strcmp(which, "present_clamp")) {
+        /* out of range is a setting that presents, not an error: the Aspect
+           rule the header states for all three */
+        check_eq(host_setting_present_backend(), 1, "PresentBackend 5 clamps to 1");
+        check_eq(host_setting_present_filter(), 2, "PresentFilter 9 clamps to 2");
+        check_eq(host_setting_vsync(), 1, "VSync 3 clamps to 1");
+    } else if (!strcmp(which, "present_junk")) {
+        /* unparseable and negative both read as the default, like every other
+           key in this file */
+        check_eq(host_setting_present_backend(), 0, "PresentBackend junk is 0");
+        check_eq(host_setting_present_filter(), 0, "PresentFilter -4 is 0");
+        check_eq(host_setting_vsync(), 0, "VSync junk is off");
+    } else if (!strcmp(which, "renderer")) {
+        /* run hd2 lane GPU2: the key on its own, read from a file, with the
+           present keys absent, because the two are independent settings */
+        check_eq(host_setting_renderer(), 1, "Renderer 1");
+        check_eq(host_setting_present_backend(), 0, "PresentBackend absent is 0");
+        check_eq(host_setting_camera_mode(), 3, "CameraMode ds still parsed (HYBRIDCAM1: ds with no CameraHybrid is hybrid)");
+    } else if (!strcmp(which, "renderer_bool")) {
+        /* the launcher serialises a C# bool, the RunMode rule every toggle in
+           this file follows */
+        check_eq(host_setting_renderer(), 1, "Renderer true is on");
+        check_eq(host_setting_texture_filter(), 2, "TextureFilter beside it");
+    } else if (!strcmp(which, "renderer_clamp")) {
+        /* out of range is a setting that draws, not an error; junk and
+           negative are the default, which is the software rasteriser */
+        check_eq(host_setting_renderer(), 1, "Renderer 7 clamps to 1");
+    } else if (!strcmp(which, "renderer_junk")) {
+        check_eq(host_setting_renderer(), 0, "Renderer junk is 0");
+        check_eq(host_setting_render_scale(), 4, "RenderScale beside the junk");
+    } else if (!strcmp(which, "quality_filter")) {
+        /* run hd2: the other filter value on its own, so both 1 and 2 are
+           read from a file somewhere rather than only through a clamp */
+        check_eq(host_setting_texture_filter(), 2, "TextureFilter 2 trilinear");
+        check_eq(host_setting_anti_aliasing(), 0, "AntiAliasing 0 is off");
+        check_eq(host_setting_render_scale(), 2, "RenderScale beside them");
+    } else if (!strcmp(which, "quality_bool")) {
+        check_eq(host_setting_render_scale(), 1, "RenderScale 1 is DS native");
+    } else if (!strcmp(which, "quality_clamp")) {
+        /* out of range is a number that is a picture, not an error: the
+           Aspect rule the header states for all three */
+        check_eq(host_setting_render_scale(), 8, "RenderScale 9 clamps to 8");   /* RESSCALE1 d54fd410e3a: the top is 8 */
+        check_eq(host_setting_smooth_models(), 3, "SmoothModels 99 clamps to 3");
+        check_eq(host_setting_texture_filter(), 2, "TextureFilter 7 clamps to 2");
+        check_eq(host_setting_anti_aliasing(), 1, "AntiAliasing 4 clamps to 1");
+    } else if (!strcmp(which, "quality_junk")) {
+        /* unparseable and negative both read as the default, like every
+           other key in this file */
+        check_eq(host_setting_render_scale(), 0, "RenderScale -2 is the default");
+        check_eq(host_setting_smooth_models(), 0, "SmoothModels junk is 0");
+        check_eq(host_setting_texture_filter(), 0, "TextureFilter junk is 0");
+        check_eq(host_setting_anti_aliasing(), 0, "AntiAliasing -5 is 0");
+    } else if (!strcmp(which, "savemenutop_off")) {
+        check_eq(host_setting_save_menu_on_top(), 0, "SaveMenuOnTop 0 is off");
+        /* the keys around it still parse: a new key must not move an old one */
+        check_eq(host_setting_camera_mode(), 3, "CameraMode ds still parsed (HYBRIDCAM1: ds with no CameraHybrid is hybrid)");
+        check_eq(host_setting_improved_minimap(), 1,
+                 "ImprovedMinimap still absent-is-on beside it");
+    } else if (!strcmp(which, "savemenutop_bool")) {
+        /* the launcher serialises a C# bool, so false means off */
+        check_eq(host_setting_save_menu_on_top(), 0,
+                 "SaveMenuOnTop false is off");
+        check_eq(host_setting_volume(), 44, "Volume beside it survived");
+    } else if (!strcmp(which, "savemenutop_true")) {
+        check_eq(host_setting_save_menu_on_top(), 1, "SaveMenuOnTop true is on");
+    } else if (!strcmp(which, "savemenutop_junk")) {
+        /* unparseable reads as the default, like every other key in this file,
+           and the default here is ON */
+        check_eq(host_setting_save_menu_on_top(), 1,
+                 "SaveMenuOnTop junk is the default, which is on");
+    } else if (!strcmp(which, "padtranslate")) {
+        check(port_pad_selftest(), "pad_backend translation selftest");
+    } else if (!strncmp(which, "hy_", 3)) {
+        /* HYBRIDCAM1: hy_<want>_<label>, the camera mode the file reads as
+           (0 analog, 1 freecam, 2 plain DS, 3 hybrid) */
+        check_eq(host_setting_camera_mode(), which[3] - '0', which);
+    } else if (!strncmp(which, "hysave_", 7)) {
+        /* HYBRIDCAM1: hysave_<m>, the settings page picks mode m; the file
+           keeps the three words and says whether the pick was hybrid */
+        static const char *const word[4] = { "analog", "freecam", "ds", "ds" };
+        const int m = which[7] - '0';
+        check(host_setting_save_camera_mode(m), "save_camera_mode wrote");
+        check_eq(host_setting_camera_mode(), m, "live camera moved");
+        const char *t = slurp("settings.json");
+        char w[64];
+        snprintf(w, sizeof w, "\"CameraMode\": \"%s\"", word[m]);
+        check(t && strstr(t, w), w);
+        check(t && strstr(t, m == 3 ? "\"CameraHybrid\": true" : "\"CameraHybrid\": false"), "CameraHybrid written");
+    } else {
+        fprintf(stderr, "  unknown case %s\n", which);
+        return 2;
+    }
+    return fails ? 1 : 0;
+}
+
+static int write_file(const char *path, const char *text)
+{
+    FILE *f = fopen(path, "wb");
+    if (!f) return 0;
+    fputs(text, f);
+    fclose(f);
+    return 1;
+}
+
+/* json is the file to write, 0 for no file at all, or (const char *)1 for
+   "the file the previous case left" -- which only exists when that case ran
+   with keep_after set, the shape the save-then-reread pair needs. */
+static int run_case_x(const char *exe, const char *dir, const char *which,
+                      const char *json, int keep_after)
+{
+    char path[MAX_PATH];
+    snprintf(path, sizeof path, "%s\\settings.json", dir);
+    const int reuse = json == (const char *)1;
+    if (!reuse) remove(path);
+    if (json && !reuse && !write_file(path, json)) {
+        fprintf(stderr, "smoke_settings: cannot write %s\n", path);
+        return 1;
+    }
+    char cwd[MAX_PATH];
+    if (!_getcwd(cwd, sizeof cwd)) return 1;
+    if (_chdir(dir) != 0) return 1;
+    const intptr_t rc = _spawnl(_P_WAIT, exe, "smoke_settings", which, (char *)0);
+    _chdir(cwd);
+    if (!keep_after) remove(path);
+    if (rc != 0) {
+        fprintf(stderr, "smoke_settings: case %s FAILED (rc %d)\n", which,
+                (int)rc);
+        return 1;
+    }
+    printf("smoke_settings: %s ok\n", which);
+    return 0;
+}
+
+static int run_case(const char *exe, const char *dir, const char *which,
+                    const char *json)
+{
+    return run_case_x(exe, dir, which, json, 0);
+}
+
+int main(int argc, char **argv)
+{
+    if (argc >= 2) return child(argv[1]);
+
+    char exe[MAX_PATH];
+    if (!GetModuleFileNameA(NULL, exe, MAX_PATH)) return 1;
+    {
+        char beside[MAX_PATH];
+        snprintf(beside, sizeof beside, "%s", exe);
+        char *slash = strrchr(beside, '\\');
+        if (slash) *slash = '\0';
+        snprintf(beside + strlen(beside), sizeof beside - strlen(beside),
+                 "\\settings.json");
+        FILE *f = fopen(beside, "rb");
+        if (f) {
+            fclose(f);
+            fprintf(stderr, "smoke_settings: %s exists; the loader reads "
+                            "beside the exe first, so every case here would "
+                            "read it. Move it away and rerun.\n", beside);
+            return 1;
+        }
+    }
+    /* the working directory must be the file that is read */
+    _putenv("SM64DS_ASSET_ROOT=");
+    _putenv("SM64DS_INSTANCE=");
+    /* run hd1's three keys each have an environment override in front of the
+       file, the Aspect contract. A developer who exported one for a capture
+       run would otherwise turn every quality case below into a test of his
+       own shell, so they are cleared for the children exactly as the asset
+       root is. Any pack-directory override goes with them because the default
+       pack directory is one of the answers pinned. */
+    _putenv("SM64DS_RENDER_SCALE=");
+    _putenv("SM64DS_SMOOTH_MODELS=");
+    /* and the swap's own override, for the same reason: a developer who
+       exported it for a capture run must not turn the four cases below into a
+       test of his own shell */
+    _putenv("SM64DS_SAVE_MENU_ON_TOP=");
+    _putenv("SM64DS_IMPROVED_MINIMAP=");
+
+    char tmp[MAX_PATH], dir[MAX_PATH];
+    if (!GetTempPathA(MAX_PATH, tmp)) return 1;
+    snprintf(dir, sizeof dir, "%ssm64ds_smoke_settings_%lu", tmp,
+             (unsigned long)GetCurrentProcessId());
+    _mkdir(dir);
+
+    int bad = 0;
+    bad |= run_case(exe, dir, "defaults", 0);
+    bad |= run_case(exe, dir, "remap",
+        "{\n"
+        "  \"KeyJump\": 74,\n"
+        "  \"KeyAttack\": \"75\",\n"
+        "  \"KeyUp\": 73,\n"
+        "  \"KeyLeft\": 74,\n"
+        "  \"KeyDown\": 75,\n"
+        "  \"KeyRight\": 76,\n"
+        "  \"KeyUpAlt\": 0,\n"
+        "  \"KeySelect\": 4660,\n"
+        "  \"PadJump\": 32768,\n"
+        "  \"PadSelect\": 32,\n"
+        "  \"CameraMode\": \"ds\",\n"
+        "  \"Volume\": 50\n"
+        "}\n");
+    bad |= run_case(exe, dir, "look_042",
+        "{\n"
+        "  \"KeyUp\": 87, \"KeyDown\": 83, \"KeyLeft\": 65, \"KeyRight\": 68,\n"
+        "  \"KeyUpAlt\": 38, \"KeyDownAlt\": 40, \"KeyLeftAlt\": 37,\n"
+        "  \"KeyRightAlt\": 39, \"KeyJump\": 32, \"KeyAttack\": 88,\n"
+        "  \"KeyCrouch\": 17, \"KeyRun\": 16, \"RunButtonKey\": 16,\n"
+        "  \"KeyStart\": 13, \"KeySelect\": 8,\n"
+        "  \"PadJump\": 4096, \"PadAttack\": 8192, \"PadCrouch\": 131072,\n"
+        "  \"PadRun\": 16384, \"RunButtonPad\": 16384, \"PadStart\": 16,\n"
+        "  \"PadSelect\": 0,\n"
+        "  \"RunMode\": \"analog\", \"CameraMode\": \"ds\"\n"
+        "}\n");
+    bad |= run_case(exe, dir, "cam_042",
+        "{\n"
+        "  \"KeyUp\": 87, \"KeyDown\": 83, \"KeyLeft\": 65, \"KeyRight\": 68,\n"
+        "  \"KeyJump\": 32, \"KeyAttack\": 88, \"KeyCrouch\": 17,\n"
+        "  \"KeyRun\": 16, \"KeyStart\": 13, \"KeySelect\": 8, \"KeyLook\": 90,\n"
+        "  \"PadJump\": 4096, \"PadAttack\": 8192, \"PadCrouch\": 131072,\n"
+        "  \"PadRun\": 16384, \"PadStart\": 16, \"PadSelect\": 0, \"PadLook\": 32768\n"
+        "}\n");
+    bad |= run_case(exe, dir, "cam_taken",
+        "{ \"KeyJump\": 67, \"PadCrouch\": 65536, \"PadAttack\": 256 }");
+    bad |= run_case(exe, dir, "mouse_default", "{ \"KeyJump\": 32 }");
+    bad |= run_case(exe, dir, "mouse_named",
+        "{ \"MouseCamHold\": 4, \"MouseCamCenter\": 5, \"MouseCamLeft\": 1, \"MouseCamZoomIn\": 6,\n"
+        "  \"MouseLook\": 3, \"KeyCamZoomIn\": 73, \"CameraStickZoom\": true }");
+    bad |= run_case(exe, dir, "mouse_left_hold", "{ \"MouseCamHold\": 1, \"MouseCamCenter\": 1 }");
+    bad |= run_case(exe, dir, "cam_named",
+        "{ \"KeyCamCenter\": 86, \"PadCamCenter\": 256, \"PadCamRight\": 1,\n"
+        "  \"KeyCamMode\": 0 }");
+    bad |= run_case(exe, dir, "look_taken",
+        "{ \"KeyJump\": 90, \"RunButtonPad\": 32768 }");
+    bad |= run_case(exe, dir, "look_named",
+        "{ \"KeyLook\": 86, \"PadLook\": 4096 }");
+    bad |= run_case(exe, dir, "camera_number", "{ \"CameraMode\": 1 }");
+    bad |= run_case(exe, dir, "alias_old",
+        "{ \"RunButtonKey\": 82, \"RunButtonPad\": 32768 }");
+    bad |= run_case(exe, dir, "alias_both",
+        "{ \"RunButtonKey\": 82, \"KeyRun\": 81,\n"
+        "  \"RunButtonPad\": 32768, \"PadRun\": 512 }");
+    bad |= run_case(exe, dir, "alias_badnew",
+        "{ \"RunButtonKey\": 82, \"KeyRun\": 999,\n"
+        "  \"RunButtonPad\": 32768, \"PadRun\": -1 }");
+    bad |= run_case(exe, dir, "save", "{\n  \"Volume\": 37\n}\n");
+    bad |= run_case(exe, dir, "padlayouts",
+        "{\n"
+        "  \"Volume\": 37,\n"
+        "  \"PadLayouts\": [\n"
+        "    { \"vid\": 1118, \"pid\": 654, \"name\": \"USB Gamepad\",\n"
+        "      \"a\": 2, \"b\": 1, \"x\": 3, \"y\": 0, \"lb\": 4, \"rb\": 5,\n"
+        "      \"back\": 8, \"start\": 9, \"lt_btn\": 6, \"rt_btn\": -1,\n"
+        "      \"rt_axis\": 3, \"lx_axis\": 2, \"lx_sign\": -1,\n"
+        "      \"ly_axis\": 5, \"ly_sign\": 1, \"rx_axis\": 0 },\n"
+        "    { \"vid\": 0, \"pid\": 5, \"a\": 1 },\n"
+        "    { \"vid\": 77, \"a\": 1 },\n"
+        "    { \"vid\": 4660, \"pid\": 22136, \"a\": 7, \"y\": 99,\n"
+        "      \"lthumb\": \"abc\", \"rx_sign\": 0, \"ly_sign\": -1 }\n"
+        "  ],\n"
+        "  \"KeyJump\": 74\n"
+        "}\n");
+    /* the save case writes into a file that already carries one pad, and
+       leaves the file for the re-read case, which is a fresh process */
+    bad |= run_case_x(exe, dir, "padlayouts_save",
+        "{\n"
+        "  \"Volume\": 37,\n"
+        "  \"PadLayouts\": [ { \"vid\": 1118, \"pid\": 654, \"a\": 2 } ]\n"
+        "}\n", 1);
+    bad |= run_case(exe, dir, "padlayouts_reread", (const char *)1);
+    bad |= run_case(exe, dir, "padlayouts_backslash",
+        "{\n"
+        "  \"PadLayouts\": [ { \"vid\": 1118, \"pid\": 654,\n"
+        "      \"name\": \"Pad \\\\ Co\", \"b\": 5 } ],\n"
+        "  \"KeyJump\": 74,\n"
+        "  \"CameraMode\": \"ds\"\n"
+        "}\n");
+    /* not an array, then an array with nothing usable in it */
+    bad |= run_case(exe, dir, "padlayouts_bad",
+        "{ \"KeyJump\": 74, \"PadLayouts\": \"nope\", \"CameraMode\": \"ds\" }");
+    bad |= run_case(exe, dir, "padlayouts_bad",
+        "{\n"
+        "  \"KeyJump\": 74,\n"
+        "  \"PadLayouts\": [ 5, \"x\", { \"vid\": \"abc\", \"pid\": 1 }, [ ] ],\n"
+        "  \"CameraMode\": \"ds\"\n"
+        "}\n");
+    /* run hd1's three picture-quality keys: the default, a file that sets all
+       three, the launcher's boolean spelling, the clamps and the junk */
+    bad |= run_case(exe, dir, "quality_defaults", 0);
+    bad |= run_case(exe, dir, "quality",
+        "{ \"RenderScale\": 3, \"SmoothModels\": 2,\n"
+        "  \"TextureFilter\": 1, \"AntiAliasing\": 1,\n"
+        "  \"CameraMode\": \"ds\" }");
+    bad |= run_case(exe, dir, "quality_clamp",
+        "{ \"RenderScale\": 9, \"SmoothModels\": 99, \n"
+        "  \"TextureFilter\": 7, \"AntiAliasing\": 4 }");
+    bad |= run_case(exe, dir, "quality_junk",
+        "{ \"RenderScale\": -2, \"SmoothModels\": \"lots\",\n"
+        "  \"TextureFilter\": \"smooth\",\n"
+        "  \"AntiAliasing\": -5 }");
+    /* run hd2: TextureFilter 2 read from a file rather than through a clamp */
+    bad |= run_case(exe, dir, "quality_filter",
+        "{ \"TextureFilter\": 2, \"AntiAliasing\": 0, \"RenderScale\": 2 }");
+    /* run hd2 lane GPU1's three present keys: all three set, the launcher's
+       boolean spelling, the clamps and the junk. The default case is covered
+       by quality_defaults above, which runs with no file at all. */
+    bad |= run_case(exe, dir, "present",
+        "{ \"PresentBackend\": 1, \"PresentFilter\": 2, \"VSync\": 1,\n"
+        "  \"RenderScale\": 3, \"CameraMode\": \"ds\" }");
+    bad |= run_case(exe, dir, "present_bool",
+        "{ \"PresentBackend\": true, \"VSync\": true, \"PresentFilter\": 1 }");
+    bad |= run_case(exe, dir, "present_clamp",
+        "{ \"PresentBackend\": 5, \"PresentFilter\": 9, \"VSync\": 3 }");
+    bad |= run_case(exe, dir, "present_junk",
+        "{ \"PresentBackend\": \"card\", \"PresentFilter\": -4,\n"
+        "  \"VSync\": \"yes please\" }");
+    /* run hd2 lane GPU2's renderer key: on its own, the launcher's boolean
+       spelling, the clamp and the junk. The default is covered by
+       quality_defaults, which runs with no file at all, and the "present"
+       case above checks that asking the card to PRESENT does not read as
+       asking it to DRAW. */
+    bad |= run_case(exe, dir, "renderer",
+        "{ \"Renderer\": 1, \"CameraMode\": \"ds\" }");
+    bad |= run_case(exe, dir, "renderer_bool",
+        "{ \"Renderer\": true, \"TextureFilter\": 2 }");
+    bad |= run_case(exe, dir, "renderer_clamp", "{ \"Renderer\": 7 }");
+    bad |= run_case(exe, dir, "renderer_junk",
+        "{ \"Renderer\": \"the card\", \"RenderScale\": 4 }");
+    bad |= run_case(exe, dir, "savemenutop_off",
+        "{ \"SaveMenuOnTop\": 0, \"CameraMode\": \"ds\" }");
+    bad |= run_case(exe, dir, "savemenutop_bool",
+        "{ \"SaveMenuOnTop\": false, \"Volume\": 44 }");
+    bad |= run_case(exe, dir, "savemenutop_true",
+        "{ \"SaveMenuOnTop\": true }");
+    bad |= run_case(exe, dir, "savemenutop_junk",
+        "{ \"SaveMenuOnTop\": \"maybe\" }");
+    bad |= run_case(exe, dir, "padtranslate", 0);
+    /* HYBRIDCAM1: never picked vs picked. A file that never chose (no file,
+       {}, "ds" or 2 with no CameraHybrid) is hybrid; ds + false is the plain
+       DS camera a player picked; the other words keep their mode. Then each
+       pick written and read back by a fresh boot. */
+    bad |= run_case(exe, dir, "hy_3_nofile", 0);
+    bad |= run_case(exe, dir, "hy_3_empty", "{}");
+    bad |= run_case(exe, dir, "hy_3_ds", "{ \"CameraMode\": \"ds\" }");
+    bad |= run_case(exe, dir, "hy_3_num2", "{ \"CameraMode\": 2 }");
+    bad |= run_case(exe, dir, "hy_2_ds_false", "{ \"CameraMode\": \"ds\", \"CameraHybrid\": false }");
+    bad |= run_case(exe, dir, "hy_3_ds_true", "{ \"CameraMode\": \"ds\", \"CameraHybrid\": true }");
+    bad |= run_case(exe, dir, "hy_0_analog", "{ \"CameraMode\": \"analog\" }");
+    bad |= run_case(exe, dir, "hy_1_freecam", "{ \"CameraMode\": \"freecam\" }");
+    bad |= run_case(exe, dir, "hy_1_freecam_true", "{ \"CameraMode\": \"freecam\", \"CameraHybrid\": true }");
+    bad |= run_case(exe, dir, "hy_3_junk", "{ \"CameraMode\": \"hybrid\" }");
+    bad |= run_case_x(exe, dir, "hysave_3", "{ \"Volume\": 37 }", 1);
+    bad |= run_case(exe, dir, "hy_3_after_save3", (const char *)1);
+    bad |= run_case_x(exe, dir, "hysave_2", "{ \"Volume\": 37 }", 1);
+    bad |= run_case(exe, dir, "hy_2_after_save2", (const char *)1);
+    bad |= run_case_x(exe, dir, "hysave_0", "{ \"Volume\": 37 }", 1);
+    bad |= run_case(exe, dir, "hy_0_after_save0", (const char *)1);
+    _rmdir(dir);
+    if (bad) {
+        printf("smoke_settings: FAIL\n");
+        return 1;
+    }
+    /* the count is the run_case calls above, counted rather than remembered:
+       it was one out of date before run hd1 added five cases to it */
+    printf("smoke_settings: ok, 61 cases\n");
+    return 0;
+}

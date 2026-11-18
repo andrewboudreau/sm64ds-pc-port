@@ -1,0 +1,16 @@
+diff --git a/src/game/actors/d_a_star.cpp b/src/game/actors/d_a_star.cpp
+--- a/src/game/actors/d_a_star.cpp
++++ b/src/game/actors/d_a_star.cpp
+@@ -262,7 +262,11 @@
+  * one this file is bound to. The deallocation is an inline operator delete --
+  * dEnemyBase_c's, reached because dEnemyBase_c is this class's IMMEDIATE base.
+  */
+-#ifndef _MSC_VER
++#ifdef _MSC_VER
++/* Host: include/daStar_c.h's host arm declares ~daStar_c() with no body and no slot.
++   hostgen MSC_ARMS_BOTH compiles the ROM arm below on the host as well, which
++   defines it (the slot 16 bridge reaches it as ??1daStar_c@@QAE@XZ). */
++#else
+ daStar_c::~daStar_c()
+ {
+ }

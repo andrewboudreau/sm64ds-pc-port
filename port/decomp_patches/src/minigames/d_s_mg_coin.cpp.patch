@@ -1,0 +1,55 @@
+diff --git a/src/minigames/d_s_mg_coin.cpp b/src/minigames/d_s_mg_coin.cpp
+--- a/src/minigames/d_s_mg_coin.cpp
++++ b/src/minigames/d_s_mg_coin.cpp
+@@ -178,6 +178,43 @@ extern const CoinPmfEntry pmf_dScMgCoin_c_Caption_StateDelay, pmf_dScMgCoin_c_Ca
+ extern const CoinPmfEntry pmf_dScMgCoin_c_Bag_StateIdle, pmf_dScMgCoin_c_Bag_StateRise,
+     pmf_dScMgCoin_c_Bag_StateParked, pmf_dScMgCoin_c_Bag_StateBounceDown;
+ 
++#ifdef _MSC_VER /* host: the pmf_dScMgCoin_c_* constants are ROM words (DS code addresses) in the ov006 mount, so a table copied from them jumps to 0x020de5ac (fold 8 battery, scene 378); the host fills each table from the member functions themselves */
++}
++/* Three no-argument states sit in the int-argument tables. The ROM ignores
++   the extra r1; a host __thiscall callee pops its own arguments, so each one
++   gets a one-line int-taking forwarder instead of a cast. */
++struct dScMgCoinHostShim : dScMgCoin_c {
++    void Bag_StateIdle_i(int) { Bag_StateIdle(); }
++    void Block_StateResting_i(int) { Block_StateResting(); }
++    void Coin_StateSettled_i(int) { Coin_StateSettled(); }
++};
++extern "C" {
++/* the phases (Behavior) */
++Entry_Behavior sCoinPhaseStateTable[6] = {
++    {&dScMgCoin_c::Phase_StateIdle},       {&dScMgCoin_c::Phase_StateIntro},
++    {&dScMgCoin_c::Phase_StatePlay},       {&dScMgCoin_c::Phase_StateSettle},
++    {&dScMgCoin_c::Phase_StateScoreDelay}, {&dScMgCoin_c::Phase_StateResult}};
++/* the blocks */
++CoinPmfEntry sCoinBlockStateTable[6] = {
++    {&dScMgCoin_c::Block_StateWaiting}, {&dScMgCoin_c::Block_StateHopDown},
++    {&dScMgCoin_c::Block_StateWander},  {&dScMgCoin_c::Block_StateDropOnCoin},
++    {static_cast<CoinPmf>(&dScMgCoinHostShim::Block_StateResting_i)}, {&dScMgCoin_c::Block_StateFallIn}};
++/* the coins */
++CoinPmfEntry sCoinCoinStateTable[3] = {{&dScMgCoin_c::Coin_StateWaitTouch},
++                                       {&dScMgCoin_c::Coin_StateHop},
++                                       {static_cast<CoinPmf>(&dScMgCoinHostShim::Coin_StateSettled_i)}};
++/* the caption */
++CoinPmfEntry sCoinCaptionStateTable[5] = {{&dScMgCoin_c::Caption_StateDelay},
++                                          {&dScMgCoin_c::Caption_StateCountIn},
++                                          {&dScMgCoin_c::Caption_StateBlink},
++                                          {&dScMgCoin_c::Caption_StateHidden},
++                                          {&dScMgCoin_c::Caption_StateLoop}};
++/* the moneybag */
++CoinPmfEntry sCoinBagStateTable[4] = {{static_cast<CoinPmf>(&dScMgCoinHostShim::Bag_StateIdle_i)},
++                                      {&dScMgCoin_c::Bag_StateRise},
++                                      {&dScMgCoin_c::Bag_StateParked},
++                                      {&dScMgCoin_c::Bag_StateBounceDown}};
++#else
+ /* the phases (Behavior) */
+ Entry_Behavior sCoinPhaseStateTable[6] = {
+     {pmf_dScMgCoin_c_Phase_StateIdle},       {pmf_dScMgCoin_c_Phase_StateIntro},
+@@ -203,6 +240,7 @@ CoinPmfEntry sCoinBagStateTable[4] = {{pmf_dScMgCoin_c_Bag_StateIdle},
+                                       {pmf_dScMgCoin_c_Bag_StateRise},
+                                       {pmf_dScMgCoin_c_Bag_StateParked},
+                                       {pmf_dScMgCoin_c_Bag_StateBounceDown}};
++#endif
+ }
+ 
+ /* Nothing to destroy by hand: D1 stores the vptr and calls dScMgBase_c's

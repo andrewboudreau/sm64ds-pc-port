@@ -1,0 +1,10 @@
+# hook_baseline MANIFEST, plain half (written by port/tools/hook_baseline.py; do not hand edit)
+pin	03a6d6aea41dcda3d6368ba1c7ef2d1cfb0233b0
+stage0	80b93b74e89c454f9c095d0871d21a7fe1c5d331
+maps	renames.tsv=e032348e68c20ead,renames_kind.tsv=b7bd12e98ff4663c,patchmap.tsv=6526770a3a0dac94
+patches	373
+hook_patches	320
+before_files	373
+cut_patches	3
+symbol_files	106
+sha256	e14f27c65092be2f09bc36bf0ef46f5f91cb8121504276eb7a82bd7acf49311d

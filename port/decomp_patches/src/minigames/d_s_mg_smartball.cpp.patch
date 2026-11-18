@@ -1,0 +1,255 @@
+diff --git a/src/minigames/d_s_mg_smartball.cpp b/src/minigames/d_s_mg_smartball.cpp
+--- a/src/minigames/d_s_mg_smartball.cpp
++++ b/src/minigames/d_s_mg_smartball.cpp
+@@ -100,6 +100,15 @@ struct TVec2 {
+ 
+ /* First virtual slot, as Behavior dispatches it. */
+ typedef void (*VFunc)(void *);
++#ifdef _MSC_VER /* host: the slot words are __thiscall member bodies, so a cdecl call leaves `this` out of ecx (fold 8 battery: scene 376 wrote through the vtable at cMgSmartball_spring_c::RestoreInitial+0x3, then at SaveSnapshot+0x10 from Behavior) */
++typedef void(__thiscall *VMethod)(void *);
++#define SB_VCALL(p, n) ((VMethod)(*(VFunc **)(p))[n])(p)
++/* host: seven object classes are 4 bytes larger than the ROM sizes the spawner allocates (ana, pakkun, propeller, board, pushswitch, wing, spring; measured with sizeof on this compiler), so their constructors wrote past the block and the heap failed (0xC0000374) */
++#define SB_NEW(ds, T) ::operator new(sizeof(T) > (ds) ? sizeof(T) : (ds))
++#else
++#define SB_VCALL(p, n) (*(VFunc **)(p))[n](p)
++#define SB_NEW(ds, T) ::operator new(ds)
++#endif
+ 
+ /* cMgSmartball_ball_c::UpdatePhysics's search state. */
+ typedef struct State2 {
+@@ -4281,7 +4290,7 @@ void dScMgSmartball_c::SpawnObjects() {
+         int n = mKinokoCount;
+         int j;
+         for (j = 0; j < n; j++) {
+-            cMgSmartball_kinoko_c *spawned = (cMgSmartball_kinoko_c *)::operator new(0x40);
++            cMgSmartball_kinoko_c *spawned = (cMgSmartball_kinoko_c *)SB_NEW(0x40, cMgSmartball_kinoko_c);
+             if (spawned != 0) {
+                 V2 tmp = pos[j];
+                 spawned = cMgSmartball_kinoko_c_Construct(spawned, this, j, &tmp);
+@@ -4323,7 +4332,7 @@ void dScMgSmartball_c::SpawnObjects() {
+             }
+         }
+         for (; n < mKinokoCount; n++) {
+-            cMgSmartball_kinoko_c *spawned = (cMgSmartball_kinoko_c *)::operator new(0x40);
++            cMgSmartball_kinoko_c *spawned = (cMgSmartball_kinoko_c *)SB_NEW(0x40, cMgSmartball_kinoko_c);
+             if (spawned != 0) {
+                 V2 tmp;
+                 int ty = pos[n].y;
+@@ -4374,7 +4383,7 @@ void dScMgSmartball_c::SpawnObjects() {
+             int n = mAnaCount;
+             int j;
+             for (j = 0; j < n; j++) {
+-                cMgSmartball_ana_c *spawned = (cMgSmartball_ana_c *)::operator new(0x38);
++                cMgSmartball_ana_c *spawned = (cMgSmartball_ana_c *)SB_NEW(0x38, cMgSmartball_ana_c);
+                 if (spawned != 0) {
+                     V2 tmp = pos[j];
+                     spawned = cMgSmartball_ana_c_Construct(spawned, this, j, &tmp);
+@@ -4396,7 +4405,7 @@ void dScMgSmartball_c::SpawnObjects() {
+             cMgSmartball_ball_c *spawned;
+             pos[j].x = ((1 - j) << 0x10) + 0xc0000;
+             pos[j].y = FX_Div(FX_MUL(pos[j].x, 0xa000), 0xd8000) + 0x90000;
+-            spawned = (cMgSmartball_ball_c *)::operator new(0x12c);
++            spawned = (cMgSmartball_ball_c *)SB_NEW(0x12c, cMgSmartball_ball_c);
+             if (spawned != 0) {
+                 V2 tmp = pos[j];
+                 spawned = cMgSmartball_ball_c_Construct(spawned, this, j, &tmp);
+@@ -4441,7 +4450,7 @@ void dScMgSmartball_c::SpawnObjects() {
+             int n = mDokanCount;
+             int j;
+             for (j = 0; j < n; j++) {
+-                cMgSmartball_dokan_c *spawned = (cMgSmartball_dokan_c *)::operator new(0x34);
++                cMgSmartball_dokan_c *spawned = (cMgSmartball_dokan_c *)SB_NEW(0x34, cMgSmartball_dokan_c);
+                 if (spawned != 0) {
+                     V2 tmp = pos[j];
+                     spawned = cMgSmartball_dokan_c_Construct(spawned, this, j, &tmp);
+@@ -4485,7 +4494,7 @@ void dScMgSmartball_c::SpawnObjects() {
+             int n = mPakkunCount;
+             int j;
+             for (j = 0; j < n; j++) {
+-                cMgSmartball_pakkun_c *spawned = (cMgSmartball_pakkun_c *)::operator new(0x3c);
++                cMgSmartball_pakkun_c *spawned = (cMgSmartball_pakkun_c *)SB_NEW(0x3c, cMgSmartball_pakkun_c);
+                 if (spawned != 0) {
+                     V2 tmp = pos[j];
+                     spawned = cMgSmartball_pakkun_c_Construct(spawned, this, j, &tmp);
+@@ -4529,7 +4538,7 @@ void dScMgSmartball_c::SpawnObjects() {
+             int j;
+             for (j = 0; j < n; j++) {
+                 cMgSmartball_propeller_c *spawned =
+-                    (cMgSmartball_propeller_c *)::operator new(0x78);
++                    (cMgSmartball_propeller_c *)SB_NEW(0x78, cMgSmartball_propeller_c);
+                 if (spawned != 0) {
+                     V2 tmp = pos[j];
+                     spawned = cMgSmartball_propeller_c_Construct(spawned, this, j, &tmp);
+@@ -4570,7 +4579,7 @@ void dScMgSmartball_c::SpawnObjects() {
+             }
+         }
+         if (k >= 1) {
+-            cMgSmartball_slot_c *spawned = (cMgSmartball_slot_c *)::operator new(0x88);
++            cMgSmartball_slot_c *spawned = (cMgSmartball_slot_c *)SB_NEW(0x88, cMgSmartball_slot_c);
+             if (spawned != 0) {
+                 V2 tmp = pos[0];
+                 spawned = cMgSmartball_slot_c_Construct(spawned, this, 0, &tmp);
+@@ -4609,7 +4618,7 @@ void dScMgSmartball_c::SpawnObjects() {
+             }
+         }
+         if (k >= 9) {
+-            cMgSmartball_board_c *spawned = (cMgSmartball_board_c *)::operator new(0x9c);
++            cMgSmartball_board_c *spawned = (cMgSmartball_board_c *)SB_NEW(0x9c, cMgSmartball_board_c);
+             if (spawned != 0) {
+                 V2 tmp = pos[4];
+                 spawned = cMgSmartball_board_c_Construct(spawned, this, 0, &tmp);
+@@ -4651,7 +4660,7 @@ void dScMgSmartball_c::SpawnObjects() {
+             int j;
+             for (j = 0; j < n; j++) {
+                 cMgSmartball_pushswitch_c *spawned =
+-                    (cMgSmartball_pushswitch_c *)::operator new(0x38);
++                    (cMgSmartball_pushswitch_c *)SB_NEW(0x38, cMgSmartball_pushswitch_c);
+                 if (spawned != 0) {
+                     V2 tmp = pos[j];
+                     spawned = cMgSmartball_pushswitch_c_Construct(spawned, this, j, &tmp);
+@@ -4692,7 +4701,7 @@ void dScMgSmartball_c::SpawnObjects() {
+             }
+         }
+         if (k >= 1) {
+-            cMgSmartball_wing_c *spawned = (cMgSmartball_wing_c *)::operator new(0x88);
++            cMgSmartball_wing_c *spawned = (cMgSmartball_wing_c *)SB_NEW(0x88, cMgSmartball_wing_c);
+             if (spawned != 0) {
+                 V2 tmp = pos[0];
+                 spawned = cMgSmartball_wing_c_Construct(spawned, this, 0, &tmp);
+@@ -4704,56 +4713,56 @@ void dScMgSmartball_c::SpawnObjects() {
+     for (int i = 0; i < mAnaCount; i++) {
+         void *p = mpAnas[i];
+         if (p != 0)
+-            (*(VFunc **)p)[2](p);
++            SB_VCALL(p, 2);
+     }
+     for (int i = 0; i < mKinokoCount; i++) {
+         void *p = mpKinokos[i];
+         if (p != 0)
+-            (*(VFunc **)p)[2](p);
++            SB_VCALL(p, 2);
+     }
+     for (int i = 0; i < mBallCount; i++) {
+         void *p = mpBalls[i];
+         if (p != 0)
+-            (*(VFunc **)p)[2](p);
++            SB_VCALL(p, 2);
+     }
+     {
+         void *p = mpSpring;
+-        (*(VFunc **)p)[2](p);
++        SB_VCALL(p, 2);
+     }
+     for (int i = 0; i < mPropellerCount; i++) {
+         void *p = mpPropellers[i];
+         if (p != 0)
+-            (*(VFunc **)p)[2](p);
++            SB_VCALL(p, 2);
+     }
+     for (int i = 0; i < mDokanCount; i++) {
+         void *p = mpDokans[i];
+         if (p != 0)
+-            (*(VFunc **)p)[2](p);
++            SB_VCALL(p, 2);
+     }
+     for (int i = 0; i < mPakkunCount; i++) {
+         void *p = mpPakkuns[i];
+         if (p != 0)
+-            (*(VFunc **)p)[2](p);
++            SB_VCALL(p, 2);
+     }
+     for (int i = 0; i < mPushSwitchCount; i++) {
+         void *p = mpPushSwitches[i];
+         if (p != 0)
+-            (*(VFunc **)p)[2](p);
++            SB_VCALL(p, 2);
+     }
+     {
+         void *p = mpSlot;
+         if (p != 0)
+-            (*(VFunc **)p)[2](p);
++            SB_VCALL(p, 2);
+     }
+     {
+         void *p = mpBoard;
+         if (p != 0)
+-            (*(VFunc **)p)[2](p);
++            SB_VCALL(p, 2);
+     }
+     {
+         void *p = mpWing;
+         if (p != 0)
+-            (*(VFunc **)p)[2](p);
++            SB_VCALL(p, 2);
+     }
+ 
+     mServeIndex = 0;
+@@ -5168,48 +5177,48 @@ s32 dScMgSmartball_c::Behavior() {
+         int i;
+ 
+         o = (char *)mpSpring;
+-        (**(VFunc **)o)(o);
++        SB_VCALL(o, 0);
+ 
+         for (i = 0; i < mBallCount; i++) {
+             o = (char *)TableEntry(this, OFFSET_OF(dScMgSmartball_c, mpBalls), i);
+-            (**(VFunc **)o)(o);
++            SB_VCALL(o, 0);
+         }
+         for (i = 0; i < mKinokoCount; i++) {
+             o = (char *)TableEntry(this, OFFSET_OF(dScMgSmartball_c, mpKinokos), i);
+-            (**(VFunc **)o)(o);
++            SB_VCALL(o, 0);
+         }
+         for (i = 0; i < mAnaCount; i++) {
+             o = (char *)TableEntry(this, OFFSET_OF(dScMgSmartball_c, mpAnas), i);
+-            (**(VFunc **)o)(o);
++            SB_VCALL(o, 0);
+         }
+         for (i = 0; i < mPropellerCount; i++) {
+             o = (char *)TableEntry(this, OFFSET_OF(dScMgSmartball_c, mpPropellers), i);
+-            (**(VFunc **)o)(o);
++            SB_VCALL(o, 0);
+         }
+         for (i = 0; i < mDokanCount; i++) {
+             o = (char *)TableEntry(this, OFFSET_OF(dScMgSmartball_c, mpDokans), i);
+-            (**(VFunc **)o)(o);
++            SB_VCALL(o, 0);
+         }
+         for (i = 0; i < mPakkunCount; i++) {
+             o = (char *)TableEntry(this, OFFSET_OF(dScMgSmartball_c, mpPakkuns), i);
+-            (**(VFunc **)o)(o);
++            SB_VCALL(o, 0);
+         }
+         for (i = 0; i < mPushSwitchCount; i++) {
+             o = (char *)TableEntry(this, OFFSET_OF(dScMgSmartball_c, mpPushSwitches), i);
+-            (**(VFunc **)o)(o);
++            SB_VCALL(o, 0);
+         }
+ 
+         o = (char *)mpSlot;
+         if (o != 0) {
+-            (**(VFunc **)o)(o);
++            SB_VCALL(o, 0);
+         }
+         o = (char *)mpBoard;
+         if (o != 0) {
+-            (**(VFunc **)o)(o);
++            SB_VCALL(o, 0);
+         }
+         o = (char *)mpWing;
+         if (o != 0) {
+-            (**(VFunc **)o)(o);
++            SB_VCALL(o, 0);
+         }
+ 
+         UpdateScores();
+@@ -5509,7 +5518,7 @@ s32 dScMgSmartball_c::InitResources() {
+         cMgSmartball_spring_c *spawned;
+         r1.x = 0xec000;
+         r1.y = 0xa0000;
+-        spawned = (cMgSmartball_spring_c *)::operator new(0x48);
++        spawned = (cMgSmartball_spring_c *)SB_NEW(0x48, cMgSmartball_spring_c);
+         if (spawned != 0) {
+             V2 r2 = r1;
+             spawned = cMgSmartball_spring_c_Construct(spawned, this, 0, &r2);

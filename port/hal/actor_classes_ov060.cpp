@@ -1,0 +1,937 @@
+// THE BOWSER FIGHT -- ov060, level 38 (koopa2_boss). Wave 5 (lane w5-e)
+// mounted the overlay and hosted the arena FLOOR; wave 6 (lane w6-A) hosts the
+// other five classes and level 38 reaches ZERO SKIPS.
+//
+// ov060 is the pack all three koopaN_boss arenas load (LoadOrUnloadObject-
+// Overlays short-circuits idx 0x24/0x26/0x28 to ov060 with an early return --
+// but the SELECTOR LOOP runs first, so those levels also get ov089, the
+// boss-reward pack: KEY 282 / LAST_STAR 283. An arm9 read, corrected in
+// wave 6 from the "ov060 alone" the first draft of this file said).
+// This lane mounts it per symbol (port/ov060_syms.txt, where the full cast
+// map, the one dsd label shift and every width pin are written down), wires
+// its 106 func_ov060_* TUs and six sinits (port/slice_w5e.txt), and hosts
+// BOWSER_FIRE_SEA_ARENA (166, daKpa2Bg_c) -- the tilting platform that IS
+// the arena's walkable floor. With it skipped, the level-38 census boots
+// honest but Mario has nothing to stand on except the lava. Wave 6 adds
+// SPIKE_BOMB (284, x8 placed), BOWSER (279), BOWSER_TAIL (278), BOWSER_FIRE
+// (280) and BOWSER_SKY_PLATFORM (167) in port/slice_w6a.txt, and ov089's
+// KEY/LAST_STAR in hal/actor_classes_ov089.cpp.
+//
+// WHAT WAVE 6 ADDED, and what the wave-5 bank got wrong:
+//   - The bank recorded "Bowser's two state-pair tables, 0x0211a4e0.. and
+//     0x0211a734..".  Re-derived from the READERS, ov060 has SIX source runs
+//     filling SEVEN runtime tables (BOWSER FIRE's one run of sixteen records
+//     fills two of them, its init half and its behaviour half), and neither of
+//     those attributions holds: 0x0211a734 is BOWSER FIRE's (both
+//     of its halves), 0x0211a4e0 is the four-halfword message-id table
+//     func_ov060_02115518 indexes and Bowser's own records start at
+//     0x0211a4e8, and SPIKE BOMB has a table of its own at 0x0211b1d8 that was
+//     not in the bank at all.  The full map, all 50 seated records and the
+//     measured pointer-to-member sizes are in
+//     port/unmatched/Ov060_StateDispatch.cpp.
+//   - Bowser's init spawns 278 AND 280 and writes through both results with
+//     no null check, and his defeat path spawns 282 (ov089's KEY) and writes
+//     through that one too -- so 279/278/280/282 register in ONE landing.
+//     Bowser Shockwaves (281) is the one class still out: its two Actor::Spawn
+//     sites ignore their results (checked), and its Render is the ModelAnim
+//     slot-5 collision on TWO ModelAnims.
+//   - The arena class's closure was reloc-walked body by body: two
+//     func_ov060 helpers (02117a64/02117ae0, in the slice), the already-
+//     seated BeforeClsn installer _ZN4dBgW21SetBeforeClsnCallbackEPFvRS_P8dActor_cR5dBgPiR7Vector3P10Vector3_16S8_E (the c9a1731da family), its
+//     two SharedFilePtrs (0211affc model / 0211aff4 clsn, built by
+//     __sinit_ov060_02119f94), and ONE cross-window CLPS read -- nothing
+//     touches the state tables. It is hostable without a single new seam.
+//
+// ---- THE CLEANUP SEAT (run rel042, lane SEATS042) --------------------------
+// Slot 3 held a host transcription here, arena_clean, because the src file
+// once spelled its two SharedFilePtrs as the placeholders G0/G1, which
+// hal/cxx_aliases.cpp binds to SignPost's LIVE ov002 pointers (the PoleLift
+// trap hal/actor_classes_ov045.cpp documents). That is no longer the file:
+// src/_ZN10daKpa2Bg_c16CleanupResourcesEv.cpp now names daKpa2Bg_c_ModelFile
+// and daKpa2Bg_c_ClsnFile, the config's own names for 0x0211affc and
+// 0x0211aff4 (config/arm9/overlays/ov060/symbols.txt), which are exactly the
+// two pool words relocs.txt carries at 0x02117b94/98, model then clsn, and
+// port/ov060_syms.txt's per-symbol mount defines both spellings on the same
+// two cells the transcription released. The TU matches under 2004/b56 with
+// strict relocs and is linkcheck VERIFIED with 0 blind slots, and it is
+// already in all three links (port/slice_faces2.txt), so arena_clean now
+// calls it through the C-name face at file bottom, the Init/Behavior/Render
+// recipe, and the transcription is retired.
+//
+// ---- THE CLPS ALIAS -------------------------------------------------------
+// InitResources passes the collider CLPS as `&func_021115bc` -- dsd's
+// code-flavored name for 0x021115bc in the twenty-way-shared level-overlay
+// window. For this class's only level the owner is ov046 (level 38's own
+// image), so the name is aliased onto the one-symbol per-symbol ov046 mount
+// (port/ov046_syms.txt). CLPS records carry no pointers; the copy cannot
+// diverge from the whole-image mount the loaders walk.
+#include "port_d16.h"
+
+#include <cstdio>
+
+/* hal/actor_slot30_seat.cpp -- the shared seat for vtable slot 30,
+   Actor::OnAimedAtWithEggReturnVec. The ROM word in slot 30 of every vtable
+   this file fills IS the arm9 base body 0x020100dc (checked against
+   config/<module>/relocs.txt at vtable+30*4), and that body is now in the
+   link from src/_ZN8dActor_c25OnAimedAtWithEggReturnVecEv.cpp on slice_gate50.
+   The three-parameter __fastcall is the sret contract MSVC uses for a
+   thiscall member returning a 12-byte struct: this in ecx, the hidden result
+   pointer the one (callee-popped) stack argument. Same shape as whomp_s30. */
+/* types main's C++ declarations below name (catchup1 linkage flip) */
+struct daKirai_c;
+struct daKpa2Bg_c;
+struct daKpa3Bg_c;
+struct daKpaFire_c;
+struct daKpaTail_c;
+struct daKpa_c;
+extern "C" void *__fastcall port_actor_s30_base(void *self, void *, void *out);
+#include "dsstate_seg.h"
+#include "dtor_faces_cpp.h"
+#include <cstdlib>
+#include <cstring>   /* SEATS042 slot-3 trace: memcpy / memcmp */
+
+#include "dActor_c.h"
+#include "fBase_c.h"
+
+extern "C" {
+/* the arm9 shared half -- the same family every hosted 31/32-slot table
+   carries; the slot addresses were read off _ZTV18BowserFireSeaArena's own
+   reloc run and match the ov045/wf tables slot for slot */
+int _ZN8dActor_c19BeforeInitResourcesEv(void *self);              /* slot 1  */
+void _ZN8dActor_c18AfterInitResourcesEj(void *self, unsigned a);  /* slot 2  */
+int _ZN8dActor_c14BeforeBehaviorEv(void *self);                   /* slot 7  */
+int _ZN8dActor_c12BeforeRenderEv(void *self);                     /* slot 10 */
+int _ZN8dActor_c13OnYoshiTryEatEv(void *self);                    /* slot 18 */
+void _ZN8dActor_c13OnTurnIntoEggER7daPly_c(void *self, void *p);   /* slot 19 */
+int _ZN8dActor_c9Virtual50Ev(void *self);                         /* slot 20 */
+void _ZN8dActor_c15OnGroundPoundedERS_(void *self, void *o);      /* slot 21 */
+void _ZN8dActor_c11OnAttacked1ERS_(void *self, void *o);          /* slot 22 */
+void _ZN8dActor_c11OnAttacked2ERS_(void *self, void *o);          /* slot 23 */
+void _ZN8dActor_c8OnKickedERS_(void *self, void *o);              /* slot 24 */
+void _ZN8dActor_c8OnPushedERS_(void *self, void *o);              /* slot 25 */
+void _ZN8dActor_c24OnHitByCannonBlastedCharERS_(void *self, void *o); /* slot 26 */
+void _ZN8dActor_c15OnHitByMegaCharER7daPly_c(void *self, void *p);     /* slot 27 */
+void _ZN8dActor_c19OnHitFromUnderneathERS_(void *self, void *o);      /* slot 28 */
+int _ZN8dActor_c16OnAimedAtWithEggEv(void *self);                     /* slot 29 */
+void _ZN10dBgActor_c4KillEv(void *self);                              /* slot 31 */
+
+const char *port_actor_class_name(unsigned id);   /* hal/actor_registry */
+void port_actor_slot_decline(const char *what);   /* func_02043fdc_hostcopy.cpp */
+void port_actor_render_probe(const char *cls, void *model); /* hal/actor_classes */
+
+/* the generated per-symbol mounts (build/host-src/ov060_syms.c, ov046_syms.c) */
+void port_ov060_pack_check(void);
+void port_ov060_syms_patch(void);
+void port_ov046_pack_check(void);
+void port_ov046_syms_patch(void);
+/* run linkw wave 6 (lane w6-A): the six state tables' seat. Rewrites the 50
+   SOURCE statics with host bodies BEFORE the sinits copy them into bss (the
+   Crate/WaterBomb ordering); see port/unmatched/Ov060_StateDispatch.cpp for
+   the table map, the measured pointer-to-member sizes and the two named
+   holes. */
+void port_ov060_states_seat(void);
+/* ov060's six sinits, all linkable (no ov045-style shared-window sinit) */
+void __sinit_ov060_021195dc(void);
+void __sinit_ov060_02119df0(void);
+void __sinit_ov060_02119f94(void);
+void __sinit_ov060_0211a000(void);
+void __sinit_ov060_0211a388(void);
+void __sinit_ov060_0211a428(void);
+
+/* the arena's own bodies (the .cpp methods are faced at file bottom) */
+int _ZN10daKpa2Bg_c13InitResourcesEv(void *self);     /* slot 0  */
+int _ZN10daKpa2Bg_c16CleanupResourcesEv(void *self);  /* slot 3  */
+int _ZN10daKpa2Bg_c8BehaviorEv(void *self);           /* slot 6  */
+int _ZN10daKpa2Bg_c6RenderEv(void *self);             /* slot 9  */
+int *_ZN10daKpa2Bg_cD1Ev(int *self);                  /* slot 16 */
+int *_ZN10daKpa2Bg_cD0Ev(int *self);                  /* slot 17 */
+extern "C++" daKpa2Bg_c *daKpa2Bg_c_classInit(void);
+/* read, never written, by the SEATS042 slot-3 trace: the arena's two file
+   cells (0x0211affc model, 0x0211aff4 clsn) and SignPost's two, the pair the
+   old G0/G1 placeholders were bound to (decl_common.h's spelling) */
+/* catchup1 Stage C round 4 (port_refcheck hal-links): the file cells under
+   TARGET's names at the same addresses: SignPost's two are C-linkage BSS in
+   src/game/actors/d_a_obj_tatefuda.cpp (0x0210e064 model, 0x0210e05c clsn),
+   the arena's are C++ objects in src/game/actors/d_a_kpa2_bg.cpp (0x0211affc
+   model, 0x0211aff4 clsn). Read only, as bytes. */
+extern "C++" struct Kpa2BgModelFilePtr daKpa2Bg_c_ModelFile;
+extern "C++" struct Kpa2BgCollisionFilePtr daKpa2Bg_c_ClsnFile;
+extern char SignPost_ModelFile;
+extern char SignPost_ClsnFile;
+/* the Enable face's C-linkage dispatcher (hal/cxxname_bridge.cpp routing) */
+int _ZN4dBgW6EnableEP8dActor_c(void *self, void *actor);
+
+/* ---- run linkw wave 6 (lane w6-A): the fight's own five classes ---------- */
+/* member teardowns the three .cpp-destructor host thunks spell by hand */
+void *_ZN8dActor_cD2Ev(void *self);
+void _ZN17dExtSimpleModel_cD1Ev(void *self);
+void _ZN14dExtAnmModel_cD1Ev(void *self);
+void _ZN15dExtAnmTexPat_cD1Ev(void *self);
+void _ZN10dBgCh_ActrD1Ev(void *self);
+void _ZN17dExtShadowModel_cD1Ev(void *self);
+void _ZN7dCcAc_cD1Ev(void *self);
+void _ZN10dCcAcPos_cD1Ev(void *self);
+
+/* SPIKE BOMB (284) -- the SHIFTED spellings, see the class block below */
+int _ZN9daKirai_c13InitResourcesEv(void *self);   /* slot 0  */
+int _ZN9daKirai_c16CleanupResourcesEv(void);      /* slot 3  */
+int _ZN9daKirai_c8BehaviorEv(void *self);         /* slot 6  */
+int _ZN9daKirai_c6RenderEv(void *self);           /* slot 9  */
+int *_ZN9daKirai_cD0Ev(int *self);                /* slot 17 */
+extern "C++" daKirai_c *daKirai_c_classInit(void);
+
+/* BOWSER (279) */
+int _ZN7daKpa_c13InitResourcesEv(void *self);               /* slot 0  */
+int _ZN7daKpa_c16CleanupResourcesEv(void);                  /* slot 3  */
+int _ZN7daKpa_c8BehaviorEv(void *self);   /* slot 6, HOST COPY (StateDispatch) */
+int _ZN7daKpa_c6RenderEv(void *self);   /* slot 9, HOST COPY (Ov060_Renders) */
+void _ZN7daKpa_c16OnPendingDestroyEv(void);                 /* slot 12 */
+int *_ZN7daKpa_cD0Ev(int *self);                            /* slot 17 */
+extern "C++" daKpa_c *daKpa_c_classInit(void);
+
+/* BOWSER TAIL (278) */
+int _ZN11daKpaTail_c13InitResourcesEv(void *self);          /* slot 0  */
+int _ZN11daKpaTail_c16CleanupResourcesEv(void);             /* slot 3  */
+int _ZN11daKpaTail_c8BehaviorEv(void *self);                /* slot 6  */
+int _ZN11daKpaTail_c6RenderEv(void);                        /* slot 9  */
+int *_ZN11daKpaTail_cD0Ev(int *self);                       /* slot 17 */
+extern "C++" daKpaTail_c *daKpaTail_c_classInit(void);
+
+/* BOWSER FIRE (280) -- an Enemy build; Init/Behavior are HOST COPIES */
+int _ZN11daKpaFire_c13InitResourcesEv(void *self);          /* slot 0  */
+int _ZN11daKpaFire_c16CleanupResourcesEv(void);             /* slot 3  */
+int _ZN11daKpaFire_c8BehaviorEv(void *self);                /* slot 6  */
+int _ZN11daKpaFire_c6RenderEv(void);                        /* slot 9  */
+int *_ZN11daKpaFire_cD1Ev(int *self);                       /* slot 16 */
+int *_ZN11daKpaFire_cD0Ev(int *self);                       /* slot 17 */
+extern "C++" daKpaFire_c *daKpaFire_c_classInit(void);
+
+/* BOWSER SKY PLATFORM (167) -- every own body is a func_ov060_* already in
+   slice_w5e.txt; only slot 6 is a host copy (Ov060_StateDispatch). */
+int _ZN10daKpa3Bg_c13InitResourcesEv(void *self);                       /* slot 0  */
+int _ZN10daKpa3Bg_c16CleanupResourcesEv(void *self);                       /* slot 3  */
+int _ZN10daKpa3Bg_c8BehaviorEv(void *self);                       /* slot 6  */
+int _ZN10daKpa3Bg_c6RenderEv(void *self);                       /* slot 9  */
+int *_ZN10daKpa3Bg_cD1Ev(int *self);                       /* slot 16 */
+int *_ZN10daKpa3Bg_cD0Ev(int *self);                       /* slot 17 */
+extern "C++" daKpa3Bg_c *daKpa3Bg_c_classInit(void);
+
+DSSTATE_BEGIN
+void *_ZTV18BowserFireSeaArena[32];
+void *_ZTV9daKirai_c[31];   /* SPIKE BOMB's table, 0x0211aa8c */
+void *_ZTV7daKpa_c[31];               /* 0x0211a6b8 */
+void *_ZTV11daKpaTail_c[31];          /* 0x0211a634 */
+void *_ZTV11daKpaFire_c[31];          /* 0x0211a7f4 */
+void *_ZTV10daKpa3Bg_c[32];       /* BOWSER SKY PLATFORM's, Kill @31 */
+DSSTATE_END
+}
+
+/* 0x0211a8b0 answers to both names; the D1/D0 (.c, real extern spellings, not
+   VT placeholders) restore it by the RTTI one. daKpa2Bg = the koopa2 arena
+   background. The base-table store in the same bodies is _ZTV10dBgActor_c,
+   already defined and host-filled by hal/actor_classes.cpp. */
+#pragma comment(linker, "/alternatename:__ZTV10daKpa2Bg_c=__ZTV18BowserFireSeaArena")
+
+/* The arena CLPS spelling onto the one-symbol ov046 mount (header note). */
+/* RETIRED at catchup1 Stage C round 4: main's d_a_kpa2_bg.cpp names the CLPS
+   block data_ov046_021115bc itself and nothing spells func_021115bc any more. */
+// #pragma comment(linker, "/alternatename:_func_021115bc=_data_ov046_021115bc")
+
+/* run linkw wave 6 (lane w6-A): the RTTI spellings the four .c destructors
+   restore their tables by. Same table, sibling name -- the daKpa2Bg_c line
+   above, four more times. kirai = the naval mine = SPIKE BOMB (the label
+   shift; the daKirai_c name belongs to the table _Z19daKirai_c_classInitv stores). */
+/* PORTSYNC2: both names of this ROM word are one name in main now; the alias would bind a symbol to itself. */ // #pragma comment(linker, "/alternatename:__ZTV9daKirai_c=__ZTV9daKirai_c")
+/* PORTSYNC2: both names of this ROM word are one name in main now; the alias would bind a symbol to itself. */ // #pragma comment(linker, "/alternatename:__ZTV7daKpa_c=__ZTV7daKpa_c")
+/* PORTSYNC2: both names of this ROM word are one name in main now; the alias would bind a symbol to itself. */ // #pragma comment(linker, "/alternatename:__ZTV11daKpaTail_c=__ZTV11daKpaTail_c")
+/* PORTSYNC2: both names of this ROM word are one name in main now; the alias would bind a symbol to itself. */ // #pragma comment(linker, "/alternatename:__ZTV11daKpaFire_c=__ZTV11daKpaFire_c")
+/* The ov066-window spellings of ov060's own bss cells (ov060_syms.txt's
+   window note): same bytes, one storage, sibling names aliased on.
+   THE THREE /alternatename ROWS THAT USED TO SIT HERE ARE GONE. run rel0215
+   wave 2, lane cast-ov066 mounted ov066 per symbol, and all three addresses
+   are named there too -- 0x0211ac20, 0x0211ac68 and 0x0211acd0 are three of
+   Eyerok's THIRTY-EIGHT pointer-to-member source pairs. The mount DEFINES
+   data_ov066_0211ac20 / _0211ac68 / _0211acd0, so every one of the three
+   aliases was defeated silently and ov060's two caller TUs would have read
+   Eyerok's state table instead of their own bss. The bindings are now
+   per-source -D renames in port/CMakeLists.txt, on the two TUs that actually
+   spell them:
+     src/func_ov060_02111c68.c   data_ov066_0211ac20, data_ov066_0211ac68
+     src/func_ov060_02112350.c   data_ov066_0211acd0
+   the w5b_review.md R2 recipe. The ov060 storage below is unchanged; only the
+   spelling bridge moved. */
+
+/* The MSVC-decorated spellings C++ TUs in the pack use for the same mounted
+   storage (the actor_faces_bob / bowserpuzzle @@3PA precedent; data aliases
+   are exact, there is no `this` to lose). The P8C one is a pointer-to-member
+   array of a TU-local class -- the cells are BUILT and DISPATCHED by host
+   code on both sides, so the stride is self-consistent (the Painting trap
+   needs ROM-record reads, which this is not). */
+#pragma comment(linker, "/alternatename:?data_ov060_0211ac20@@3PAHA=_data_ov060_0211ac20")
+#pragma comment(linker, "/alternatename:?data_ov060_0211ac68@@3PAHA=_data_ov060_0211ac68")
+#pragma comment(linker, "/alternatename:?data_ov060_0211ac70@@3PAHA=_data_ov060_0211ac70")
+#pragma comment(linker, "/alternatename:?data_ov060_0211aed4@@3PAUTabEnt@@A=_data_ov060_0211aed4")
+/* The @@3PAP8C@@AEXXZA (0x0211ae9c) and @@3PAUEntry@@A (0x0211b1ac) siblings
+   of the line above are GONE in wave 6: the two TUs that spelled those cells
+   at C++ linkage -- func_ov060_02115b84 and _ZN17BowserSkyPlatform8BehaviorEv -- are host
+   copies now and use the C name. The guard reads an unreferenced LHS as
+   "unused, OK", so leaving them would have been inert rather than wrong; they
+   are removed because they would read as live documentation of a spelling
+   nothing emits any more. The TabEnt one stays: func_ov060_021128c0 is still
+   matched src and still spells it that way. */
+
+/* Two statics wanted by pack TUs under their STRUCT-tagged MSVC decorations
+   (the class-tagged PAV variants already exist in hal/actor_faces_bob.cpp;
+   statics are cdecl on both sides, so the aliases are exact), and the
+   mangled-in-mangled free-function spelling of UpdatePosWithTransform (@@YA,
+   the one alias-eligible decoration class), aliased onto the same defined
+   MSVC static the @@3PAHA data spelling in hal/actor_classes_bob_world.cpp
+   already targets. */
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEFEATED: the left hand side is a real definition in this link now (_ZN8dActor_c15FindWithActorIDEjPS_.cpp.obj), so the directive is inert and alternatename_guard fails on it. */
+// #pragma comment(linker, "/alternatename:?FindWithActorID@dActor_c@@SAPAU1@IPAU1@@Z=__ZN8dActor_c15FindWithActorIDEjPS_")
+#pragma comment(linker, "/alternatename:?LoadFile@dBgW_Kc@@SAPAUKCL_File@@AAUSharedFilePtr@@@Z=__ZN7dBgW_Kc8LoadFileER13SharedFilePtr")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines ?UpdatePosWithTransform@dBgW@@SAXAAU1@PAUActor@@AAUClsnResult@@AAUVector3@@PAUVector3_16@@4@Z, and nothing references ?_ZN4dBgW22UpdatePosWithTransformERS_P8dActor_cR5dBgPiR7Vector3P10Vector3_16S8_@@YAXXZ, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN4dBgW22UpdatePosWithTransformERS_P8dActor_cR5dBgPiR7Vector3P10Vector3_16S8_@@YAXXZ=?UpdatePosWithTransform@dBgW@@SAXAAU1@PAUActor@@AAUClsnResult@@AAUVector3@@PAUVector3_16@@4@Z")
+
+/* Link residue of the wired pack, each with its named precedent:
+   - the arena Init TU spells three C-linkage bodies at C++ linkage (no
+     extern "C" on its decls); all three decorations are @@YA cdecl free
+     functions, the one alias-eligible class, onto their defined C names --
+     the wf_enemy_bridges UpdatePosAndAngs recipe (its @@YAXXZ sibling is
+     already there; the arena's decls return int, hence @@YAH here);
+   - Bowser_IsAnimAtLastFrame declares Animation::GetFrameCount returning
+     int; the matched method (slice_gate21) emits the u32 form. Identical
+     receiver, identical args, return in eax either way -- the
+     StarMarkerFace member-onto-member alias precedent;
+   - func_ov060_02112ee0 wants Sound::StopLoadedMusic_Layer1 by its GNU
+     spelling; the matched TU (slice_gate10) defines the MSVC STATIC --
+     no `this`, cdecl both sides, exact. */
+#pragma comment(linker, "/alternatename:?_ZN10dBgW_KcMbg7SetFileEP8KCL_FileRK9Matrix4x3isR10CLPS_Block@@YAHPAX00HF0@Z=__ZN10dBgW_KcMbg7SetFileEP8KCL_FileRK9Matrix4x3isR10CLPS_Block")
+#pragma comment(linker, "/alternatename:?_ZN4dBgW21SetBeforeClsnCallbackEPFvRS_P8dActor_cR5dBgPiR7Vector3P10Vector3_16S8_E@@YAHPAX0@Z=__ZN4dBgW21SetBeforeClsnCallbackEPFvRS_P8dActor_cR5dBgPiR7Vector3P10Vector3_16S8_E")
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEAD RHS and an UNREFERENCED left hand side: nothing in the build defines __ZN4dBgW16UpdatePosAndAngsERS_P8dActor_cR5dBgPiR7Vector3P10Vector3_16S8_, and nothing references ?_ZN4dBgW16UpdatePosAndAngsERS_P8dActor_cR5dBgPiR7Vector3P10Vector3_16S8_@@YAHXZ, so the row can never fire and nothing wants it to. */
+// #pragma comment(linker, "/alternatename:?_ZN4dBgW16UpdatePosAndAngsERS_P8dActor_cR5dBgPiR7Vector3P10Vector3_16S8_@@YAHXZ=__ZN4dBgW16UpdatePosAndAngsERS_P8dActor_cR5dBgPiR7Vector3P10Vector3_16S8_")
+#pragma comment(linker, "/alternatename:?GetFrameCount@dExtFrameCtrl_c@@QBEHXZ=?GetFrameCount@dExtFrameCtrl_c@@QBEIXZ")
+#pragma comment(linker, "/alternatename:__ZN5Sound22StopLoadedMusic_Layer1Ej=?StopLoadedMusic_Layer1@Sound@@SAXI@Z")
+
+/* ?Enable@dBgW@@QAEXPAUActor@@@Z -- the STRUCT-Actor variant of
+   the face hal/shutter_bob_face.cpp defines for `class Actor` spellers. A
+   thiscall member can never be an /alternatename; this TU includes Actor.h,
+   so Actor is a struct here and the symbol this definition emits is
+   byte-for-byte the one the pack TUs reference. Forwards to the C-linkage
+   dispatcher like every other Enable. */
+struct MeshColliderBase {
+    void Enable(dActor_c *a);
+};
+void MeshColliderBase::Enable(dActor_c *a)
+{ _ZN4dBgW6EnableEP8dActor_c(this, a); }
+
+// ---- the trap --------------------------------------------------------------
+static void ov60_trap_report(void *self, int slot)
+{
+    unsigned id = self ? *(unsigned short *)((char *)self + 0xc) : 0u;
+    std::fprintf(stderr,
+                 "UNHOSTED: ov060 vtable slot %d is not hosted (actor id %u "
+                 "%s)\n", slot, id, port_actor_class_name(id));
+    { static char _m[128];
+      std::snprintf(_m, sizeof _m, "unhosted ov060 vtable slot %d on id %u %s",
+                    slot, id, port_actor_class_name(id));
+      port_actor_slot_decline(_m); }
+}
+#define OV60_TRAP(n) \
+    static int __fastcall ov60_trap##n(void *s, void *) \
+    { ov60_trap_report(s, n); return 0; }
+OV60_TRAP(13) OV60_TRAP(14) OV60_TRAP(17)
+#undef OV60_TRAP
+
+static int __fastcall ov60_binit(void *s, void *)
+{ return _ZN8dActor_c19BeforeInitResourcesEv(s); }
+static void __fastcall ov60_ainit(void *s, void *, unsigned a)
+{ _ZN8dActor_c18AfterInitResourcesEj(s, a); }
+static int __fastcall ov60_bclean(void *s, void *)
+{ return ((dActor_c *)s)->dActor_c::BeforeCleanupResources(); }
+static void __fastcall ov60_aclean(void *s, void *, unsigned a)
+{ ((fBase_c *)s)->fBase_c::AfterCleanupResources(a); }
+static int __fastcall ov60_bbeh(void *s, void *)
+{ return _ZN8dActor_c14BeforeBehaviorEv(s); }
+static void __fastcall ov60_abeh(void *s, void *, unsigned a)
+{ ((fBase_c *)s)->fBase_c::AfterBehavior(a); }
+static int __fastcall ov60_bren(void *s, void *)
+{ return _ZN8dActor_c12BeforeRenderEv(s); }
+static void __fastcall ov60_aren(void *s, void *, unsigned a)
+{ ((fBase_c *)s)->fBase_c::AfterRender(a); }
+static int __fastcall ov60_pdes(void *s, void *)
+{ ((fBase_c *)s)->fBase_c::OnPendingDestroy(); return 0; }
+static int __fastcall ov60_heap(void *s, void *)
+{ return ((fBase_c *)s)->fBase_c::OnHeapCreated(); }
+static int __fastcall ov60_yoshi(void *s, void *)
+{ return _ZN8dActor_c13OnYoshiTryEatEv(s); }
+/* slot 19 takes the three-parameter shape so it emits `ret 4`: the dispatch
+   site pushes the Player the callee pops -- the wf_turn_egg contract. */
+static int __fastcall ov60_turn_egg(void *s, void *, void *p)
+{ _ZN8dActor_c13OnTurnIntoEggER7daPly_c(s, p); return 0; }
+static int __fastcall ov60_v50(void *s, void *)
+{ return _ZN8dActor_c9Virtual50Ev(s); }
+static int __fastcall ov60_pounded(void *s, void *, void *o)
+{ _ZN8dActor_c15OnGroundPoundedERS_(s, o); return 0; }
+static int __fastcall ov60_atk1(void *s, void *, void *o)
+{ _ZN8dActor_c11OnAttacked1ERS_(s, o); return 0; }
+static int __fastcall ov60_atk2(void *s, void *, void *o)
+{ _ZN8dActor_c11OnAttacked2ERS_(s, o); return 0; }
+static int __fastcall ov60_kicked(void *s, void *, void *o)
+{ _ZN8dActor_c8OnKickedERS_(s, o); return 0; }
+static int __fastcall ov60_pushed(void *s, void *, void *o)
+{ _ZN8dActor_c8OnPushedERS_(s, o); return 0; }
+static int __fastcall ov60_cannon(void *s, void *, void *o)
+{ _ZN8dActor_c24OnHitByCannonBlastedCharERS_(s, o); return 0; }
+static int __fastcall ov60_mega(void *s, void *, void *p)
+{ _ZN8dActor_c15OnHitByMegaCharER7daPly_c(s, p); return 0; }
+static int __fastcall ov60_under(void *s, void *, void *o)
+{ _ZN8dActor_c19OnHitFromUnderneathERS_(s, o); return 0; }
+static int __fastcall ov60_egg(void *s, void *)
+{ return _ZN8dActor_c16OnAimedAtWithEggEv(s); }
+/* slot 31, the Platform tail; the arena's table carries it (id 166 is a
+   PlatformC2 build and its reloc run has 0x020ee55c at slot 31). */
+static int __fastcall ov60_kill(void *s, void *)
+{ _ZN10dBgActor_c4KillEv(s); return 0; }
+
+/* The shared half, slots 1..30, read off _ZTV18BowserFireSeaArena's own
+   reloc run (slot 12 is ActorBase::OnPendingDestroy 0x02043ac0 there, so it
+   is written here; a wave-6 class that overrides 12 -- Bowser and
+   ExtendingPlatform-shaped ids -- writes its own after this returns).
+   Slots 13/14 are the ActorBase Virtual34/38 traps and 30 declines, the
+   wf/ov45 reading.
+
+   THE POINTER IS VOLATILE ON PURPOSE -- the gate-200 elided-stores bug
+   (hal/actor_classes_ov002g200.cpp): MSVC 19.44 x86 /O2 can delete a static
+   filler's stores when it is called with several distinct extern-array
+   arguments. One caller today, seven tomorrow. */
+static void ov60_fill_shared(void *volatile *vt)
+{
+    vt[1]  = (void *)ov60_binit;
+    vt[2]  = (void *)ov60_ainit;
+    vt[4]  = (void *)ov60_bclean;
+    vt[5]  = (void *)ov60_aclean;
+    vt[7]  = (void *)ov60_bbeh;
+    vt[8]  = (void *)ov60_abeh;
+    vt[10] = (void *)ov60_bren;
+    vt[11] = (void *)ov60_aren;
+    vt[12] = (void *)ov60_pdes;
+    vt[13] = (void *)ov60_trap13;
+    vt[14] = (void *)ov60_trap14;
+    vt[15] = (void *)ov60_heap;
+    vt[17] = (void *)ov60_trap17;
+    vt[18] = (void *)ov60_yoshi;
+    vt[19] = (void *)ov60_turn_egg;
+    vt[20] = (void *)ov60_v50;
+    vt[21] = (void *)ov60_pounded;
+    vt[22] = (void *)ov60_atk1;
+    vt[23] = (void *)ov60_atk2;
+    vt[24] = (void *)ov60_kicked;
+    vt[25] = (void *)ov60_pushed;
+    vt[26] = (void *)ov60_cannon;
+    vt[27] = (void *)ov60_mega;
+    vt[28] = (void *)ov60_under;
+    vt[29] = (void *)ov60_egg;
+    vt[30] = (void *)port_actor_s30_base;
+}
+
+// ---- the mount bring-up ----------------------------------------------------
+// The ov45_bringup shape: no lane owns hal/actor_overlays.cpp this wave
+// either, so the pack bring-up rides the first registry fill. Whoever next
+// owns actor_overlays.cpp should move this body beside the ov013/ov045
+// blocks and cut the guard to a call. The ov046 one-symbol mount rides the
+// same guard: its only consumer is this cast.
+/* CAPTURED, and the argument is hal/level_boot.cpp's on g_level_mounted: this
+   flag says "port_ov60_bringup has run", and everything that pass writes --
+   the mount's rebased pointers and the SharedFilePtrs its static initialisers
+   construct -- lives in .dsstate. A restore rolls that back. A guard that does
+   not roll back with it leaves the pass skipped forever and the overlay
+   holding raw DS pointers, which is the defect behind both of the RELOAD
+   review's referrals. Bracketed, the pass re-runs exactly when its results
+   were rolled away. */
+DSSTATE_BEGIN
+static int g_ov60_bringup_done;
+DSSTATE_END
+
+extern "C" void port_ov60_bringup(void)
+{
+    if (g_ov60_bringup_done)
+        return;
+    g_ov60_bringup_done = 1;
+    port_ov060_pack_check();
+    port_ov060_syms_patch();
+    port_ov046_pack_check();
+    port_ov046_syms_patch();
+    /* BEFORE the sinits: all six state tables are bss the sinits fill from
+       .data source records holding DS code addresses. */
+    port_ov060_states_seat();
+    __sinit_ov060_021195dc();
+    __sinit_ov060_02119df0();
+    __sinit_ov060_02119f94();
+    __sinit_ov060_0211a000();
+    __sinit_ov060_0211a388();
+    __sinit_ov060_0211a428();
+}
+
+// ============================================================================
+// BOWSER_FIRE_SEA_ARENA (id 166) -- table 0x0211a8b0, 32 slots
+// ============================================================================
+//
+// PlatformC2 build; Model at +0x324, MovingMeshCollider at +0x374. The
+// arena's tilting disc over the fire sea: its InitResources loads its model
+// and collision through the two __sinit_ov060_02119f94 SharedFilePtrs,
+// installs MeshColliderBase::UpdatePosWithTransform as the BeforeClsn
+// callback through _ZN4dBgW21SetBeforeClsnCallbackEPFvRS_P8dActor_cR5dBgPiR7Vector3P10Vector3_16S8_E (the contested-slot family c9a1731da seats
+// -- the third mover proof after ov015's bridge and JRB's SHIP_UP), and its
+// Behavior tilts the disc under the player through the two func_ov060
+// helpers. Own slots 0/3/6/9/16/17 + Platform::Kill at 31.
+static int __fastcall arena_init(void *s, void *)
+{ return _ZN10daKpa2Bg_c13InitResourcesEv(s); }
+/* slot 3, SEATED on the matched TU (run rel042, lane SEATS042; the file
+   header's CLEANUP SEAT block has the evidence). The ROM word is
+   _ZTV10daKpa2Bg_c (0x0211a8b0) + 4*3 = 0x0211a8bc, which ov060/relocs.txt
+   relocates to 0x02117b58, _ZN10daKpa2Bg_c16CleanupResourcesEv; the head
+   reads base-8 an unrelocated zero and base-4 the typeinfo at 0x0211a870,
+   out of extracted/overlays/overlay_0060.bin (.text base 0x02111900).
+
+   SM64DS_SEATS042_TRACE=1 prints one line when the slot runs and one per
+   file cell, the arena's two and SignPost's two, read before and after the
+   body; it writes nothing and is otherwise inert. */
+static int ov60_seats042_trace_on(void)
+{
+    static int v = -1;
+    if (v < 0) {
+        const char *e = std::getenv("SM64DS_SEATS042_TRACE");
+        v = (e && *e && *e != '0') ? 1 : 0;
+    }
+    return v;
+}
+static void ov60_seats042_cell(const char *name, const void *cell,
+                               const unsigned char *was)
+{
+    const unsigned char *now = (const unsigned char *)cell;
+    unsigned p0, p1;
+    std::memcpy(&p0, was + 4, 4);
+    std::memcpy(&p1, now + 4, 4);
+    const char *verdict = std::memcmp(was, now, 8) == 0 ? "untouched"
+                        : now[2] < was[2] ? "released" : "CHANGED";
+    std::fprintf(stderr, "SEATS042:   %s: file 0x%04x->0x%04x refs %u->%u "
+                 "ptr 0x%08x->0x%08x -- %s\n", name,
+                 (unsigned)(was[0] | (was[1] << 8)),
+                 (unsigned)(now[0] | (now[1] << 8)), (unsigned)was[2],
+                 (unsigned)now[2], p0, p1, verdict);
+}
+static int __fastcall arena_clean(void *s, void *)
+{
+    if (!ov60_seats042_trace_on())
+        return _ZN10daKpa2Bg_c16CleanupResourcesEv(s);
+    unsigned char m[8], c[8], spm[8], spc[8];
+    std::memcpy(m, &daKpa2Bg_c_ModelFile, 8);
+    std::memcpy(c, &daKpa2Bg_c_ClsnFile, 8);
+    std::memcpy(spm, &SignPost_ModelFile, 8);
+    std::memcpy(spc, &SignPost_ClsnFile, 8);
+    const int r = _ZN10daKpa2Bg_c16CleanupResourcesEv(s);
+    void *word = (*(void ***)s)[3];
+    const unsigned id = *(const unsigned short *)((const char *)s + 0xc);
+    std::fprintf(stderr, "SEATS042: _ZTV18BowserFireSeaArena[3] "
+                 "CleanupResources (ov060 0x02117b58, the matched TU) ENTERED "
+                 "this=%p id=%u %s; slot 3 word=%p, seated thunk=%p -- %s; "
+                 "returned %d\n", s, id, port_actor_class_name(id), word,
+                 (void *)arena_clean,
+                 word == (void *)arena_clean ? "SAME WORD" : "DIFFERENT WORD",
+                 r);
+    ov60_seats042_cell("data_ov060_0211affc daKpa2Bg_c_ModelFile",
+                       &daKpa2Bg_c_ModelFile, m);
+    ov60_seats042_cell("data_ov060_0211aff4 daKpa2Bg_c_ClsnFile",
+                       &daKpa2Bg_c_ClsnFile, c);
+    ov60_seats042_cell("data_ov002_0210e064 SignPost_ModelFile",
+                       &SignPost_ModelFile, spm);
+    ov60_seats042_cell("data_ov002_0210e05c SignPost_ClsnFile",
+                       &SignPost_ClsnFile, spc);
+    std::fflush(stderr);
+    return r;
+}
+static int __fastcall arena_behavior(void *s, void *)
+{ return _ZN10daKpa2Bg_c8BehaviorEv(s); }
+static int __fastcall arena_render(void *s, void *)
+{ port_actor_render_probe("BOWSER_FIRE_SEA_ARENA", (char *)s + 0x324);
+  return _ZN10daKpa2Bg_c6RenderEv(s); }
+static int __fastcall arena_d1(void *s, void *)
+{ return (int)(size_t)_ZN10daKpa2Bg_cD1Ev((int *)s); }
+static int __fastcall arena_d0(void *s, void *)
+{ return (int)(size_t)_ZN10daKpa2Bg_cD0Ev((int *)s); }
+extern "C" void hal_fill_bowser_fire_sea_arena_vtable(void)
+{
+    port_ov60_bringup();
+    void *volatile *vt = (void *volatile *)_ZTV18BowserFireSeaArena;
+    ov60_fill_shared(vt);
+    vt[0]  = (void *)arena_init;
+    vt[3]  = (void *)arena_clean;
+    vt[6]  = (void *)arena_behavior;
+    vt[9]  = (void *)arena_render;
+    vt[16] = (void *)PORT_D16(arena_d1);
+    vt[17] = (void *)arena_d0;
+    vt[31] = (void *)ov60_kill;
+}
+
+// ============================================================================
+// SPIKE BOMB (id 284) -- table 0x0211aa8c, 31 slots        run linkw wave 6
+// ============================================================================
+//
+// THE LABEL SHIFT, re-confirmed on this tree rather than inherited: the table
+// dsd names _ZTV9SpikeBomb / _ZTV9daKirai_c is the one _Z19daKirai_c_classInitv
+// stores (src/d_a_kirai.c, `p[0] = (int)_ZTV9SpikeBomb`), and
+// its slot bodies carry the shifted _ZN17BowserSkyPlatform* spellings.
+// _Z20daKpa3Bg_c_classInitv stores the UNNAMED _ZTV17BowserSkyPlatform instead.
+// The semantics settle it a fourth way: this class's InitResources ends in
+// AddSpikeBomb(this), which claims a slot in the eight-entry global
+// data_0209f3a4 -- and level 38 places exactly EIGHT id-284 objects.
+//
+// Own slots 0/3/6/9/16/17, no Platform tail (31 slots, the plain Actor shape;
+// this is an Actor build with a Model at +0xd4 and a
+// MovingCylinderClsnWithPos at +0x124, 432 bytes).
+//
+// EVERY BODY IS MATCHED SRC. Two things that would normally hold bodies out
+// do NOT apply here, both checked:
+//   - Behavior decodes its state record BY HAND (`struct {int a,b;}`, an
+//     8-byte read, then a cdecl call through the first word) instead of
+//     forming an MSVC pointer-to-member, so its stride is the ROM's. It only
+//     needs the four source records at 0x0211aa30/38/40/48 seated, which
+//     port_ov060_states_seat does.
+//   - Render's `((Sub *)&mModel)->m(0)` six-virtual local shadow lands on
+//     _ZTV17dExtSimpleModel_c slot 5, and hal/cxxname_bridge.cpp DUAL-FILLS that table
+//     (slot 4 and slot 5 both Render) precisely for shadow-TU dispatch. This
+//     is not the ModelAnim collision -- ModelAnim cannot be dual-filled
+//     because Virtual18 already occupies its slot 5, and this class has no
+//     ModelAnim.
+static int __fastcall spikebomb_init(void *s, void *)
+{ return _ZN9daKirai_c13InitResourcesEv(s); }
+static int __fastcall spikebomb_clean(void *s, void *)
+{ return _ZN9daKirai_c16CleanupResourcesEv(); }
+static int __fastcall spikebomb_behavior(void *s, void *)
+{ return _ZN9daKirai_c8BehaviorEv(s); }
+static int __fastcall spikebomb_render(void *s, void *)
+{ port_actor_render_probe("SPIKE_BOMB", (char *)s + 0xd4);
+  return _ZN9daKirai_c6RenderEv(s); }
+/* SLOT 16 IS THIS CLASS'S OWN D1. The ROM word 16 of 0x0211aa8c is 0x02118438,
+   SpikeBomb's D1: its own vptr, then dCcAcPos_c +0x124, Model +0xd4, then
+   dActor_c's D2 (read out of overlay_0060.bin). The slot used to seat
+   hal_cppd1_BowserSkyPlatform, the sky platform's D1 at 0x02117d1c, which runs
+   dBgW_KcMbg's destructor at +0x124: a mesh-collision teardown over this
+   class's dCcAcPos_c, whose own destructor never ran. The body is the matched
+   src/_ZN9SpikeBombD1Ev.cpp (??1SpikeBomb@@QAE@XZ), reached through the face
+   hal/actorport_dtor_bridge.cpp aliases onto it. */
+extern "C" void __fastcall actorport_d16t_SpikeBomb(void *, void *);
+static int __fastcall spikebomb_d1(void *s, void *e)
+{ actorport_d16t_SpikeBomb(s, e); return (int)(size_t)s; }
+static int __fastcall spikebomb_d0(void *s, void *)
+{ return (int)(size_t)_ZN9daKirai_cD0Ev((int *)s); }
+extern "C" void hal_fill_spike_bomb_vtable(void)
+{
+    port_ov60_bringup();
+    void *volatile *vt = (void *volatile *)_ZTV9daKirai_c;
+    ov60_fill_shared(vt);
+    vt[0]  = (void *)spikebomb_init;
+    vt[3]  = (void *)spikebomb_clean;
+    vt[6]  = (void *)spikebomb_behavior;
+    vt[9]  = (void *)spikebomb_render;
+    vt[16] = (void *)PORT_D16(spikebomb_d1);
+    vt[17] = (void *)spikebomb_d0;
+}
+
+// ============================================================================
+// BOWSER (279) + BOWSER TAIL (278) + BOWSER FIRE (280)     run linkw wave 6
+// ============================================================================
+//
+// THESE THREE LAND TOGETHER, and that is not a preference. Bowser's
+// InitResources ends with two Actor::Spawn calls and writes through BOTH
+// results without a null check (src/_ZN6Bowser13InitResourcesEv.cpp, verified on
+// this tree, not inherited from the wave-5 bank):
+//
+//     a1 = Actor::Spawn(0x118 = 280 BOWSER FIRE, ...);
+//     *(int *)(a1 + 0x2cc) = *(int *)(c + 4);            <- unchecked
+//     a2 = Actor::Spawn(0x116 = 278 BOWSER TAIL, ...);
+//     *(int *)(c + 0x3a8) = *(int *)(a2 + 4);            <- unchecked read
+//     *(int *)(a2 + 0x108) = *(int *)(c + 4);            <- unchecked
+//     func_02011d50(a2);
+//
+// The port's Actor::Spawn returns null for an unregistered class (that is what
+// the census counts as a skip), so a Bowser registered alone faults on his
+// first init frame at null+0x2cc. 279 without 280 and 278 is not a smaller
+// step, it is a crash.
+//
+// A THIRD CLASS IS REACHED THE SAME WAY, one level deeper, and this one was
+// NOT in the wave-5 bank: func_ov060_021135fc -- Bowser's defeat path, reached
+// from func_ov060_02112ee0 and func_ov060_021130c0 -- spawns 0x11a (282 KEY)
+// and writes `*(short *)(spawned + 0x440)` unchecked. KEY lives in ov089,
+// which the arena already loads through the selector row, and its registry row
+// is in hal/actor_classes_ov089.cpp: it has to be in the same landing as
+// Bowser or his defeat sequence faults the same way his init would.
+// (Its sibling spawn, 0x11b = 283 LAST_STAR, IS ignored.
+//
+// TWO MORE WRITERS, named here because the lane's prose left them anonymous:
+// _ZN11daKpaFire_c19func_ov060_021167ecEv spawns 0x118 = 280 once and writes f92/f94/f96 and
+// +0x360 through the result, and _ZN11daKpaFire_c19func_ov060_021169f8Ev spawns 0x118 at THREE
+// sites and writes +0x360 through each. Neither null-checks. Both are already
+// safe in this landing because 280 registers with Bowser -- but they are safe
+// as a by-product of his init needing it, not because a registration decision
+// was ever made for them, which is exactly why they are written down here.
+//
+// The remaining ov060-internal sites -- func_ov060_02114858, 02115b0c,
+// 02116b68, 0211747c -- ignore their results, and _ZN11daKpaFire_c19func_ov060_021172e0Ev
+// null-checks both of its. That is the whole sweep: NINE functions in the pack
+// call Actor::Spawn, sixteen call sites between them, FOUR of those functions
+// write through a result without a check (Bowser's InitResources, his defeat
+// path func_ov060_021135fc, _ZN11daKpaFire_c19func_ov060_021167ecEv and _ZN11daKpaFire_c19func_ov060_021169f8Ev), and
+// every id those four reach -- 278, 280, 282 -- registers in this landing.)
+//
+// BOWSER 279, table 0x0211a6b8, 31 slots. Own 0/3/6/9/12/16/17 -- he is the
+// one class in this pack that overrides OnPendingDestroy (slot 12), so his
+// fill writes it AFTER ov60_fill_shared. His Behavior dispatches two of the
+// three tables the seat covers (0x0211aeb4 through func_ov060_02112434, then
+// 0x0211aed4 through func_ov060_021128c0, which aeb4[0] points at).
+// Slot 16 is a HOST THUNK -- src/_ZN6BowserD1Ev.cpp is a real MSVC destructor
+// over a shadow class (the BigBooIcon case); the chain is his matched D0's,
+// minus the Deallocate. Slot 9 is a HOST COPY, the ModelAnim slot-5 collision
+// (port/unmatched/Ov060_Renders.cpp).
+//
+// BOWSER TAIL 278, table 0x0211a634, 31 slots -- width 31, not the 33 the dsd
+// span reads: the two words past it are _ZTV6Bowser's {offset-to-top,
+// typeinfo} RTTI header (re-read from the image this wave, slot 31 raw zero,
+// slot 32 a pointer to _ZTI7daKpa_c which is _ZTV6Bowser's typeinfo).
+// Own 0/3/6/9/16/17; slot 16 is the same .cpp-destructor host thunk. Its
+// Behavior runs func_ov060_02115b84 (host copy) over the third seated table.
+//
+// BOWSER FIRE 280, table 0x0211a7f4, 31 slots, an EnemyC2 build. Own
+// 0/3/6/9/16/17, and BOTH of its own state-driven bodies are host copies:
+// InitResources forms its pointer-to-member over a complete empty `struct
+// Actor { }` (stride 4) and Behavior over a never-defined one (stride 16),
+// against the ROM's 8. Its D1/D0 are .c and link directly.
+static int __fastcall bowser_init(void *s, void *)
+{ return _ZN7daKpa_c13InitResourcesEv(s); }
+static int __fastcall bowser_clean(void *s, void *)
+{ return _ZN7daKpa_c16CleanupResourcesEv(); }
+static int __fastcall bowser_behavior(void *s, void *)
+{ return _ZN7daKpa_c8BehaviorEv(s); }
+static int __fastcall bowser_render(void *s, void *)
+{ port_actor_render_probe("BOWSER", (char *)s + 0xd4);
+  return _ZN7daKpa_c6RenderEv(s); }
+static int __fastcall bowser_pdes(void *s, void *)
+{ (void)s; _ZN7daKpa_c16OnPendingDestroyEv(); return 0; }
+/* slot 16 is the matched src D1 through hal/dtor_faces_cpp.cpp (lane DTOR-FACES-CPP);
+   the transcribed thunk that stood here (bowser_d1) spelled the same chain by hand. */
+static int __fastcall bowser_d0(void *s, void *)
+{ return (int)(size_t)_ZN7daKpa_cD0Ev((int *)s); }
+extern "C" void hal_fill_bowser_vtable(void)
+{
+    port_ov60_bringup();
+    void *volatile *vt = (void *volatile *)_ZTV7daKpa_c;
+    ov60_fill_shared(vt);
+    vt[0]  = (void *)bowser_init;
+    vt[3]  = (void *)bowser_clean;
+    vt[6]  = (void *)bowser_behavior;
+    vt[9]  = (void *)bowser_render;
+    vt[12] = (void *)bowser_pdes;   /* after the shared fill, which writes 12 */
+    vt[16] = (void *)PORT_D16(hal_cppd1_daKpa_c);
+    vt[17] = (void *)bowser_d0;
+}
+
+static int __fastcall btail_init(void *s, void *)
+{ return _ZN11daKpaTail_c13InitResourcesEv(s); }
+static int __fastcall btail_clean(void *s, void *)
+{ return _ZN11daKpaTail_c16CleanupResourcesEv(); }
+static int __fastcall btail_behavior(void *s, void *)
+{ return _ZN11daKpaTail_c8BehaviorEv(s); }
+static int __fastcall btail_render(void *s, void *)
+{ (void)s; return _ZN11daKpaTail_c6RenderEv(); }
+/* slot 16 is the matched src D1 through hal/dtor_faces_cpp.cpp (lane DTOR-FACES-CPP);
+   the transcribed thunk that stood here (btail_d1) spelled the same chain by hand. */
+static int __fastcall btail_d0(void *s, void *)
+{ return (int)(size_t)_ZN11daKpaTail_cD0Ev((int *)s); }
+extern "C" void hal_fill_bowser_tail_vtable(void)
+{
+    port_ov60_bringup();
+    void *volatile *vt = (void *volatile *)_ZTV11daKpaTail_c;
+    ov60_fill_shared(vt);
+    vt[0]  = (void *)btail_init;
+    vt[3]  = (void *)btail_clean;
+    vt[6]  = (void *)btail_behavior;
+    vt[9]  = (void *)btail_render;
+    vt[16] = (void *)PORT_D16(hal_cppd1_daKpaTail_c);
+    vt[17] = (void *)btail_d0;
+}
+
+static int __fastcall bfire_init(void *s, void *)
+{ return _ZN11daKpaFire_c13InitResourcesEv(s); }
+static int __fastcall bfire_clean(void *s, void *)
+{ return _ZN11daKpaFire_c16CleanupResourcesEv(); }
+// BOWSER10: a burnt-out variant 6/7 fire (_ZN11daKpaFire_c19func_ov060_021172e0Ev, inlined into _ZN11daKpaFire_c19func_ov060_02116f90Ev) gives a Yoshi target a cap
+// of a character drawn at random among Mario / Luigi / Wario, redrawing until it hits one this save has unlocked. With none of
+// the three unlocked that draw never ends and the game loop stops (the ROM's own loop; a normal solo game never reaches it, the
+// port's other player paths can: a fresh-save Yoshi as Bowser's target). For that save only, Bowser's
+// mCapActorAlive (0x42b) reads 1 while the variant 6/7 handler runs, so the ROM takes its coin branch; it is put back after.
+// Any save with a human unlocked runs the ROM untouched. The handler is reached through the PMF table data_ov060_0211afb4
+// (entries 0211a744 / 0211a784, hal/pmf_host_values.cpp); the two decl symbols below are defined here, so the generated
+// /alternatename fallback to _ZN11daKpaFire_c19func_ov060_02116f90Ev is not taken (the vtable slot is not on this path: the class's own MSVC
+// vftable dispatches Behavior).
+extern "C" int _ZN8SaveData19IsCharacterUnlockedEj(unsigned ch);
+extern "C" void _ZN11daKpaFire_c19func_ov060_02116f90Ev(void *self);
+static unsigned char *bowser10_lift(void)
+{
+    if (_ZN8SaveData19IsCharacterUnlockedEj(0) || _ZN8SaveData19IsCharacterUnlockedEj(1) ||
+        _ZN8SaveData19IsCharacterUnlockedEj(2)) return nullptr;
+    unsigned char *kpa = (unsigned char *)dActor_c::FindWithActorID(0x117, nullptr);
+    if (!kpa || kpa[0x42b] != 0) return nullptr;
+    kpa[0x42b] = 1;
+    return kpa;
+}
+static void bowser10_fire_falls(void *self)
+{
+    unsigned char *kpa = bowser10_lift();
+    _ZN11daKpaFire_c19func_ov060_02116f90Ev(self);
+    if (kpa) kpa[0x42b] = 0;
+}
+// The fire piranha ball (daFPknBall_c, Bowser's BitS fireballs among others) has the same draw in func_ov002_020f897c, inlined
+// into its Behavior, which runs from the class's own MSVC vftable. Its Behavior slot there is wrapped once at boot (from the
+// Bowser fire fill below) with the same guard.
+extern "C" void *bowser10_fpkn_vft[];
+extern "C" int bowser10_fpkn_behavior_sym(void);
+#pragma comment(linker, "/alternatename:_bowser10_fpkn_vft=??_7daFPknBall_c@@6B@")
+#pragma comment(linker, "/alternatename:_bowser10_fpkn_behavior_sym=?Behavior@daFPknBall_c@@UAEHXZ")
+extern "C" __declspec(dllimport) int __stdcall VirtualProtect(void *addr, unsigned long size, unsigned long prot, unsigned long *old);
+typedef int(__fastcall *Bowser10Beh)(void *, void *);
+static Bowser10Beh g_bowser10_fpkn_real = nullptr;
+static int __fastcall bowser10_fpkn_behavior(void *self, void *edx)
+{
+    unsigned char *kpa = bowser10_lift();
+    const int r = g_bowser10_fpkn_real(self, edx);
+    if (kpa) kpa[0x42b] = 0;
+    return r;
+}
+static void bowser10_wrap_fpkn(void)
+{
+    if (g_bowser10_fpkn_real) return;
+    for (int i = 0; i < 32; ++i) {
+        if (bowser10_fpkn_vft[i] != (void *)&bowser10_fpkn_behavior_sym) continue;
+        unsigned long old = 0;
+        if (!VirtualProtect(&bowser10_fpkn_vft[i], sizeof(void *), 0x04 /* PAGE_READWRITE */, &old)) return;
+        g_bowser10_fpkn_real = (Bowser10Beh)bowser10_fpkn_vft[i];
+        bowser10_fpkn_vft[i] = (void *)&bowser10_fpkn_behavior;
+        VirtualProtect(&bowser10_fpkn_vft[i], sizeof(void *), old, &old);
+        return;
+    }
+    std::fprintf(stderr, "[bowser10] fire piranha ball Behavior not found in its vftable: not wrapped\n");
+}
+extern "C" int port_pmff_decl_data_ov060_0211a744(void *self) { bowser10_fire_falls(self); return 0; }
+extern "C" int port_pmff_decl_data_ov060_0211a784(void *self) { bowser10_fire_falls(self); return 0; }
+static int __fastcall bfire_behavior(void *s, void *)
+{ return _ZN11daKpaFire_c8BehaviorEv(s); }
+static int __fastcall bfire_render(void *s, void *)
+{ (void)s; return _ZN11daKpaFire_c6RenderEv(); }
+static int __fastcall bfire_d1(void *s, void *)
+{ return (int)(size_t)_ZN11daKpaFire_cD1Ev((int *)s); }
+static int __fastcall bfire_d0(void *s, void *)
+{ return (int)(size_t)_ZN11daKpaFire_cD0Ev((int *)s); }
+extern "C" void hal_fill_bowser_fire_vtable(void)
+{
+    port_ov60_bringup();
+    bowser10_wrap_fpkn();
+    void *volatile *vt = (void *volatile *)_ZTV11daKpaFire_c;
+    ov60_fill_shared(vt);
+    vt[0]  = (void *)bfire_init;
+    vt[3]  = (void *)bfire_clean;
+    vt[6]  = (void *)bfire_behavior;
+    vt[9]  = (void *)bfire_render;
+    vt[16] = (void *)PORT_D16(bfire_d1);
+    vt[17] = (void *)bfire_d0;
+}
+
+// ============================================================================
+// BOWSER SKY PLATFORM (167) -- table _ZTV17BowserSkyPlatform, 32 slots
+// ============================================================================
+//
+// The other half of the label shift: the koopa3 arena's floor (daKpa3Bg_c),
+// whose table carries NO _ZTV name because dsd handed that name to the table
+// SpikeBomb actually uses. A Platform build (812 bytes, PlatformC2, Model at
+// +0xd4 like every Platform), so slot 31 is Platform::Kill and the width is
+// 32 -- both read off the reloc run.
+//
+// Every own body is already a linked func_ov060_* (slice_w5e.txt); only its
+// Spawn joins this lane's slice. Slot 6 is the host copy: it dispatches the
+// three-record bss table at 0x0211b1ac through a pointer-to-member whose
+// stride is 4, not 8. Slot 9's `((Base *)(self + 0xd4))->m(0)` six-virtual
+// shadow lands on _ZTV17dExtSimpleModel_c slot 5, which cxxname_bridge dual-fills -- the
+// SpikeBomb reading, and Platform::Platform is what puts a plain Model there
+// (src/runtime/actor/d_bg_actor.cpp, `dExtSimpleModel_c::Model(this + 0xd4)`).
+//
+// NOT PLACED IN LEVEL 38 -- this is level 40's floor (koopa3_boss). It
+// registers here because the seat, the mount and the cast map are all in hand
+// and the row costs one line; level 40's mount is a separate lane.
+static int __fastcall skyplat_init(void *s, void *)
+{ return _ZN10daKpa3Bg_c13InitResourcesEv(s); }
+static int __fastcall skyplat_clean(void *s, void *)
+{ return _ZN10daKpa3Bg_c16CleanupResourcesEv(s); }
+static int __fastcall skyplat_behavior(void *s, void *)
+{ return _ZN10daKpa3Bg_c8BehaviorEv(s); }
+static int __fastcall skyplat_render(void *s, void *)
+{ port_actor_render_probe("BOWSER_SKY_PLATFORM", (char *)s + 0xd4);
+  return _ZN10daKpa3Bg_c6RenderEv(s); }
+static int __fastcall skyplat_d1(void *s, void *)
+{ return (int)(size_t)_ZN10daKpa3Bg_cD1Ev((int *)s); }
+static int __fastcall skyplat_d0(void *s, void *)
+{ return (int)(size_t)_ZN10daKpa3Bg_cD0Ev((int *)s); }
+extern "C" void hal_fill_bowser_sky_platform_vtable(void)
+{
+    port_ov60_bringup();
+    void *volatile *vt = (void *volatile *)_ZTV10daKpa3Bg_c;
+    ov60_fill_shared(vt);
+    vt[0]  = (void *)skyplat_init;
+    vt[3]  = (void *)skyplat_clean;
+    vt[6]  = (void *)skyplat_behavior;
+    vt[9]  = (void *)skyplat_render;
+    vt[16] = (void *)PORT_D16(skyplat_d1);
+    vt[17] = (void *)skyplat_d0;
+    vt[31] = (void *)ov60_kill;
+}
+
+// ---- method faces ----------------------------------------------------------
+// The four bodies src defines as real C++ methods against
+// BowserFireSeaArena.h (Init/Cleanup/Behavior/Render; the D1/D0 are .c and
+// callable directly). The IceSheet/ov045 recipe: the face is the C-name
+// bridge INTO the matched method, not a host copy of it. Cleanup joined the
+// other three at lane SEATS042, when arena_clean's transcription retired.
+#include "daKpa2Bg_c.h"
+extern "C" {
+int _ZN10daKpa2Bg_c13InitResourcesEv(void *self)
+{ return ((daKpa2Bg_c *)self)->daKpa2Bg_c::InitResources(); }
+int _ZN10daKpa2Bg_c16CleanupResourcesEv(void *self)
+{ return ((daKpa2Bg_c *)self)->daKpa2Bg_c::CleanupResources(); }
+int _ZN10daKpa2Bg_c8BehaviorEv(void *self)
+{ return ((daKpa2Bg_c *)self)->daKpa2Bg_c::Behavior(); }
+int _ZN10daKpa2Bg_c6RenderEv(void *self)
+{ return ((daKpa2Bg_c *)self)->daKpa2Bg_c::Render(); }
+}
+
+// run linkw wave 6 (lane w6-A): the same recipe for the five wave-6 bodies src
+// defines as real C++ methods. SPIKE BOMB's three were written against
+// BowserSkyPlatform.h when dsd's ov060 labels were one class off. They are not:
+// config/arm9/overlays/ov060 puts _ZN9SpikeBomb13InitResourcesEv at 0x02118bb4,
+// _ZN9SpikeBomb8BehaviorEv at 0x02118b2c and _ZN9SpikeBomb6RenderEv at
+// 0x02118ad4, and BowserSkyPlatform's own three at 0x021182b0 / 0x02118254 /
+// 0x0211822c. src/_ZN9SpikeBomb*.cpp define SpikeBomb's methods against
+// include/SpikeBomb.h, so each face is bound to its own class.
+#include "daKpa3Bg_c.h"
+#include "daKpaTail_c.h"
+#include "daKirai_c.h"
+extern "C" {
+int _ZN9daKirai_c13InitResourcesEv(void *self)
+{ return ((daKirai_c *)self)->daKirai_c::InitResources(); }
+int _ZN9daKirai_c8BehaviorEv(void *self)
+{ return ((daKirai_c *)self)->daKirai_c::Behavior(); }
+int _ZN9daKirai_c6RenderEv(void *self)
+{ return ((daKirai_c *)self)->daKirai_c::Render(); }
+int _ZN11daKpaTail_c13InitResourcesEv(void *self)
+{ return ((daKpaTail_c *)self)->daKpaTail_c::InitResources(); }
+int _ZN11daKpaTail_c8BehaviorEv(void *self)
+{ return ((daKpaTail_c *)self)->daKpaTail_c::Behavior(); }
+}

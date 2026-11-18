@@ -1,0 +1,950 @@
+// ---------------------------------------------------------------------------
+// boot_os.cpp -- the ROM's own boot chain, run at the points the ROM runs it.
+//
+// WHAT THIS REPLACES. The port boots through tests/walk_window.cpp's main(),
+// which stands in for the ROM's Entry and main(). Two of the ROM's boot steps
+// were already there and named as such -- Heap::InitializeRootHeap (the
+// NitroStartUp step) and Heap::InitializeGameHeap(0x3b000, 0) (the
+// _Z13func_0201a054v step) -- with the derivation written above each. Everything
+// else the ROM does between and around them was simply not done: the OS tick,
+// the thread system, the VBlank handler install, the debug/fatal vector table.
+// The 503 matched translation units that hang off Entry/main were unlinked for
+// exactly that reason, not because they could not build.
+//
+// This file is the next slice of that same transcription. Each block below is
+// one span of a ROM function, in the ROM's order, calling the ROM's own bodies:
+//
+//   port_boot_rom_pre_main()        src/func_02019780.c, before the root heap
+//   port_boot_rom_main_head()       src/NitroMain.cpp, its first three calls
+//   port_boot_rom_game_init_head()  src/func_0201a054.c, before the game heap
+//   port_boot_rom_game_init_tail()  src/func_0201a054.c, after the game heap
+//   port_boot_rom_worker()          src/func_0201a2f8.cpp, the boot worker's
+//                                   ov000 step, at main's loop seam
+//
+// THE RULE THIS FILE OBEYS. Nothing here calls a ROM function anywhere except
+// where the ROM calls it. Where a ROM step cannot run on the host the step is
+// SKIPPED and the comment says which hardware is missing -- it is never
+// replaced by a host imitation, and it is never called from somewhere else to
+// make a translation unit link.
+//
+// WHAT IS SKIPPED, AND WHY (measured, not assumed):
+//
+//   PXI_Init / OS_InitReset / CTRDG_Init / PM_Init
+//       THIS PARAGRAPH IS STALE AND IS KEPT ONLY SO THE CHANGE IS VISIBLE. It
+//       used to read "port/ntr models no IPC at all", and three of the four
+//       arms now RUN from the span below: run link100 lane IPC wrote
+//       port/ntr/ipc.cpp and port/hal/boot2_ipc.cpp, the ARM7 claims six
+//       channels at power-on, and every `while (PXI_IsCallbackReady(ch, 1) == 0) ;`
+//       turns. PXI_Init, OS_InitReset and PM_Init are real calls
+//       here. CTRDG_Init is the one that did not come with them, and it is
+//       blocked on `G` rather than on the FIFO -- see below.
+//
+//   func_02019ebc
+//       RE-DERIVED AGAIN, by run link100's lane THREAD, and THREAD CREATION IS
+//       NO LONGER ON THE LIST. That lane linked src/func_02058200.c and the
+//       card driver's own use of it, so "func_02019ebc's whole purpose is to
+//       create a THIRD thread" stopped being a blocker; what stopped it being
+//       one is the same fiber seam this paragraph used to ask for. FOUR things
+//       are left, and NONE of them is the scheduler. Every one was measured off
+//       extracted/arm9_dec.bin (flat, load base 0x02004000) rather than
+//       inherited.
+//
+//       (1) func_02061128 IS NOT A SYMBOL AND HAS NO TU. src/func_02019ebc.c is
+//       one line, `func_02061128(func_02019f10)`, and config/arm9/symbols.txt
+//       has no entry at 0x02061128 at all. It is INSIDE func_020610fc, whose
+//       row reads size=0x3c (0x020610fc..0x02061138) -- and
+//       src/func_020610fc.c's own banner already names the overlap: "The
+//       symbol's span also contains an unreachable epilogue-less tail that
+//       stores r0 into data_020a89a4". That tail IS func_02061128, and it is
+//       three instructions:
+//
+//           02061128  ldr r1, [pc, #4]      pool 0x02061134 = 0x020a89a4
+//           0206112c  str r0, [r1]
+//           02061130  bx lr
+//
+//       i.e. `func_02061128(fn) { data_020a89a4 = fn; }`. SO func_02019ebc DOES
+//       NOT START THE WIRELESS MANAGER -- it REGISTERS it, and the thing that
+//       reads data_020a89a4 is src/_ZN3IRQ21GameCardIREQMCHandlerEv.cpp, the
+//       game-card IREQ_MC interrupt handler. (data_020a89a4 itself is hosted:
+//       hal/boot_globals.cpp:325, four bytes, its ROM span.) Linking
+//       func_02019ebc therefore needs config/arm9/symbols.txt to SPLIT
+//       func_020610fc at +0x2c and a TU for the tail -- a decomp-side change,
+//       not a port one, and the first thing anyone taking this on has to do.
+//
+//       (2) NOTHING WOULD RUN IT EVEN THEN. That handler is installed by
+//       func_02061138 with IRQ::SetIRQHandler(0x100000, ...) and
+//       ntr/runtime.cpp's SetIRQHandler keeps masks 0x200000 (GXFIFO) and 2
+//       (HBlank) and drops every other one. func_02061138 also cannot link:
+//       its handler reaches func_020610fc, which is HAND-ASM (an PXI_SendWordByFifo loop
+//       and a deliberate `b self`) that MSVC cannot assemble. Same reason the
+//       card bring-up below calls CARDi_InitCommon rather than CARD_Init.
+//
+//       (3) THE WM THREAD'S RECORD AND STACK LIVE INSIDE THE TRIG TABLE,
+//       AND THE PORT MUST NEVER HOST ANYTHING THERE. src/func_02019f10.c is
+//       the entry func_02061128 registers, and its own literal pool builds a
+//       thread out of thin air:
+//
+//           02019f28  ldr r0, [pc, #0x38]    pool 0x02019f58 = 0x02086214
+//           02019f30  sub r4, r0, #0x94      the record: 0x02086180
+//           02019f3c  mov r3, r4             stack TOP = the record's own base
+//           02019f40  str r2, [sp]           pool 0x02019f5c = 0x3f6c, the size
+//           02019f4c  bl  OS_CreateThread
+//           02019f54  bl  OS_WakeupThreadDirect
+//
+//       An earlier version of this note called that span '16 KB the port hosts
+//       nowhere' and asked the decomp for names in it. THAT WAS WRONG, and the
+//       correction is worth keeping because acting on it would have done real
+//       damage. [0x02082214, 0x02086214) is the 4096-entry sine/cosine table:
+//       read the image and sample it as s16/4096 and the maximum deviation from
+//       sin(2*pi*idx/4096) is 0.0001. port/tools/romdata.py already hosts it as
+//       ONE object, (0x02082214, 0x4000, "short"). 0x02086180 is entry 4059.
+//       Naming a record there would have carved the table in two and given the
+//       port two overlapping objects where the ROM has one array.
+//
+//       So the cartridge DELIBERATELY ALIASES THE TRIG TABLE as scratch for a
+//       thread that only exists while the radio is up. The chain is dormant,
+//       not dead: src/_start.c's bare `bl NitroStartUp` (reloc from:0x020048a4)
+//       runs on every boot, NitroStartUp calls func_02019ebc
+//       (from:0x02019790), and func_02019ebc only LOADS func_02019f10's address
+//       (from:0x02019ecc kind:load -- the single reference to it in the whole
+//       image). Registration is unconditional; the handler executes only if
+//       something later dispatches the stored pointer, i.e. the radio coming
+//       up. Single-card play never dispatches it, so the table is never
+//       disturbed in normal play. In the port's world the radio thread does not
+//       exist, so the aliasing has no reason to be modelled at all: host
+//       nothing at 0x02086180, and if the WM is ever brought up, give its
+//       thread its own storage rather than reproducing the alias.
+//
+//       AND THE RULING IS STRONGER THAN 'HOST NOTHING THERE': NEVER EMULATE
+//       THAT PATH'S SIDE EFFECTS. OS_CreateThread does not merely record the
+//       stack bounds. Read src/func_02058200.c: it plants the SDK canaries
+//       (*(stackBottom-4) = 0xfddb597d at line 33, *(stackTop) = 0x7bf9dd5b at
+//       line 34) and then MIi_CpuClear32(0, base+4, size-8) ZERO-FILLS the
+//       stack. With end 0x02086180 and size 0x3f6c that fill covers
+//       [0x02082214, 0x02086180) -- the sine table itself. So a FAITHFUL port
+//       of this thread creation would wipe sixteen kilobytes of trig table and
+//       break every angle in the game, and it would present as a physics bug,
+//       not a memory bug. On hardware the table survives because the path is
+//       dormant: func_02019f10 is what IRQ::GameCardIREQMCHandler invokes
+//       through the global at 0x020a89a4 (src/_ZN3IRQ21GameCardIREQMCHandlerEv
+//       reads data_020a89a4), and a single-card boot never raises that
+//       interrupt. If the radio thread is ever modelled here, give it its own
+//       storage and do NOT reproduce the cartridge's alias. Measured and
+//       cross-checked with the decomp side 2026-09-06.
+//
+//       (4) AN ARM7 WIRELESS DRIVER, unchanged from the last pass.
+//       hal/boot2_ipc.cpp holds channel 0xa OBSERVED ONLY, on the stated
+//       grounds that "nothing in this build runs WM_Init, so a fabricated
+//       wireless answer would be answering a question no one asked". Running
+//       WM_Init asks it, and then every WM_SendCommand needs a completion or
+//       the ROM waits forever -- the same shape as the channel-6 refusal below.
+//
+//       NOT STARTED BY THIS LANE, deliberately: (1) is a decomp change, (3) is
+//       a globals lane and (4) is a subsystem. What this lane owed the WM chain
+//       was the scheduler, and the scheduler is done.
+//
+//   OS_Init and NitroStartUp THEMSELVES
+//       Both CALL the arms still skipped below, so neither can be seated as a
+//       body; their runnable spans are transcribed here instead. OS_Init
+//       is three arms away from being a real call now (calls 4, 6 and 11), and
+//       all three want the same `G` fix.
+//
+//   OS_InitArena / OS_InitArenaEx / OS_InitException / CTRDG_Init
+//       THE OS ARENA AND THE GBA-SLOT ARMS. OS_InitArena ends in
+//       `OS_SetArenaLo(n, OS_GetInitArenaLo(n))` and hal/os_arena.cpp OWNS
+//       OS_SetArenaLo over an 8MB host block -- feeding it a DS-derived arena
+//       address would move the root heap out from under Heap::SetupRootHeap.
+//       That part is unchanged.
+//
+//       THE OTHER THREE ARE BLOCKED ON `G`, AND THAT IS NOT WHAT THE LAST PASS
+//       OF THIS FILE SAID. Run link100 lane BOOT2 re-derived them. The Slot-2
+//       read BOOT named is real -- OS_GetConsoleType -> OSi_GetDeviceType reads
+//       0x08000000/0x08000004 for the "NINTENDO" magic and no ntr::kRegions
+//       entry covers that address -- but it is the SECOND thing that happens,
+//       not the first. OSi_GetDeviceType takes the ARM7 lock before it reads the
+//       magic:
+//
+//           if ((OS_ReadOwnerOfLockWord((u16 *)0x027fffe8) & 0x40) != 0 ||
+//               (res = OS_TryLockCartridge(x)) == 0) { ...read the magic... }
+//
+//       and 0x027fffec is zero in the port's shared block, so OS_TryLockCartridge
+//       always runs. OS_TryLockCartridge passes &OSi_AllocateCartridgeBus as its cleanup
+//       callback and OS_UnlockCartridge passes &OSi_FreeCartridgeBus, and BOTH of those
+//       bodies are one line:  `*(unsigned short *)G ^= 0x80`, in the two
+//       directions.
+//
+//       `G` IS include/decl_common.h's GENERIC PLACEHOLDER, not one byte, and
+//       in this binary it links to hal/heap_vtable.cpp's default-heap word (the
+//       `_G` the /MAP names). So taking that lock writes the game's default
+//       heap pointer. THE ROM'S OWN LITERAL POOLS SAY WHAT EACH USER REALLY IS,
+//       read out of extracted/arm9_dec.bin (load base 0x02004000) at each
+//       function's pool word, none of which carries a reloc in
+//       config/arm9/relocs.txt because they are absolute I/O addresses:
+//
+//           OSi_FreeCartridgeBus  pool 0x0205713c  0x04000204  EXMEMCNT, |= 0x0080
+//           OSi_AllocateCartridgeBus  pool 0x02057154  0x04000204  EXMEMCNT, &= ~0x0080
+//           OSi_FreeCardBus  pool 0x020570d4  0x04000204  EXMEMCNT, |= 0x0800
+//           OSi_AllocateCardBus  pool 0x020570ec  0x04000204  EXMEMCNT, &= ~0x0800
+//           MI_SetWramBank  pool 0x02059f54  0x04000247  WRAMCNT, strb
+//           G3X_SetHOffset  pool 0x02055460  0x04000010
+//           OS_GetTickLo  pool 0x0205964c  0x04000100
+//           PM_GetLCDPower  pool 0x0205f668  0x04000304
+//
+//       Every one of those addresses IS mapped by the port (ntr's I/O window is
+//       0x04000000 + 0x2000), so the bodies would be exactly right the moment
+//       the decomp spells the register instead of the placeholder. It cannot be
+//       done from here: `extern unsigned short G[];` needs a SYMBOL at an
+//       absolute address, and MSVC has no way to give one (the same wall
+//       OS_InitThread hits below), and a per-source COMPILE_DEFINITIONS rename
+//       onto a host object would desync bits 2-4 of the same register, which
+//       CTRDGi_ChangeLatestAccessCycle and CTRDGi_RestoreAccessCycle read and write directly.
+//
+//       So: OS_InitArenaEx (OS_Init's call 4), OS_InitException (call 6) and
+//       CTRDG_Init (call 11, PXI channel 0xd, which lane IPC otherwise
+//       unblocked -- the channel is claimed and the readiness spin turns) all
+//       want the SAME one-line-per-file decomp fix first, and the empty Slot-2
+//       region second. Together they are ~29 matched TUs, about half of them
+//       hand-asm exceptions.
+//
+//       ONE CORRECTION FOR CTRDG_Init, from run link100 lane IPCSEND: `G`
+//       is not the first thing in its way and neither is Slot-2. Its call ONE,
+//       CTRDGi_InitCommon, writes 20 bytes from CTRDGi_Work -- four dsd names
+//       that are hosted NOWHERE -- and everything else in the arm sits behind
+//       CTRDGi_InitModuleInfo's REG_POSTFLG guard, which this port never opens. The
+//       full re-derivation is at the arm's own point in the pre-main span
+//       below, including the two grouped runs it wants.
+//
+//   _Z13func_020134c8v -> _Z13func_020133bcv
+//       The ROM's sound bring-up. RE-DERIVED by run link100's lane THREAD, and
+//       it is back to ONE blocker rather than two: thread creation is modelled
+//       now (port/slice_gate223.txt), so what is left is the reason BOOT gave
+//       first. _Z13func_020133bcv takes 1MB out of Memory::Allocate and stands the
+//       ROM's OWN SDAT player up over it, and the port serves sound through
+//       hal/sdat. Two players over one SDAT is a subsystem decision, not a boot
+//       step, and nothing this lane did touches it.
+//
+//       THE THREAD HALF, measured so the sound lane does not re-derive it.
+//       _Z13func_020133bcv's own call func_020506fc(2) is the sound thread's
+//       creation and it has the SAME SHAPE as the card driver's:
+//
+//           OS_CreateThread(&data_020a5684, func_02050038, 0, &data_020a5bb8,
+//                         0x400, arg)
+//
+//       so data_020a5684 (the OSThread record) and data_020a8760's counterpart
+//       data_020a5bb8 (the stack TOP) have to be ONE contiguous object, and
+//       dsd split it three ways exactly as it split the card's:
+//       data_020a5684 -> data_020a5718 -> data_020a5bb8, total 0x534 = the
+//       0x94 record plus padding plus the 1 KB stack. data_020a5684 is hosted
+//       NOWHERE today and data_020a5bb8 IS hosted elsewhere, so the grouping
+//       is hal/globals_link100.cpp's card block done a second time, including
+//       the LNK2005 hand-over that one went through. Named, not taken.
+//
+//   func_0203bbc0
+//       RUN link100 lane BOOT2 measured this instead of inheriting "Crash()es
+//       on a refusal". The Crash() calls are downstream; what actually stops
+//       the boot is TP_WaitBusy(8), a bare spin on tpState + 0x36 that
+//       only the ARM7's channel-6 completion clears. The full measurement is at
+//       its own point in the boot below and in port/slice_gate222.txt.
+//
+//   GX_Init / _Z13func_02019440v
+//       NO LONGER SKIPPED. Run link100 lane BOOT2 seated both at their own
+//       points in _Z13func_0201a054v; see port/slice_gate222.txt and the comments
+//       below. This is BOOT's "left for the step that moves the graphics
+//       bring-up as a whole", and the two are one step: GX_InitGXState turns the
+//       VRAM banks off and GX_SetBankForLCDC(0x1ff) inside _Z13func_02019440v turns them
+//       back on, so seating one without the other would not have been correct.
+//
+//   func_020196cc
+//       SEATED, run link100 lane IPCSEND. BOOT2's refusal was right about the
+//       cause and the cause has been fixed: src/IPCSend.c is hostgen'd now
+//       (port/CMakeLists.txt's GATE2IPC_SYMS), so its store to IPCFIFOSEND
+//       reaches ntr::ipc_reg_write instead of latching in the mapped window,
+//       and this port makes ARM9->ARM7 sends for the first time. The round trip
+//       and what the host ARM7 answers are at its own point in the tail below
+//       and in port/slice_ipcsend.txt.
+//
+//   _Z13func_0201fec8v
+//       REFUSED, AND NOT FOR THE REASON THE LAST PASS OF THIS FILE GAVE. Run
+//       link100 lane GLOBALS sized data_0209d574 by its ROM span, which was
+//       the blocker written down here, and then measured what else the body
+//       reaches before seating it. _Z13func_0201fec8v's fall-through arm (the port
+//       takes it: *(u16*)0x027ffc40 is 0, so buf[0] off the zeroed shared
+//       block selects the default case) is
+//
+//           func_0203db64(data_02075358, data_02075304)
+//
+//       and THAT body is a second undersized-global field of the same class,
+//       eight names wide. Counted against config/arm9/symbols.txt:
+//
+//           data_020a1064   dsd span   64, written 0x40   NO HOST AT ALL
+//           data_020a0fec   dsd span   52, written 0x1c   NO HOST AT ALL
+//           data_020a0fa0   dsd span    6, written 0x18   NO HOST AT ALL
+//           data_020a1040   dsd span    4, written 0x24   hal/camera_bridges
+//           data_020a0fb8   dsd span    6, written 0x18   comms_conductor.cpp
+//           data_020a10a4   dsd span    2, written 0x58   comms_conductor.cpp
+//           data_020a10fc   dsd span    2, written 0x58   comms_conductor.cpp
+//           data_020a1154   dsd span   12, written 0x90   hal/camera_bridges
+//
+//       Every one of those is a dsd-split run whose host grouping would have
+//       to be proved contiguous for the FULL memset length before the call is
+//       safe, three of them are not hosted at all, and the two grouped runs
+//       that do exist belong to the comms and camera lanes rather than to
+//       this one. Sizing data_0209d574 unblocked func_0201a9fc; it did not
+//       unblock this. The measurement is left here so the next lane starts
+//       from it instead of from the old one-line claim.
+//
+//   OS_InitThread
+//       REFUSED, AND THE HOST-GLOBAL SIZE WAS NEVER THE WHOLE STORY. The
+//       storage half is fixed: the ROM's OS thread-info record is one
+//       0x54-byte object under three dsd names and hal/cxx_aliases.cpp's
+//       link100 GLOBALS block now hosts it as one grouped run (the old int[4]
+//       and hal/auto_bss.cpp's separate data_020a6148 were the bug, and the
+//       second of those was the quiet half -- OSi_GetUnusedThreadId scanned one array
+//       while OS_CreateThread wrote another). What still refuses the call is an
+//       ADDRESS, not a size. src/func_02058308.c reads two absolute linker
+//       symbols:
+//
+//           ovr = (s32)func_00000000;                 the DS's SYS stack size
+//           ... - (s32)func_00000600;                 the DS's IRQ stack size
+//
+//       Neither is in config/arm9/symbols.txt at all: dsd invented the names
+//       from literal-pool words whose VALUE is 0 and 0x600, because on the DS
+//       these are absolute linker symbols whose ADDRESS is the number. MSVC
+//       has no way to give a symbol an absolute address -- the same wall
+//       hal/scene_boot.cpp writes up for overlay_100 -- so the body does not
+//       even link today (two unresolved externals), and defining them as
+//       ordinary host functions is worse than not linking: with
+//       (s32)func_00000000 non-zero the body takes the other arm, computes
+//
+//           end = &data_023c0000 + 0x3fc0 - (s32)func_00000600
+//
+//       from a host code address, and stores 0xfddb597d through it. On the DS
+//       those two arms resolve to base 0x023c0020 / end 0x023c39c0 -- DTCM,
+//       the main thread's stack -- which is what the port would have to model
+//       to seat this at all.
+//
+//   _Z14ClearSaveBlockv
+//       memsets 0x32c bytes of data_0209caa0, the save block, which the host
+//       has already staged by this point in its own boot. RE-DERIVED, and the
+//       harder half was missing: hal/level_boot.cpp hosts data_0209caa0 as a
+//       0x14 object -- the dsd symbol's own span, next name data_0209cab4 --
+//       while the ROM object is the full 0x32c. The arithmetic closes exactly:
+//       0x0209caa0 + 0x32c = 0x0209cdcc, which is the next symbol AFTER the
+//       four dsd names inside the run (data_0209cab4, data_0209cad2,
+//       data_0209cae4, data_0209caf4). Seating the body today writes 796 bytes
+//       into a 20-byte object. It wants one grouped run in hal/level_boot.cpp.
+//
+//   MI_SetWramBank
+//       REFUSED ON A NAME, and the name is now known. Its body is `G[0] = v`.
+//       `G` is include/decl_common.h's generic placeholder (`extern int G;`),
+//       used by eight different TUs for eight different absolutes, and the last
+//       pass of this file guessed wrong twice: it is not one byte and it is not
+//       the port's screen-gap word. In this binary `G` links to
+//       hal/heap_vtable.cpp's default-heap word, and the byte THIS TU means is
+//       0x04000247 -- WRAMCNT -- read out of its own literal pool at
+//       0x02059f54, with no reloc against it in config/arm9/relocs.txt because
+//       it is an absolute I/O address. OS_Init's own call is
+//       MI_SetWramBank(3), i.e. WRAMCNT = 3. Still refused, and still for the
+//       decomp to fix: see the `G` block above for why the port cannot bind it
+//       from here. The full per-TU address table is there.
+// ---------------------------------------------------------------------------
+
+#include <cstdio>
+
+#include "dsstate_seg.h"
+
+// main()'s own thread object. src/NitroMain.cpp passes `&OSi_LauncherThread` to
+// OS_SetUserExceptionHandler, and no host file defines it, so the port has to. SIZED BY ROM
+// SPAN, not by the fields the callers happen to touch: config/arm9/symbols.txt
+// puts OSi_LauncherThread at 0x020a621c in .bss with the next symbol at 0x020a6378,
+// so the object is 348 bytes. (OS_InitThread writes as far as +0x74 and is
+// refused for an unrelated reason below; an object sized to that write instead
+// of to the span would be the exact undersized-global bug this port keeps
+// finding.) It is mutable DS state, so it goes in the .dsstate capture section
+// the save state rolls back, the same as hal/auto_bss.cpp's globals.
+DSSTATE_BEGIN
+extern "C" {
+char OSi_LauncherThread[348];
+}
+DSSTATE_END
+
+extern "C" {
+
+// --- src/func_02058c84.c, the runnable arms ---------------------------------
+void OS_InitIrqTable(void);          // DTCM word 0 = 0
+void OS_InitVAlarm(void);          // the DMA-channel bookkeeping + DisableIRQs(4)
+// --- src/func_02019780.c ----------------------------------------------------
+void func_0201a490(void);          // data_0209a03c(data_0208ee60)
+// --- src/NitroMain.cpp -------------------------------------------------------------
+void OS_InitTick(void);          // OS_InitTick: timer 0 + its IRQ handler
+void OS_InitAlarm(void);          // the alarm system
+void OS_SetUserExceptionHandler(int a, int b);  // the main thread record
+void func_0201a03c(void);          // main()'s thread entry, passed by address
+// --- src/func_0201a054.c, in its own order ----------------------------------
+void func_020427f8(void);                     // veneer -> OS_InitTick
+unsigned long long func_02042784(void);       // the boot timestamp
+void FX_Init(void);
+void GX_Init(void);                     // the ROM's own display reset
+int  GX_VBlankIntr(int enable);               // DISPSTAT VBlank-IRQ enable
+void func_0203d740(void);
+extern "C++" void func_0201a4e4(void);        // install IRQ::VBlankHandler (C++ at TARGET, src/IRQ2.cpp)
+extern "C++" void func_0203bb5c(void);        // C++ at TARGET
+/* _Z13func_02042f68iPh's FIRST ARM, the card driver's bring-up (src/func_02060890.c).
+   The transcription note at its point in the boot below says why it is
+   called there and why it does nothing on a default boot. */
+void CARD_Init(void);
+void port_thread_create_proof(void);          // hal/thread_create.cpp
+void func_02018aa4(void);                     // the file-system bring-up
+extern "C++" void func_0203ad84(void);        // C++ at TARGET (src/engine/path/PathPtr.cpp)
+/* func_0201a9fc(data_0209d574): the ROM calls this twice in _Z13func_0201a054v,
+   once on each side of Heap::InitializeGameHeap. hal/actor_vtables.cpp hosts
+   data_0209d574 at its ROM span of 68 bytes, which is what the +0x38 store
+   needs; the object is declared here as the char[] the matched TU's own
+   prototype takes. */
+void func_0201a9fc(void *c);
+extern char data_0209d574[];
+extern "C++" void func_02019440(void);        // the VRAM/OAM/palette clear + 3D (C++ at TARGET)
+void func_0203b684(void);
+void func_020233f0(void);
+void func_020196cc(void);                     // the channel-8 firmware read,
+                                              // the RNG boot seed, SetSoundMode
+void func_0201a5cc(void);                     // the fatal-vector pair
+// --- src/func_0201a2f8.cpp, the boot worker's ov000 step ----------------------
+void InitializeAssetHandleTable(void);               // ov000's entry: the handle table
+void port_ov000_pack_check(void);             // host-src/ov000_syms.c, the mount
+void port_ov000_syms_patch(void);             //   of port/ov000_syms.txt
+double port_ov0_table_clock_ms(void);         // hal/s4ov0_ov0table.cpp
+void port_ov0_table_report(double ms);
+
+
+// Which arms actually ran, printed once so a boot log says what the ROM did
+// rather than what this file intended.
+static void say(const char *what) {
+    std::fprintf(stderr, "[boot] ROM %s\n", what);
+}
+
+// ---------------------------------------------------------------------------
+// src/func_02019780.c, the step Entry runs before main.
+//
+//     OS_Init();   <- transcribed below, four PXI arms skipped
+//     func_0201a490();
+//     func_02019ebc();   <- skipped, the wireless thread
+//     Heap::InitializeRootHeap();   <- ALREADY in tests/walk_window.cpp
+//     Heap::SetNodeID(*data_020a0e9c, 1);
+//
+// Called immediately before that InitializeRootHeap line, which is where the
+// ROM's own order puts it.
+// ---------------------------------------------------------------------------
+extern "C" void port_os_lock_words_seed(void);
+extern "C" void port_os_arena_seed(void);
+extern "C" void PXI_Init(void);
+extern "C" void OS_InitReset(void);
+extern "C" void PM_Init(void);
+extern "C" void port_ipc_rom_boot_done(void);
+
+void port_boot_rom_pre_main(void)
+{
+    // OS_Init's arms, in the ROM's order. The gaps are the PXI four;
+    // see the header block for the measurement that closes them.
+    /* OS_InitArena() -- OS_InitArena. Its OS_ARENA_MAIN row, the only one a
+       linked ROM reader asks for, written from the port's arena block by
+       hal/os_arena.cpp (hi then lo, the ROM's order), here at the arm's own
+       point: after ntr::io_init holds the shared block the table lives in,
+       before the ROM's own OS_GetArenaLo (src/func_02058ea0.c) reads it at the
+       top of Heap::SetupRootHeap. Run linkfull wave 27, lane SMALLS1. */
+    port_os_arena_seed();
+    PXI_Init();   /* call 2: PXI init (PXI_InitFifo); the ARM7 half is
+                          hal/boot2_ipc.cpp's model, attached before main() */
+    /* OS_InitLock() -- takes the 0x7e lock and spins on the shared block.
+       Its two stores (the OS lock words at 0x027fffb0 = -1, -0x10000) are
+       the only part a host can honour; hal/os_lockid.cpp writes them here,
+       at the ROM's own point in the order, so OS_GetLockID hands out ids
+       the way the ROM does instead of -3. */
+    port_os_lock_words_seed();
+    /* OS_InitArenaEx() -- STILL REFUSED, AND THE FIRST REASON HAS MOVED. Run
+       link100 lane BOOT2 derived two blockers here, in this order: (1)
+       OS_GetConsoleType -> OSi_GetDeviceType takes the ARM7 lock through
+       OS_TryLockCartridge, whose cleanup callback OSi_AllocateCartridgeBus wrote `G` -- the
+       decomp's generic placeholder, which linked to hal/heap_vtable.cpp's
+       default-heap word while the ROM's own literal pool at 0x02057154 says
+       0x04000204 (EXMEMCNT) -- so running this arm wrote the default heap
+       pointer; and (2) the unmapped GBA slot at 0x08000000.
+       BLOCKER (1) IS GONE. Run link100 rung R3F spelled the register in
+       src/func_02057140.c (and in OSi_FreeCartridgeBus and G3X_SetHOffset), all three
+       still byte-verify against the ROM, and the three TUs are hostgen-ROUTED
+       so the store reaches EXMEMCNT instead. Taking the lock no longer touches
+       the heap pointer. What is left is blocker (2) ALONE: no ntr::kRegions
+       entry covers 0x08000000, so OS_GetConsoleType still reads the Slot-2 magic
+       out of nothing. Un-refusing this arm is a rung of its own and wants its
+       own proof; R3F did not take it. The header block carries the whole
+       table. */
+    OS_InitIrqTable();
+    /* OS_InitException() -- STILL REFUSED, and its reason moved the same way:
+       same OS_GetConsoleType path, same lock, same `G`, so R3F's spelling and
+       route retired the heap-pointer half of it and the empty Slot-2 region is
+       what remains. Everything else about it is host-safe -- it stores
+       OSi_ExceptionHandler into 0x027ffd9c (mapped, shared block) and 0x023c3fdc
+       (mapped, inside ntr's main-RAM reservation). */
+    /* MI_SetWramBank(3) -- REFUSED ON THE SAME NAME, and the byte is now known.
+       `G` here is 0x04000247, WRAMCNT, out of this TU's own literal pool at
+       0x02059f54 (no reloc, because it is an absolute I/O address), so the
+       ROM's line is WRAMCNT = 3. The port maps that address; what it cannot do
+       is give `extern int G;` an absolute address under MSVC. The decomp has
+       to name the register. See the header block. */
+    OS_InitVAlarm();
+    /* OS_InitThread() -- the OS thread system. STILL REFUSED, and the reason
+       has changed: the host-global size named here is fixed (the ROM's one
+       0x54-byte thread-info record is a grouped run in hal/cxx_aliases.cpp
+       now), and what is left is func_00000000 / func_00000600, two ABSOLUTE
+       linker symbols the body reads as numbers. See the header block for the
+       arithmetic they feed and why MSVC cannot supply them. */
+    OS_InitReset();   /* call 10: PXI channel 0xc, answered by the model */
+    /* CTRDG_Init() -- PXI channel 0xd. STILL REFUSED, and run link100 lane
+       IPCSEND re-derived the whole list rather than inheriting it, because the
+       obvious question after that lane is "did the send unblock this too".
+       IT DID NOT, AND IT NEVER COULD HAVE. The only PXI_SendWordByFifo in this chain is
+       src/func_0206a318.c, and CTRDGi_InitModuleInfo is the only thing that calls it --
+       past CTRDGi_InitModuleInfo's own guard, `if ((*(volatile u16 *)0x4000300 & 1) ==
+       0) return;`. That is REG_POSTFLG, nothing in this port writes it (the
+       only mention of the address in the whole tree is that read), so the
+       mapped word is zero and the body returns before it reaches the send, the
+       0x08000080 DMA or anything else. Measured on the seat this lane did
+       take: the exit census over a 300-frame level run lists tag 7 and tag 8
+       and nothing else.
+       SO WHAT IS LEFT, in the order CTRDG_Init would hit it:
+         (1) A HOST-GLOBAL GROUPING JOB, AND IT COMES FIRST -- before `G`,
+             before the guard, on call ONE. CTRDGi_InitCommon does
+             `SVC_CpuSet(&local, CTRDGi_Work, 0x5000001)`: five words, 20 bytes,
+             from CTRDGi_Work. NONE of CTRDGi_Work / de4 / de8 / dec is
+             hosted anywhere in this port, and that write crosses all four, so
+             they are ONE 0x20-byte run ending at data_020a9e00. The second run
+             is data_020a9e00 + data_020a9e04: CTRDGi_InitModuleInfo reads
+             `data_020a9e00 + 0xbe`, which lands inside data_020a9e04's own
+             span, and the next symbol after data_020a9e04 is data_020a9ec0 --
+             so 0x020a9e00..0x020a9ec0, 0xc0 bytes, one object. This is
+             hal/globals_link100.cpp's card block done again, and until it
+             exists the very first call of the very first arm writes 20 bytes
+             into whatever the linker put next.
+         (2) `G`, WHICH IS THE DECOMP'S AND IS A LINK CLAIM HERE RATHER THAN A
+             RUNTIME ONE. CTRDGi_LockByProcessor -> OS_TryLockCartridge -> the cleanup
+             callback OSi_AllocateCartridgeBus, `*(unsigned short *)G ^= 0x80`. All three
+             of those TUs are ALREADY LINKED out of port/slice_gate214.txt, so
+             nothing new arrives with them; what a seat would add is that the
+             body becomes REACHABLE if REG_POSTFLG ever stops reading zero.
+         (3) TWO UNMAPPED PAGES, both behind the same guard and neither in
+             ntr::kRegions: 0x08000080 (the Slot-2 GBA cart, which
+             MI_DmaCopy16 reads 0x40 halfwords out of) and 0xffff0020
+             (the ARM9 exception-vector page MIi_CpuCopy32 writes 0x9c bytes
+             to).
+         (4) AN ARM7 GBA-SLOT DRIVER. hal/boot2_ipc.cpp holds 0xd
+             OBSERVED ONLY, and if the guard ever opened, CTRDGi_SendtoPxi's word
+             would get no answer -- so CTRDGi_InitModuleInfo's `while (CTRDGi_Work !=
+             1) SVC_WaitByLoop(1)` would never turn, and any answer whose
+             (data & 0x3f) is not 1 makes src/func_0206a694.c call Crash().
+       Every C TU in the closure exists and compiles (CTRDGi_InitCommon, 694, 634,
+       600, 6d0, 3a4, 458, 424, 37c, 318 and IRQ::SetIRQs are all plain C; its
+       three hand-asm leaves MIi_CpuCopy32, CP15::FlushAndInvalidateDataCache
+       and SVC_WaitByLoop are already hosted), so this is four pieces of host work
+       and one decomp fix, not a link wall. */
+    /* CARD_Init() -- the game card, reached instead through _Z13func_02042f68iPh */
+    PM_Init();   /* call 13: PXI channel 8, answered by the model */
+
+    /* func_0201a490() -- one line, `data_0209a03c(data_0208ee60)`. The .data
+       word at 0x0209a03c is RELOCATED (config/arm9/relocs.txt:
+       from:0x0209a03c to:0x02057e30), so the ROM's own bytes there are a DS
+       address that means nothing here; hal/ptr_tables.cpp binds it to the host
+       func_02057e30 the way it binds the ROM's other function tables, and with
+       that binding this is a real call again. */
+    func_0201a490();
+    say("pre-main OS init (NitroStartUp)");
+    port_ipc_rom_boot_done();   /* the PXI model's report + selftest, after the ROM's handshake */
+}
+
+// ---------------------------------------------------------------------------
+// src/NitroMain.cpp, its first three calls. main() runs these before _Z13func_0201a054v,
+// and Entry runs NitroStartUp before main, so this belongs immediately after
+// the root heap comes up.
+//
+//     OS_InitTick();
+//     OS_InitAlarm();
+//     OS_SetUserExceptionHandler(&func_0201a03c, &OSi_LauncherThread);
+//     Heap::SetNodeID(*data_020a0e9c, 2);
+//
+// The two SetNodeID calls are name-tagging for the heap debugger and are left
+// to the existing host line that already carries the root heap.
+// ---------------------------------------------------------------------------
+void port_boot_rom_main_head(void)
+{
+    OS_InitTick();
+    OS_InitAlarm();
+    // main() hands the thread entry and the thread object by ADDRESS; the
+    // two words go into data_020a63a0/data_020a63a4 and nothing calls
+    // through them until the scheduler actually switches, which the port's
+    // single fiber never does.
+    OS_SetUserExceptionHandler((int)(void *)&func_0201a03c, (int)(void *)OSi_LauncherThread);
+    say("main() head: tick, alarms, main-thread record");
+}
+
+// ---------------------------------------------------------------------------
+// src/func_0201a054.c, the span BEFORE Heap::InitializeGameHeap(0x3b000, 0).
+// The ROM's order, with the skips named in the header block:
+//
+//     func_020427f8(); func_02042784(); FX_Init(); GX_Init();
+//     PXI_Init(); func_0203d740(); _Z14ClearSaveBlockv(); _Z13func_0201a4e4v();
+//     IRQ::EnableIRQs(1); IME = 1; IRQ::Enable();
+//     GX_VBlankIntr(1); func_0203bbc0(); _Z13func_0203bb5cv();
+//     if (!r4) _Z13func_0201fec8v();
+//     _Z13func_02042f68iPh(0xd01, data_0208ee50);
+//     if (!r4) func_02018aa4();
+//     if (r4) IRQ::DisableIRQs(0x100000);
+//     if (!r4) _Z13func_0203ad84v();
+//     func_0201a9fc(data_0209d574);
+//
+// r4 is `*(u16*)0x027ffc40 == 2`, and ntr/io.cpp writes 0 to that word at
+// io_init, so every `if (!r4)` arm is the one the port takes -- which is what
+// makes _Z13func_0203ad84v a step of this boot and not a branch of it.
+//
+// The IRQ trio (EnableIRQs(1), IME = 1, IRQ::Enable) is ALREADY done, by
+// ntr::rt_irq_boot_state(), whose own comment cites this exact line of
+// _Z13func_0201a054v as its source. It is not repeated here.
+// ---------------------------------------------------------------------------
+void port_boot_rom_game_init_head(void)
+{
+    func_020427f8();          // -> OS_InitTick, guarded and idempotent
+    func_02042784();          // the boot timestamp off the tick
+    FX_Init();
+    /* THE DISPLAY RESET, run link100 lane BOOT2. It resets POWCNT1, calls
+       GX_InitGXState (the VRAM bank shadow and VRAMCNT A..I), zeroes DISPSTAT
+       and DISPCNT, clears both 2D register banks and seeds the EIGHT BG affine
+       words to 0x100. BOOT left it "for the step that moves the graphics
+       bring-up as a whole" on the grounds that it was not obviously correct
+       where the host is by this line. MEASURED, and it is:
+
+         * this seam runs before ANY of the port's own graphics bring-up. The
+           level boot in tests/walk_window.cpp is below it, and
+           hal_sub_screen_init -- the host file that writes four of these eight
+           affine words by hand -- is called ~800 lines further down still, so
+           the ROM's reset cannot wipe host state that has not been written.
+         * hal/sub_screen.cpp:947 is the port's own record of the gap this
+           closes: it seeds the SUB engine's four and says the main engine's
+           four are "still unseeded, which is a real gap and deliberately not
+           closed from this line". The ROM's own body seeds all eight.
+         * POWCNT1 bit 15 (main engine drives the top screen) SURVIVES: the
+           middle store's mask is 0xfffffdf1, which keeps bit 15, and the first
+           store sets it. The host line in sub_screen.cpp sets it again later.
+         * the VRAM banks GX_InitGXState turns off are turned back on by the
+           ROM's own _Z13func_02019440v -> GX_SetBankForLCDC(0x1ff) and _Z13func_0200f4f4v in
+           the tail below, and after that by each scene's InitResources. */
+    GX_Init();
+    /* PXI_Init() -- the ROM calls the PXI init a SECOND time here. Not
+       repeated: port_boot_rom_pre_main() above already made OS_Init's
+       call 2, and src/func_0205bad8.c is guarded on `FifoCtrlInit == 0`, so
+       the ROM's own second call takes and releases the IRQ mask and returns.
+       Left out to keep the surface this lane verified minimal; putting it back
+       would be equally faithful and would change nothing. */
+    func_0203d740();
+    /* _Z14ClearSaveBlockv() -- memsets 0x32c bytes of the save block. REFUSED, and
+       the reason is no longer only "the host already staged it":
+       hal/level_boot.cpp hosts data_0209caa0 as a 0x14 object -- the dsd
+       symbol's own span -- while the ROM object is the full 0x32c, which is
+       exactly 0x0209caa0 to 0x0209cdcc and absorbs four more dsd names. See the
+       header block. */
+    func_0201a4e4();          // IRQ::SetIRQHandler(1, IRQ::VBlankHandler)
+    /* the IRQ trio: ntr::rt_irq_boot_state() */
+    /* DISPSTAT bit 3, the VBlank-IRQ enable. Already-linked ROM body, so it
+       adds nothing to the count; it is here because it is the ROM's own next
+       line and the port can run it. It touches bit 3 only, and ntr's HBlank
+       gate reads bit 4 (ntr/runtime.cpp's DISPSTAT_HBLANK_IRQ_ENABLE), so the
+       two do not meet. _Z13func_02019440v in the tail makes the same call again,
+       exactly as the ROM does. */
+    GX_VBlankIntr(1);
+    /* func_0203bbc0() -- REFUSED, and the reason is now measured rather than
+       "Crash()es on a refusal". Its first call, TP_Init, registers the
+       touch/SPI receive callback on PXI channel 6 and comes back fine now that
+       lane IPC claims the channel. What does not come back is the THIRD line:
+       TP_RequestSetStabilityAsync(3, 0x1e) posts two words on channel 6 and sets
+       tpState + 0x36 bit 3, and TP_WaitBusy(8) is nothing but
+           while (*(volatile u16 *)(tpState + 0x36) & mask) ;
+       Only TPi_TpCallback clears that bit, and only for an ARM7 completion whose
+       (msg & 0x7f00) >> 8 is the same bit with (msg & 0xff) == 0.
+       hal/boot2_ipc.cpp holds channel 6 OBSERVED ONLY and its no-driver reply
+       carries the no-handler flag, which TPi_TpCallback turns into a SET of f34
+       rather than a clear of f36 -- so the spin never turns. WHAT IT WANTS is a
+       host ARM7 touch/SPI driver (completions for bit 3 and bit 1, and live
+       samples at 0x027fffaa/0x027fffac), which is a subsystem and not a boot
+       step. Its host-side blocker is real too and belongs to another lane:
+       hal/scene_boot.cpp hosts tpState as int[6], 24 bytes, and the ROM
+       object runs 0x38 -- 0x020a80cc to 0x020a8104, absorbing the dsd name
+       data_020a80e4 at +0x18. */
+    func_0203bb5c();
+    /* _Z13func_0201fec8v() -- the user settings block. Still refused; the blocker
+       is func_0203db64's eight-name wireless run and not data_0209d574, which
+       is sized now. The count is in the header block. */
+    /* _Z13func_02042f68iPh(0xd01, data_0208ee50) -- ARM 1 IS src/func_02060890.c
+       NOW (run linkfull, lane S4CARD), and the line below is the ROM's
+       bring-up itself, not its CARDi_InitCommon two levels down.
+
+       ON A DEFAULT BOOT IT RETURNS AT ONCE, and that is the ROM's order, not a
+       skip: hal/boot_arms.cpp's R2c arm runs _Z13func_02042f68iPh whole inside main's
+       _Z13func_0201a054v seam, before this line and before the first card read of
+       every run (the card reads finish on the thread it creates), so the
+       ROM's own `if (state != 0) return` guard is set by the time this runs.
+       The call stays for SM64DS_ROM_MAIN=0, whose transcribed head reaches no
+       a054 seam: there the same guard lets it bring the card up here -- late
+       for a scene run's reads, which that knob does not serve. The direct
+       CARDi_InitCommon() that stood here would build a second card thread over
+       the same record, so it is gone.
+
+       What follows is the note this line carried while it called
+       CARDi_InitCommon (run link100, lane THREAD; port/slice_gate223.txt),
+       kept for the storage and scheduler evidence.
+
+       THE CHAIN, and where this line sits in it:
+           src/func_0201a054.c    _Z13func_02042f68iPh(0xd01, data_0208ee50)
+             src/func_02042f68.c  arm 1: CARD_Init()      <-- transcribed
+                                  arm 2: CARD_IdentifyBackup(0xd01) <-- skipped
+                                  arm 3: the eight-byte tag copy into
+                                         data_020a4b40        <-- skipped
+               src/func_02060890.c  CARDi_InitCommon()           <-- CALLED HERE
+                                    func_02061138()           <-- skipped
+                                    rom_stat = CARDi_ReadCard  <-- skipped
+
+       WHAT WAS REFUSING IT AND WHO FIXED EACH:
+         the storage    lane GLOBALS. hal/globals_link100.cpp hosts
+                        cardi_common / data_020a81bc / data_020a8760 as ONE
+                        grouped run, 60 + 1444 + 4, so OS_CreateThread's
+                        `base = end - 0x400` and the two guard words it paints
+                        at the ends of that kilobyte land on the ROM's own
+                        bytes. The proof reads both guard words back.
+         the scheduler  run link2's lane THR. "A port that runs the game on ONE
+                        fiber" has not been true since hal/boot2_thread.cpp;
+                        OS_WakeupThreadDirect -> OS_RescheduleThread is a real switch.
+         the creation   THIS LANE. src/func_02058200.c, src/func_02058538.c and
+                        src/func_020581a8.cpp are linked, and
+                        hal/boot2_thread.cpp adopts the record they build.
+         PXI 0xb        run link100's lane IPC. hal/boot2_ipc.cpp claims the
+                        channel at power-on and src/func_0205ba64.c is on
+                        port/slice_gate2ipc.txt, so CARDi_InitCommon's
+                        registration is a real store into FifoRecvCallbackTable[0xb].
+                        Nothing posts on 0xb in this build -- ntr/backup.cpp
+                        faces CARDi_Request and answers the card commands
+                        without the FIFO -- so src/func_02060310.c is linked
+                        (its address is taken) and never called.
+
+       WHY CARDi_InitCommon AND NOT CARD_Init, which is the arm the ROM
+       actually calls. Two of CARD_Init's three statements cannot link:
+         func_02061138()   IRQ::SetIRQHandler(0x100000,
+                           IRQ::GameCardIREQMCHandler) reaches func_020610fc,
+                           which is HAND-ASM (an PXI_SendWordByFifo loop and a deliberate
+                           `b self`) that MSVC cannot assemble, and whose
+                           handler also stores through the absolute address
+                           0x020a89a0. ntr/runtime.cpp's SetIRQHandler drops
+                           mask 0x100000 anyway, so the handler would never be
+                           dispatched.
+         rom_stat = CARDi_ReadCard
+                           the FLASH read path. ntr/backup.cpp: "no call site
+                           in this game reaches it", and rom_stat is
+                           hosted nowhere (ROM span 0x220, next symbol
+                           data_020a89a0).
+       Its seven field writes are not lost: ntr/backup.cpp's PortBackupFill
+       already sets the same object to the same values at start-up (state = 1,
+       f24 = -1, src/dst/len/cbfn/cbarg = 0), and CARDi_InitCommon itself writes
+       the two that matter to the lock -- owner = ~2 and depth = 0 -- along
+       with the command-block pointer, the wait queue and the priority. So the
+       skipped arm's effect is already there and this call adds the thread.
+       (SUPERSEDED, lane S4CARD: both statements link now and run in the R2c
+       arm; ntr/backup.cpp no longer seeds the state word.)
+
+       WHAT IS STILL SKIPPED ABOVE THIS, and it is not threads:
+         CARD_IdentifyBackup(0xd01)  the device identify, blocked on ntr/backup.cpp's
+                               own ROMDATA PROPOSAL -- it reaches
+                               func_02060398, a lookup in the device table at
+                               arm9 .rodata 0x020867bc, and mounting that span
+                               through port/tools/romdata.py makes a ROM-CLEAN
+                               kit emit a ZEROED row, i.e. a save chip of size
+                               0 and a kit that silently cannot save.
+         the tag copy          same file, same reason: it reads
+                               data_0208ee50 ("ds mario"), the other unmounted
+                               .rodata span, and ntr/backup.cpp defines
+                               data_020a4b40 with those eight bytes today. */
+    CARD_Init();
+    /* And the measurement, because a seat that links and never runs reads as
+       progress. No-ops unless SM64DS_THREAD_CREATE_PROOF is set; see
+       hal/thread_create.cpp and port/tools/thread_create_proof.py. */
+    port_thread_create_proof();
+    func_02018aa4();          // FS_Init's once-guard (already tripped) +
+                              // func_02017e60, which clears the twelve
+                              // overlay-resident records at data_0209d3c4
+    func_0203ad84();
+    /* The ROM calls this on both sides of Heap::InitializeGameHeap; this is
+       the first of the two. data_0209d574 is 68 bytes now, its ROM span, so
+       the s64 the tick goes into at +0x38 is inside the object. */
+    func_0201a9fc(data_0209d574);
+    say("game init head (_Z13func_0201a054v)");
+}
+
+// ---------------------------------------------------------------------------
+// src/func_0201a054.c, the span AFTER Heap::InitializeGameHeap(0x3b000, 0):
+//
+//     func_0201a9fc(data_0209d574);
+//     _Z13func_02019440v();
+//     if (!r4) _Z13func_020134c8v();
+//     func_0203b684();
+//     data_020a4bb8 = ACTOR_SPAWN_TABLE;
+//     func_020233f0();
+//     Scene::PrepareToSpawnBoot();
+//     func_020196cc();
+//     data_0209ee90.f44 = 0x100;
+//     *(u32*)0x040004c8 = 0x296a5800; ... (the 3D fog/edge registers)
+//     func_0201a5cc();
+//
+// `data_020a4bb8 = ACTOR_SPAWN_TABLE` is the actor spawn table pointer, which
+// tests/walk_window.cpp already seats on its own line, and
+// Scene::PrepareToSpawnBoot picks the ROM's boot scene (0x168) -- a decision
+// the host boot has already made by this point, so it is not taken back here.
+// ---------------------------------------------------------------------------
+void port_boot_rom_game_init_tail(void)
+{
+    /* the second of _Z13func_0201a054v's two calls, the one after the game heap */
+    func_0201a9fc(data_0209d574);
+    /* THE OTHER HALF OF THE GRAPHICS BRING-UP, run link100 lane BOOT2.
+       func_0203bd24 (empty in the ROM), POWCNT1 again, GX_VBlankIntr(1),
+       GX_SetBankForLCDC(0x1ff) -- which is what turns the VRAM banks
+       GX_InitGXState cleared back on -- 0xa4000 bytes of VRAM zeroed from
+       0x06800000, 0x400 of OAM to 0xc0 and 0x400 of palette to 0, the three
+       stage words, and then _Z13func_0200f4f4v: Initialise3dGraphics(0),
+       GX::SetBankForTex(3), GX::SetBankForTexPltt(0x30), _Z13func_02045d9cv and the
+       IDENTITY_MATRIX4X3 -> data_0209b3ec matrix with its inverse.
+       IT IS SAFE HERE FOR THE SAME REASON GX_Init IS: nothing the port
+       draws has happened yet at this line. tests/walk_window.cpp seeds
+       data_0209b3ec by hand right after port_boot_rom_main_head(); this is the
+       ROM's own writer of the same words and it runs later, so the ROM's value
+       is the one that stands. The 0x06800000 span is sub-engine BG VRAM, which
+       no scene has loaded into by this line. */
+    func_02019440();
+    /* _Z13func_020134c8v() -- the ROM's sound bring-up. STILL REFUSED, and ON ONE
+       REASON RATHER THAN TWO. The thread half is GONE: this line used to say
+       "its closure reaches OS_CreateThread, and hal/boot2_thread.cpp states that
+       thread CREATION is not modelled", and that has not been true since lane
+       THR -- OS_CreateThread is linked (port/slice_gate223.txt) and this file's
+       own header at the _Z13func_020134c8v entry, ~line 215, has said so for as
+       long. The call-site comment was the stale copy; corrected by run link100
+       lane SND1, which had to read both to know which one to believe.
+
+       WHAT STILL REFUSES IT is what BOOT gave first, narrowed by that lane's
+       measurement: _Z13func_020133bcv takes 1MB out of Memory::Allocate and stands
+       the ROM's OWN SDAT player up over it (rung R2), and it opens the archive
+       off the card, which inverts hal/sdat/sdat.cpp's residency pre-seat and
+       root seat (rung R4). Those two are a subsystem decision, held for Tango's
+       word. The pieces below them that are NOT that decision have been taken:
+       the pool, the status block and the channel-7 registration are the ROM's
+       own now (port/slice_snd1.txt, rung R1), driven from
+       hal/sdat/consumer.cpp's sd_sound_init_host rather than from here. */
+    func_0203b684();
+    /* data_020a4bb8 = ACTOR_SPAWN_TABLE -- already seated by the host boot */
+    func_020233f0();
+    /* Scene::PrepareToSpawnBoot() -- picks the ROM boot scene */
+    /* THE FIRMWARE READ AND THE SOUND MODE. SEATED, run link100 lane IPCSEND,
+       and what seats it is one hostgen row rather than anything about this
+       body. src/IPCSend.c is in GATE2IPC_SYMS now (its plain line is commented
+       out of port/slice_gate10.txt), so its `*(volatile unsigned int *)
+       0x4000188 = cmd.raw` reaches ntr::ipc_reg_write instead of latching in
+       the mapped I/O window, and the ARM9 makes real sends for the first time.
+       THE ROUND TRIP, END TO END. PM_GetBackLight -> PMi_ReadRegister ->
+       PMi_ReadRegisterAsync takes the busy flag (PMi_Work = 1), parks
+       PMi_DummyCallback and its argument, and posts (a & 0xff) | 0x3006500 through
+       PMi_SendPxiData -- PXI_SendWordByFifo(8, 0x3006500, 0). ntr/ipc.cpp hands the word to
+       the host ARM7 on the store; hal/boot2_ipc.cpp HOLDS channel 8 with no
+       power-management driver behind it and gives the SDK's own no-handler
+       answer, the word back with bit 5 set; ipc_arm7_send dispatches it INLINE
+       through the ROM's own IRQ::IPCRxFifoNotEmptyHandler, which finds
+       PMi_CommonCallback in FifoRecvCallbackTable[8] and calls it with that flag; and
+       PMi_CommonCallback's first branch is PMi_CallCallbackAndUnlock(2), which clears
+       PMi_Work and hands 2 to the parked callback. So PMi_ReadRegister
+       returns 2, PM_GetBackLight returns 2, and the `== 0` fails. The BOOT2 hang
+       is gone at its cause: PMi_WaitBusy's spin is released before it is even
+       entered.
+       AND THE SKIPPED ARM IS WHERE A REAL DS ENDS UP TOO. It is
+       `if (r == 0 && a == 0) { if (b == 0) data_0208ee3c[0] = 0; }` -- both
+       BACKLIGHTS off, data_0208ee3c being the flag TurnBacklightOn/Off write.
+       A DS running this game has both on, so a != 0 and the arm is skipped
+       there as well. The port's answer is the honest one besides: this host
+       ARM7 really has no PM driver, and saying so is a smaller claim than
+       fabricating a PMIC register value.
+       THE ONE STATE CHANGE IT DOES MAKE is the ROM's own:
+       func_0203b9b4(data_0209d4b8, 0x4d2) puts the arm9 RNG on its boot
+       constant instead of the .bss zero. hal/scene_mg.cpp's RNG note names
+       THIS call as the ROM's boot seeder and its own minigame seeder re-seeds
+       on top of it. SetSoundMode(data_0209d4b4[0]) is SetSoundMode(0) off zero
+       bss -> func_02011d5c(1), which returns at once while gSoundInitialized is
+       still zero this early in the boot. See port/slice_ipcsend.txt. */
+    func_020196cc();
+    func_0201a5cc();
+    say("game init tail (_Z13func_0201a054v)");
+}
+
+// ---------------------------------------------------------------------------
+// src/func_0201a2f8.cpp, THE BOOT WORKER, its ov000 step (run linkfull, lane
+// S4OV0). The ROM's order on a cartridge boot (0x027ffc40 is not 2, which
+// ntr/io.cpp's io_init makes true here as well):
+//
+//     size = FS_TryLoadTable(0, 0); ptr = Memory::Allocate(size);
+//     FS_TryLoadTable(ptr, size);          the file-name tables, cached in RAM
+//     LoadOverlay(&overlay_0);
+//     CapIconMgr_DispatchVs();             ov000's entry          <-- THIS CALL
+//     UnloadOverlay(&overlay_0);
+//     FS_UnloadArchiveTables(FS_FindArchive("rom", 3)); Memory::Deallocate(ptr);
+//     LoadOverlay(&overlay_1);
+//     Sound::LoadInitialGroup(0); LoadFont(0);
+//
+// WHAT THE ENTRY DOES. It allocates the game's ov0 handle table (0x80a u16s,
+// 4116 bytes, off the default heap) and fills it with the file id of each of
+// ov000's 2058 path strings, through the ROM's own FS_ConvertPathToFileID.
+// src/func_02018a24.c reads that table for every file the game asks for by
+// handle. Until this lane the port answered those lookups from
+// build/assets/handles.tsv in a host face (hal/fs.cpp) and never built the
+// table at all; the face is retired on the game targets.
+//
+// WHERE IT RUNS. On the cartridge the boot scene's InitResources starts this
+// worker (func_0201a244, a DS thread) in the first frame of main's loop, so
+// the worker's point is main's last call, after the whole of _Z13func_0201a054v.
+// hal/rom_main.cpp's port_rom_loop_seam IS that call on the port, and it is on
+// every run shape, scene and level alike: after the a054 seam has brought the
+// card thread up (the lookups read the file-name table off the card) and
+// before tests/walk_window.cpp's ov002 static initialisers, which construct
+// SharedFilePtrs by handle and so already need the table. The two transcribed
+// _Z13func_0201a054v spans above run later than this in wall time, on the level
+// path only; the entry reads nothing they set up.
+//
+// WHAT IS CALLED, AND WHAT IS NOT:
+//   the entry        CALLED, by its ov000 name. src/func_0201a2f8.cpp spells the
+//                    call CapIconMgr_DispatchVs (ov000 and ov001 share the base
+//                    0x020aa420 and config/arm9/relocs.txt:2834 cannot tell
+//                    them apart), and that spelling names ov001's bytes. What
+//                    the worker runs at that address is ov000's entry, loaded
+//                    by the line before it.
+//   LoadOverlay(0)   what it makes true is made true here without the loader:
+//                    ov000's code is compiled in (port/slice_w31_s4ov0.txt)
+//                    and its data is the per-symbol mount port/ov000_syms.txt,
+//                    whose patch below puts the table's 2058 pointers onto the
+//                    hosted path strings. The patch writes absolute values, so
+//                    running it on every boot is safe.
+//   the RAM tables   NOT CALLED. FS_TryLoadTable / FS_UnloadArchiveTables only change
+//                    WHERE the 2058 lookups read the file-name table from (RAM
+//                    instead of the card); the ids are the same. The line the
+//                    report prints says what the card route costs here.
+//   the rest         UnloadOverlay(0), LoadOverlay(1), the sound group and the
+//                    font are not this step and nothing about them changes.
+// ---------------------------------------------------------------------------
+void port_boot_rom_worker(void)
+{
+    port_ov000_pack_check();
+    port_ov000_syms_patch();
+    const double t0 = port_ov0_table_clock_ms();
+    InitializeAssetHandleTable();
+    port_ov0_table_report(port_ov0_table_clock_ms() - t0);
+    say("boot worker: ov000's entry built the ov0 handle table "
+        "(func_0201a2f8's ov000 step)");
+}
+
+}  // extern "C"

@@ -1,0 +1,1088 @@
+// DS 2D engine, text-mode backgrounds.
+//
+// Register layout from GBATEK. The address arithmetic is cross-checked against
+// the decomp's own G2::GetBG0ScrPtr, which computes
+//
+//     0x6000000 + ((DISPCNT & 0x38000000) >> 27 << 16) + ((BG0CNT & 0x1f00) >> 8 << 11)
+//
+// i.e. DISPCNT bits 27-29 select a 64K screen-base offset and BGxCNT bits 8-12 a
+// 2K screen block. Those two shifts are the ones most likely to be wrong, so they
+// are taken from code that is byte-verified against the ROM rather than from docs.
+
+#include <vector>
+#include "ntr/ppu.h"
+
+/* for ntr::gx_aa_preimage: the display capture reads the frame as it was
+   before the edge-smoothing pass, never the smoothed one. */
+#include "ntr/gx.h"
+
+#include "ntr/mmio.h"
+
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+namespace ntr {
+
+// ---- THE RUNTIME ACTIVE EXTENT (see ntr/ppu.h) -----------------------------
+//
+// Defaults are the tier's own screen. On NTR_WIDE_RT the framebuffer is the
+// wide maximum but the DEFAULT aspect is 4:3 (the old 2x window's 512x384), so
+// a run that never sets the toggle -- or a tool that links this without wiring
+// the settings key -- is the 4:3 build exactly. configure_aspect() below is
+// the only writer, called once at boot.
+#ifdef NTR_WIDE_RT
+int active_w = 512;
+int active_h = 384;
+#else
+int active_w = SCREEN_W;
+int active_h = SCREEN_H;
+#endif
+#ifdef NTR_WIDE169
+// The fixed-compile 16:9 tier: the wide branches are ALWAYS on, so the runtime
+// flag they now read is true from the start. (NTR_WIDE_RT starts 4:3 and flips
+// this in configure_aspect; every 4:3 tier leaves it false.)
+bool widescreen = true;
+#else
+bool widescreen = false;
+#endif
+
+/* THE WINDOW'S SIZE, and the scale it was chosen at. Both are written once by
+   configure_aspect and read-only afterwards. The defaults are the extent's own
+   defaults above, so a program that never calls configure_aspect -- every
+   smoke, every tool that links this -- answers exactly what it answers for
+   active_w / active_h, which is what it answered before these existed. */
+#ifdef NTR_WIDE_RT
+int g_default_w = 512;
+int g_default_h = 384;
+#else
+int g_default_w = SCREEN_W;
+int g_default_h = SCREEN_H;
+#endif
+int g_render_scale;
+
+int default_active_w(void) { return g_default_w; }
+int default_active_h(void) { return g_default_h; }
+int render_scale(void) { return g_render_scale; }
+
+#ifdef NTR_WIDE_RT
+/* THE DEFAULT BOX, and it is NOT the allocation any more.
+
+   The RenderScale-0 extent is still derived inside the 1024x576 wide maximum
+   this tier shipped with, and these two constants are that box. The buffer
+   grew to 1368x768 so a scaled run has somewhere to draw; the default run's
+   numbers must not follow it, or a settings.json with no RenderScale in it
+   would silently get a different 16:9 picture than the build before this. So
+   the arm below reads DEFAULT_W / DEFAULT_H exactly where it read SCREEN_W /
+   SCREEN_H, token for token, and its answers are the shipped answers at every
+   aspect: 512x384 at 0, 1024x576 at 16:9, 1024x256 at 32:9, 576x576 at 1:1. */
+constexpr int DEFAULT_W = 1024;
+constexpr int DEFAULT_H = 576;
+
+/* The extent a run with no RenderScale gets, which is also the size the window
+   opens at whatever the scale. Lifted out of configure_aspect unchanged. */
+void default_extent(double aspect, int &out_w, int &out_h)
+{
+    if (!(aspect > 0.0)) {
+        // 0, negative, or NaN: the native sentinel. The 4:3 window at the old
+        // 2x size, rendered into the top-left of the wide buffer and presented
+        // at that size -- byte-for-byte the shipped build.
+        out_w = 512;
+        out_h = 384;
+        return;
+    }
+    // Clamp again at the point of use. host_setting_aspect already clamps,
+    // but this is the divide that sizes a framebuffer and it does not get to
+    // trust its caller.
+    if (aspect < 1.0) aspect = 1.0;
+    if (aspect > 4.0) aspect = 4.0;
+    // The largest w:h rectangle that fits the default box. Start full width
+    // and derive the height; if that is taller than the box, the ratio is
+    // narrower than the box's own and the height binds instead. At 1.7777778
+    // the first arm lands exactly on 1024x576, the measured 16:9 tier, with
+    // no rounding at all.
+    int w = DEFAULT_W;
+    int h = (int)(DEFAULT_W / aspect + 0.5);
+    if (h > DEFAULT_H) {
+        h = DEFAULT_H;
+        w = (int)(DEFAULT_H * aspect + 0.5);
+        if (w > DEFAULT_W) w = DEFAULT_W;
+    }
+    // Even extents: several centring and half-screen reads divide by two,
+    // and an odd width there leaves a one-pixel seam for no gain. The
+    // DERIVED side rounds in the direction that keeps the picture no WIDER
+    // than the ratio asked for, so the delivered w:h stays inside the
+    // clamp rather than sliding a hair past it -- 3.0 asked for on this
+    // box is 1024/342 (2.994) and not 1024/340 (3.012). The PINNED side
+    // is already even (both box dimensions are), so its round is a no-op.
+    if (h != DEFAULT_H) h = (h + 1) & ~1;   // width pinned: round height up
+    else                w &= ~1;            // height pinned: round width down
+    if (h > DEFAULT_H) h = DEFAULT_H;
+    if (w < 2) w = 2;
+    if (h < 2) h = 2;
+    out_w = w;
+    out_h = h;
+}
+
+/* The extent a run WITH a RenderScale gets. The height is the anchor and is
+   an exact whole multiple of the DS's 192 rows, so the 2D compositor's sy,
+   the HUD's uniform scale, the stacked sub-screen's scale and the display
+   capture's ry are all exact integers by construction; the width is whatever
+   that height needs for this run's ratio. See ntr/ppu.h for the worked table
+   and for why the height carries the rule. */
+void scaled_extent(double aspect, int scale, int &out_w, int &out_h)
+{
+    int h = scale * 192;
+    int w;
+    if (!(aspect > 0.0)) {
+        // the native sentinel: the DS's own 4:3, so the width is the DS's own
+        // 256 columns at the same multiplier and the picture is exactly square
+        // pixels. scale 2 lands on 512x384, which is the default extent, so
+        // "RenderScale 2 at aspect 0" and "no RenderScale at aspect 0" are the
+        // same picture and not merely the same size.
+        w = scale * 256;
+    } else {
+        if (aspect < 1.0) aspect = 1.0;
+        if (aspect > 4.0) aspect = 4.0;
+        w = (int)(h * aspect + 0.5);
+        w &= ~1;                    // height pinned: round the width down
+        if (w > SCREEN_W) {
+            // THE BUFFER BINDS. A tall scale at an ultrawide ratio asks for
+            // more columns than the allocation has, and the answer is the one
+            // the default box already gives in the same situation: pin the
+            // width and bring the HEIGHT down to hold the ratio the player
+            // asked for, rather than widen the picture past it. The height
+            // stops being a whole 192-multiple here, which is exactly what
+            // happens at those ratios today (1024x256 at 32:9), so no pass
+            // meets a case it has not met before.
+            w = SCREEN_W;
+            h = (int)(SCREEN_W / aspect + 0.5);
+            h = (h + 1) & ~1;       // width pinned: round the height up
+            if (h > SCREEN_H) h = SCREEN_H;
+        }
+    }
+    if (w < 2) w = 2;
+    if (h < 2) h = 2;
+    out_w = w;
+    out_h = h;
+}
+#endif
+
+void configure_aspect(double aspect, int render_scale_key)
+{
+#ifdef NTR_WIDE_RT
+    /* THE SCALE IS SANITISED HERE AS WELL, the rule the aspect follows:
+       host_setting_render_scale has already clamped it, and this is the
+       multiply that sizes a framebuffer, so it does not get to trust its
+       caller. Negative reads as 0, the default, and a scale taller than the
+       buffer comes down to the tallest the buffer holds. */
+    if (render_scale_key < 0) render_scale_key = 0;
+    if (render_scale_key * 192 > SCREEN_H) render_scale_key = SCREEN_H / 192;
+    g_render_scale = render_scale_key;
+    /* ALWAYS COMPUTED, whatever the scale: this is the window's size, and a
+       scaled run opens the same window a default run does. */
+    default_extent(aspect, g_default_w, g_default_h);
+    if (render_scale_key == 0) {
+        active_w = g_default_w;
+        active_h = g_default_h;
+    } else {
+        scaled_extent(aspect, render_scale_key, active_w, active_h);
+    }
+    // "Is this run's picture wider than the DS's 4:3", which is what every
+    // runtime wide branch actually asks. Computed from the extent rather than
+    // stored from the argument, so an Aspect of 1.3333 (a 4:3 ratio written out
+    // longhand) correctly reads as NOT widescreen: there is no frustum to widen.
+    // A SCALED 4:3 run is w = s*256, h = s*192, so w*3 == h*4 at every scale
+    // and a sharper picture is still not a wider one.
+    widescreen = (active_w * 3 != active_h * 4);
+#else
+    // A fixed tier has one aspect and one size; there is nothing to choose.
+    // Kept so callers can invoke it unconditionally.
+    (void)aspect;
+    (void)render_scale_key;
+#endif
+}
+
+// ---- THE PRESENT RECTANGLE (see ntr/ppu.h) ---------------------------------
+//
+// One bool of state and five derivations off it. The bool is written at SCENE
+// BOOT by hal/scene_boot.cpp's port_scene_layout_propose, from the ROM's own
+// IsMinigameActorID, and cleared at the one place a scene is replaced by the
+// adventure without a new process (tests/walk_window.cpp's fall-through).
+// Nothing else writes it and the level path never touches it, so a level run
+// is the run it always was.
+namespace {
+bool g_present_native;
+}
+
+bool present_native(void) { return g_present_native; }
+void set_present_native(bool on) { g_present_native = on; }
+
+// The uniform native scale, the same integer divide the HUD compositor calls
+// `uni`. At least 1, because a picture shorter than 192 host rows would give
+// a zero-width present rectangle and a divide-by-zero downstream.
+int present_w(void)
+{
+    if (!g_present_native) return active_w;
+    const int uni = active_h / 192 > 0 ? active_h / 192 : 1;
+    return 256 * uni;
+}
+
+int present_h(void)
+{
+    if (!g_present_native) return active_h;
+    const int uni = active_h / 192 > 0 ? active_h / 192 : 1;
+    return 192 * uni;
+}
+
+// Centred horizontally, top-anchored vertically, which is exactly where the
+// compositor's pillarbox arm and the sub-screen's pan_x0 already put a
+// full-2D minigame: `margin / 2` across, row 0 down.
+int present_x(void)
+{
+    const int w = present_w();
+    return w >= active_w ? 0 : (active_w - w) / 2;
+}
+
+int present_y(void) { return 0; }
+
+namespace {
+
+// Engine A registers start at 0x4000000, engine B at 0x4001000. Engine B has no
+// DISPCNT char/screen base offset -- those bits are engine A only -- and its BG
+// VRAM and palette live elsewhere.
+struct EngineMap {
+    uint32_t reg_base;
+    uint32_t vram_base;
+    uint32_t pltt_base;
+    bool has_base_offset;
+};
+
+constexpr EngineMap kEngines[2] = {
+    {0x04000000u, 0x06000000u, 0x05000000u, true},
+    {0x04001000u, 0x06200000u, 0x05000400u, false},
+};
+
+inline uint16_t rd16(uint32_t a) { return *reinterpret_cast<volatile uint16_t *>(a); }
+inline uint32_t rd32(uint32_t a) { return *reinterpret_cast<volatile uint32_t *>(a); }
+
+// DS palettes are BGR555.
+inline uint32_t bgr555(uint16_t c) {
+    const uint32_t r = (c >> 0) & 0x1F, g = (c >> 5) & 0x1F, b = (c >> 10) & 0x1F;
+    return 0xFF000000u | ((r << 3 | r >> 2) << 16) | ((g << 3 | g >> 2) << 8)
+           | (b << 3 | b >> 2);
+}
+
+// Text-mode screen sizes, in tiles.
+void text_size(unsigned sz, int &tw, int &th) {
+    tw = (sz & 1) ? 64 : 32;
+    th = (sz & 2) ? 64 : 32;
+}
+
+struct BgConfig {
+    bool enabled;
+    int priority;
+    uint32_t screen;      // tilemap address
+    uint32_t chars;       // tile data address
+    bool bpp8;
+    int tiles_w, tiles_h;
+    int hofs, vofs;
+};
+
+BgConfig read_bg(const EngineMap &em, int bg, uint32_t dispcnt) {
+    BgConfig c{};
+    c.enabled = (dispcnt >> (8 + bg)) & 1;
+    if (!c.enabled) return c;
+
+    const uint16_t cnt = rd16(em.reg_base + 0x08 + bg * 2);
+    c.priority = cnt & 3;
+    c.bpp8 = (cnt >> 7) & 1;
+
+    const uint32_t char_off = em.has_base_offset ? ((dispcnt >> 24) & 7) << 16 : 0;
+    const uint32_t scr_off = em.has_base_offset ? ((dispcnt >> 27) & 7) << 16 : 0;
+
+    c.screen = em.vram_base + scr_off + (((cnt >> 8) & 0x1F) << 11);
+    // FOUR bits of character base, not the GBA's two. The decomp's own
+    // G2S::GetBG0CharPtr is (v & 0x3c) >> 2 << 14, and the game uses base 4 on
+    // the sub screen -- with two bits every engine-B tile fetch lands at base 0.
+    c.chars = em.vram_base + char_off + (((cnt & 0x3c) >> 2) << 14);
+
+    text_size((cnt >> 14) & 3, c.tiles_w, c.tiles_h);
+
+    // BGxHOFS/BGxVOFS are write-only 9-bit scroll registers, 4 bytes per BG.
+    c.hofs = rd16(em.reg_base + 0x10 + bg * 4) & 0x1FF;
+    c.vofs = rd16(em.reg_base + 0x12 + bg * 4) & 0x1FF;
+    return c;
+}
+
+// One text-mode screen entry: tile 0-9, hflip 10, vflip 11, palette 12-15.
+inline uint32_t screen_entry_addr(const BgConfig &c, int tx, int ty) {
+    // 512-wide/tall maps are stored as consecutive 32x32 blocks of 2KB.
+    const int bx = tx >> 5, by = ty >> 5;
+    const int blocks_w = c.tiles_w >> 5;
+    const int block = by * blocks_w + bx;
+    return c.screen + block * 0x800 + (((ty & 31) * 32 + (tx & 31)) * 2);
+}
+
+// Returns false where the background is transparent at this pixel.
+bool sample_bg(const EngineMap &em, const BgConfig &c, int x, int y, uint32_t &out) {
+    const int px = (x + c.hofs) & (c.tiles_w * 8 - 1);
+    const int py = (y + c.vofs) & (c.tiles_h * 8 - 1);
+
+    const uint16_t se = rd16(screen_entry_addr(c, px >> 3, py >> 3));
+    const int tile = se & 0x3FF;
+    int fx = px & 7, fy = py & 7;
+    if (se & 0x400) fx = 7 - fx;
+    if (se & 0x800) fy = 7 - fy;
+
+    uint32_t index;
+    if (c.bpp8) {
+        index = *reinterpret_cast<volatile uint8_t *>(c.chars + tile * 64 + fy * 8 + fx);
+        if (index == 0) return false;
+    } else {
+        const uint8_t pair =
+            *reinterpret_cast<volatile uint8_t *>(c.chars + tile * 32 + fy * 4 + (fx >> 1));
+        index = (fx & 1) ? (pair >> 4) : (pair & 0xF);
+        if (index == 0) return false;
+        index += ((se >> 12) & 0xF) * 16;
+    }
+    out = bgr555(rd16(em.pltt_base + index * 2));
+    return true;
+}
+
+}  // namespace
+
+void ppu_scanout(Engine eng, Framebuffer &fb) {
+    const EngineMap &em = kEngines[eng];
+    const uint32_t dispcnt = rd32(em.reg_base);
+
+    // Display mode 0 is "display off" -- the DS shows white, not black.
+    const unsigned disp_mode = (dispcnt >> 16) & 3;
+    const bool forced_blank = (dispcnt >> 7) & 1;
+    if (disp_mode == 0 || forced_blank) {
+        for (int y = 0; y < active_h; ++y)
+            for (int x = 0; x < active_w; ++x) fb.px[y][x] = 0xFFFFFFFFu;
+        return;
+    }
+
+    BgConfig bgs[4];
+    for (int i = 0; i < 4; ++i) bgs[i] = read_bg(em, i, dispcnt);
+
+    const uint32_t backdrop = bgr555(rd16(em.pltt_base));
+
+    for (int y = 0; y < active_h; ++y) {
+        for (int x = 0; x < active_w; ++x) {
+            uint32_t c = backdrop;
+            // Lower priority value wins; ties break toward the lower BG number,
+            // so walk priorities 3..0 and let later writes overwrite.
+            for (int prio = 3; prio >= 0; --prio) {
+                for (int bg = 3; bg >= 0; --bg) {
+                    if (!bgs[bg].enabled || bgs[bg].priority != prio) continue;
+                    uint32_t s;
+                    if (sample_bg(em, bgs[bg], x, y, s)) c = s;
+                }
+            }
+            fb.px[y][x] = c;
+        }
+    }
+}
+
+// --- OBJ layer --------------------------------------------------------------
+// GBATEK "LCD OBJ": 128 OAM entries per engine; tiles in the engine's OBJ
+// VRAM region, palette at pltt+0x200. Sizes come from the shape/size table.
+// Affine params sit in the filler word of entries group*4+0..3 (pa,pb,pc,pd).
+//
+// OBJ MODE, attribute 0 bits 10-11. GBATEK: 0 Normal, 1 Semi-Transparent,
+// 2 OBJ Window, 3 Prohibited (the DS reuses 3 for bitmap OBJs). The decomp's
+// own OAM::Render pins the field position independently -- it composes the
+// word as `(mode << 10) | (mosaic << 12)` in
+// src/_ZN3OAM6RenderEbP7OamAttriiii5Fix12IiEi.c, and the sibling TU's bitfield
+// `yb:8, objMode:2, mode:2, mosaic:1, ...` puts the same two bits at 10-11
+// (that TU's `objMode` name is bits 8-9, the affine/double-size pair, which is
+// a naming collision between the two TUs and not a disagreement).
+//
+// THIS CODE USED TO SKIP MODE 3 AND CALL IT "the OBJ window". That is the wrong
+// mode: mode 3 is the prohibited/bitmap encoding and mode 2 is the window. The
+// effect of the mix-up is that an OBJ-window sprite -- which on hardware is
+// INVISIBLE and contributes only a mask -- was drawn as an ordinary opaque
+// sprite, painting the mask shape onto the screen. Nothing in the port's
+// measured runs uses either mode (port/ppu_gap_audit.txt: zero mode-1, mode-2
+// and mode-3 objects across 1200 sampled frames of level 1 and scene 4), so
+// this is a latent contract error rather than a visible regression, and it is
+// corrected here rather than left for whatever first uses the mode.
+//
+// This file has no window unit, so a mode-2 sprite cannot contribute its mask
+// here. Not drawing it is still the closer answer of the two: on hardware it
+// does not appear in the image either way.
+/* ENGINE A's OAM SOURCE OVERRIDE, for a host-side seam mode. The port composites
+   the top screen BEFORE this frame's OAM::Load and scans the bottom screen
+   after it, so the two screens are one frame apart -- a deliberate trade
+   everywhere else, but with the screens butted edge to edge a falling object
+   loses one frame of travel at the seam and reads one pixel short while it
+   straddles. When that mode is engaged, hal/screen_gap.cpp points this at the
+   game's own working shadow (the block Load is ABOUT to upload), so the top
+   screen draws the same frame the bottom will. Zero everywhere else, which
+   is the hardware OAM and the behaviour every level has always had. */
+static uint32_t g_oam_src_a;
+}  // namespace ntr
+namespace ntr {
+void ppu_obj_oam_source_a(uint32_t addr) { g_oam_src_a = addr; }
+
+void ppu_scanout_obj(Engine eng, Framebuffer &fb) {
+    static const int kSizes[3][4][2] = {
+        {{8, 8}, {16, 16}, {32, 32}, {64, 64}},    // square
+        {{16, 8}, {32, 8}, {32, 16}, {64, 32}},    // wide
+        {{8, 16}, {8, 32}, {16, 32}, {32, 64}},    // tall
+    };
+    const uint32_t oam_base =
+        eng == ENGINE_A ? (g_oam_src_a ? g_oam_src_a : 0x07000000u)
+                        : 0x07000400u;
+    const uint32_t obj_vram = eng == ENGINE_A ? 0x06400000u : 0x06600000u;
+    const uint32_t obj_pltt = kEngines[eng].pltt_base + 0x200u;
+    // DISPCNT bit 4: OBJ 1D mapping; bits 20-21: tile-index boundary shift.
+    const uint32_t dispcnt = rd32(kEngines[eng].reg_base);
+    const uint32_t boundary = 32u << ((dispcnt >> 20) & 3);
+    // BIT 4, 1 = one-dimensional (a sprite's tiles are consecutive), 0 = two-
+    // dimensional (OBJ VRAM is a 32-tile-wide matrix and the next row of a
+    // sprite is 32 slots on). THIS READER USED TO HARD-CODE 1D, and on the DS
+    // that is the mode the game almost never leaves the engine in:
+    // Scene::ResetHardwareRegisters ANDs 0xffcfffef into both engines' DISPCNT,
+    // which clears bit 4 along with the boundary field, and nothing on the
+    // scene paths sets it back (GX::SetGraphicsMode preserves bit 4 -- its mask
+    // is 0xfff0fff0 -- and its third argument only ever reaches bit 3).
+    // Measured on scene 374: DISPCNT_A 00001400 / 00007400 on all 300 samples,
+    // bit 4 CLEAR. ntr/ppu_sub.cpp has read the bit since the sub screen's
+    // bring-up; this is engine A catching up, and the two now compute the slot
+    // the same way.
+    const bool map1d = (dispcnt >> 4) & 1;
+
+    for (int i = 127; i >= 0; --i) {           // low index on top: draw high first
+        const uint16_t a0 = rd16(oam_base + i * 8u);
+        const uint16_t a1 = rd16(oam_base + i * 8u + 2);
+        const uint16_t a2 = rd16(oam_base + i * 8u + 4);
+        /* SM64DS_OAMAGE_TRACE=1: one line per bob-omb entry, naming the table
+           this raster read and the row it held. Temporary owner-pass probe. */
+        {
+            static int aget = -1;
+            if (aget < 0) {
+                const char *e = std::getenv("SM64DS_OAMAGE_TRACE");
+                aget = e && *e && *e != '0';
+            }
+            static unsigned af;
+            if (aget && i == 127) ++af;
+            if (aget && a2 == 0x1010)
+                std::fprintf(stderr, "[oamage] A f%u src=%08x slot%d y=%d\n",
+                             af, (unsigned)oam_base, i, (int)(a0 & 0xff));
+        }
+        const bool affine = a0 & 0x100;
+        if (!affine && (a0 & 0x200)) continue;             // disabled
+        const unsigned objmode = (a0 >> 10) & 3;
+        if (objmode == 2) continue;   // OBJ window: a mask, never drawn
+        if (objmode == 3) continue;   // bitmap OBJ: not hosted
+        const int shape = (a0 >> 14) & 3;
+        if (shape == 3) continue;
+        const int size = (a1 >> 14) & 3;
+        const int w = kSizes[shape][size][0], h = kSizes[shape][size][1];
+        const bool dbl = affine && (a0 & 0x200);
+        const int bw = dbl ? w * 2 : w, bh = dbl ? h * 2 : h;
+        int x = a1 & 0x1FF, y = a0 & 0xFF;
+        if (x >= 256) x -= 512;
+        if (y >= 192 && y >= 256 - bh) y -= 256;
+        const bool c256 = a0 & 0x2000;
+        const bool hflip = !affine && (a1 & 0x1000);
+        const bool vflip = !affine && (a1 & 0x2000);
+        const uint32_t tile = a2 & 0x3FF;
+        const uint32_t pal = (a2 >> 12) & 0xF;
+
+        int pa = 256, pb = 0, pc = 0, pd = 256;
+        if (affine) {
+            const int grp = (a1 >> 9) & 0x1F;
+            pa = (int16_t)rd16(oam_base + (grp * 4 + 0) * 8u + 6);
+            pb = (int16_t)rd16(oam_base + (grp * 4 + 1) * 8u + 6);
+            pc = (int16_t)rd16(oam_base + (grp * 4 + 2) * 8u + 6);
+            pd = (int16_t)rd16(oam_base + (grp * 4 + 3) * 8u + 6);
+        }
+
+        for (int sy = 0; sy < bh; ++sy) {
+            const int py = y + sy;
+            if (py < 0 || py >= active_h) continue;
+            for (int sx = 0; sx < bw; ++sx) {
+                const int px = x + sx;
+                if (px < 0 || px >= active_w) continue;
+                // texel coordinate: affine maps through the matrix around the
+                // box center; plain is direct with optional flips.
+                int tx, ty;
+                if (affine) {
+                    const int cx = sx - bw / 2, cy = sy - bh / 2;
+                    tx = ((pa * cx + pb * cy) >> 8) + w / 2;
+                    ty = ((pc * cx + pd * cy) >> 8) + h / 2;
+                    if (tx < 0 || tx >= w || ty < 0 || ty >= h) continue;
+                } else {
+                    tx = hflip ? w - 1 - sx : sx;
+                    ty = vflip ? h - 1 - sy : sy;
+                }
+                const int tcol = tx >> 3, trow = ty >> 3;
+                const int fx = tx & 7, fy = ty & 7;
+                // Where this 8x8 cell lives, in 32-byte tile slots from the
+                // sprite's base. 1D: consecutive, and a 256-colour cell is two
+                // slots. 2D: a 32-slot-wide matrix, and a 256-colour cell is
+                // two slots wide within it.
+                const uint32_t slot =
+                    map1d ? (uint32_t)(trow * (w / 8) + tcol) * (c256 ? 2u : 1u)
+                          : (uint32_t)(trow * 32 + (c256 ? tcol * 2 : tcol));
+                const uint32_t cell = obj_vram + tile * boundary + slot * 32u;
+                uint32_t index;
+                if (c256) {
+                    index = *reinterpret_cast<volatile uint8_t *>(cell + fy * 8u + fx);
+                    if (!index) continue;
+                    fb.px[py][px] = bgr555(rd16(obj_pltt + index * 2u));
+                } else {
+                    const uint8_t b =
+                        *reinterpret_cast<volatile uint8_t *>(cell + fy * 4u + fx / 2);
+                    index = (fx & 1) ? (b >> 4) : (b & 0xF);
+                    if (!index) continue;
+                    fb.px[py][px] = bgr555(rd16(obj_pltt + (pal * 16u + index) * 2u));
+                }
+            }
+        }
+    }
+}
+
+/* THE BMP WRITER IS PARAMETRIC ON SIZE, and ppu_write_bmp is it at the
+   framebuffer's. It was written inline against SCREEN_W and SCREEN_H, which
+   was right while the framebuffer was the only image the port ever dumped.
+   The stacked presentation (ntr/ppu_sub.cpp) is a second image and it is
+   twice as tall, so the size moved into arguments rather than being spelled a
+   second time somewhere else. At w = SCREEN_W, h = SCREEN_H every byte this
+   writes is the byte the old body wrote: same header fields, same bottom-up
+   row order, same 4-byte row padding, same BGR triple. */
+bool ppu_write_bmp_px(const char *path, const uint32_t *px, int w, int h) {
+    if (!px || w <= 0 || h <= 0) return false;
+    std::FILE *f = std::fopen(path, "wb");
+    if (!f) return false;
+
+    const uint32_t stride = (uint32_t)w * 3;
+    const uint32_t pad = (4 - (stride & 3)) & 3;
+    const uint32_t img = (stride + pad) * (uint32_t)h;
+    const uint32_t off = 54;
+
+    uint8_t hdr[54] = {};
+    hdr[0] = 'B'; hdr[1] = 'M';
+    const uint32_t total = off + img;
+    std::memcpy(hdr + 2, &total, 4);
+    std::memcpy(hdr + 10, &off, 4);
+    const uint32_t dib = 40;
+    std::memcpy(hdr + 14, &dib, 4);
+    const int32_t bw = w, bh = h;
+    std::memcpy(hdr + 18, &bw, 4);
+    std::memcpy(hdr + 22, &bh, 4);
+    const uint16_t planes = 1, bpp = 24;
+    std::memcpy(hdr + 26, &planes, 2);
+    std::memcpy(hdr + 28, &bpp, 2);
+    std::memcpy(hdr + 34, &img, 4);
+    std::fwrite(hdr, 1, sizeof hdr, f);
+
+    // ONE WRITE A ROW (run after093, lane SMOOTHTAGS1): the same bytes, but a
+    // 3-byte fwrite per pixel cost tens of milliseconds a picture, which made a
+    // SmoothMotion picture dump starve the very pictures it was recording.
+    std::vector<uint8_t> line((size_t)stride + pad, 0);
+    for (int y = h - 1; y >= 0; --y) {                 // BMP rows run bottom-up
+        const uint32_t *row = px + (size_t)y * (size_t)w;
+        uint8_t *o = line.data();
+        for (int x = 0; x < w; ++x) {
+            const uint32_t c = row[x];
+            o[0] = static_cast<uint8_t>(c);
+            o[1] = static_cast<uint8_t>(c >> 8);
+            o[2] = static_cast<uint8_t>(c >> 16);
+            o += 3;
+        }
+        std::fwrite(line.data(), 1, line.size(), f);
+    }
+    std::fclose(f);
+    return true;
+}
+
+bool ppu_write_bmp(const char *path, const Framebuffer &fb) {
+    // A frame held on the graphics card (run cardfull, lane CARD2) is only its
+    // 2D in the framebuffer: read the 3D back first, so a dump is the picture.
+    gx_card_settle_fb(const_cast<Framebuffer &>(fb), "a picture dump");
+    // The framebuffer's live image is active_w x active_h. On every fixed tier
+    // (and on NTR_WIDE_RT with the toggle on) that equals the row stride, so the
+    // buffer is already tight and this is the byte-identical old call.
+    if (active_w == SCREEN_W)
+        return ppu_write_bmp_px(path, &fb.px[0][0], active_w, active_h);
+    // NTR_WIDE_RT, 4:3 toggle: the picture is narrower than the SCREEN_W stride,
+    // so pack the active rows tight before the writer (which assumes stride ==
+    // width) sees them.
+    //
+    // ON THE HEAP, AND ALLOCATED THE FIRST TIME A BMP IS WRITTEN, for the
+    // reason the raster buffers in ntr/gx.cpp moved there: this image is 4
+    // bytes a pixel of the whole allocation, the host image has to end below
+    // 0x02000000 because ntr/io.cpp reserves the DS's main RAM there, and a
+    // debug dump has no business spending 4 MB of that ceiling in every run
+    // that never writes one. Never freed: a program that wrote one BMP
+    // usually writes a hundred.
+    static uint32_t *packed;
+    if (!packed) {
+        packed = (uint32_t *)std::calloc((size_t)SCREEN_W * SCREEN_H, 4);
+        if (!packed) {
+            std::fprintf(stderr, "ppu_write_bmp: no memory for the %dx%d "
+                         "packing buffer; %s not written\n",
+                         active_w, active_h, path);
+            return false;
+        }
+    }
+    for (int y = 0; y < active_h; ++y)
+        std::memcpy(packed + (size_t)y * active_w, fb.px[y], (size_t)active_w * 4);
+    return ppu_write_bmp_px(path, packed, active_w, active_h);
+}
+
+// ---- THE DISPLAY CAPTURE UNIT ----------------------------------------------
+//
+// See ntr/ppu.h for the register decode and for what is and is not modelled.
+// Everything here is GBATEK's DISPCAPCNT and VRAM control tables.
+
+namespace {
+
+constexpr uint32_t kDispCapCnt = 0x04000064u;
+constexpr uint32_t kVramCnt = 0x04000240u;   // A..G at +0..+6, H at +7, I at +8
+constexpr uint32_t kLcdcBase = 0x06800000u;  // block N at +N*0x20000
+constexpr uint32_t kBankSize = 0x20000u;     // 128 KB, banks A..D
+
+// What the last capture put in each block, so ppu_vram_publish knows the one
+// range worth carrying. `len` 0 means this block has never been captured into,
+// which is every block in every scene that never programs the unit.
+struct CapRegion {
+    uint32_t off;    // bytes from the start of the bank
+    uint32_t len;    // bytes written
+    uint32_t home0;  // where the block was visible when it was captured into (MENUS093C)
+};
+CapRegion g_cap[4];
+
+// The home each captured block was last seen at, so a change can be noticed.
+// 0 is "not established yet" and the first publish pass only records.
+uint32_t g_home[4];
+int g_home_have[4];
+
+// One-shot refusals. A picture that quietly comes out of an unmodelled corner
+// is worse than one that does not come out at all, so each corner says its
+// piece once and then stops.
+int g_said_srcb, g_said_notlcdc;
+
+/* THE BLOCK'S OWN STORAGE. The capture unit has its own port into VRAM and
+   writes the BLOCK, not a mapping of it, so the destination is the LCDC-space
+   address whatever the bank's VRAMCNT currently says. */
+inline uint32_t lcdc_addr(unsigned block) {
+    return kLcdcBase + (uint32_t)block * kBankSize;
+}
+
+/* WHERE A BANK IS VISIBLE RIGHT NOW, per GBATEK's VRAM control table, for the
+   two banks the capture path uses and the two MSTs it uses them in. Returns 0
+   for "nowhere a reader in this program looks", which covers a disabled bank,
+   an ARM7 allocation and a texture slot alike -- all three are correct answers
+   of the same kind: nothing here reads that. */
+/* SM64DS_BANK_A_BG_OFF=1: the captured block is left where it landed when it becomes engine A's BG memory (the 0.9.2 behaviour) */
+inline bool bank_a_bg_off() {
+    static const bool v = std::getenv("SM64DS_BANK_A_BG_OFF") != nullptr;
+    return v;
+}
+
+uint32_t bank_home(unsigned block, uint8_t cnt) {
+    if (!(cnt & 0x80)) return 0;             // disabled
+    const unsigned mst = cnt & 7;
+    if (mst == 0) return lcdc_addr(block);   // LCDC, every bank
+    /* MENUS093C (D23): VRAM-A..D as engine A's BG memory (MST 1, OFS bits 3-4 pick the 128 KB slot). The title's drawing page maps the bank the face
+       frame was captured into as BG VRAM and reads it as a direct-colour bitmap (BG3): that is the held frame under the page's fading paper. */
+    if (mst == 1 && !bank_a_bg_off()) return 0x06000000u + (uint32_t)((cnt >> 3) & 3) * kBankSize;   // VRAM-A..D -> engine A BG
+    if (block == 2 && mst == 4) return 0x06200000u;   // VRAM-C -> engine B BG
+    if (block == 3 && mst == 4) return 0x06600000u;   // VRAM-D -> engine B OBJ
+    /* Every other MST is a real answer of the same kind -- an ARM7 allocation,
+       a texture slot, an engine A window -- and no reader on the capture path
+       looks at any of them. Silent, because there is nothing wrong with it: a
+       captured block sitting where nothing reads it is the ordinary state of
+       three blocks out of four. */
+    return 0;
+}
+
+}  // namespace
+
+/* ---- WHAT A BANK'S CONTENT IS, WHEN THE WINDOWS ARE FLAT (run hunt8, MGFLASH1)
+ *
+ * This port keeps ONE flat copy of each engine's VRAM window (0x06200000 for
+ * engine B BG, 0x06600000 for engine B OBJ) and the bank mapping only decides
+ * which captured block is carried into it. On the DS the windows are views of
+ * banks, and the dual-screen 3D minigames (Trampoline Time 384, Trampoline
+ * Terror 385, Bounce and Pounce 373, and 372) depend on two things that a
+ * single flat window cannot hold at once:
+ *
+ *   1. BANK I IS THE PAUSE MENU'S OWN STORAGE. src/minigames/d_s_mg_d3d_base.cpp
+ *      Virtual7C (slot 31) maps bank I as engine B OBJ (GX::SetBankForSubOBJ
+ *      (0x100) writes VRAMCNT_I = 0x82), loads the language's menu picture at
+ *      0x06600000 and 0x06602000, and maps the previous owner back. Bank I
+ *      keeps that picture while it is unmapped. OnAimedAtWithEgg (slot 29) maps
+ *      it again when the player pauses and the three buttons are drawn from it.
+ *      The capture publish below used to carry the last captured frame over the
+ *      same 0x06600000 window every other frame (bank D's home), so by the time
+ *      the player paused the window held a captured picture read as tiles: the
+ *      striped garbage where CONTINUE / QUIT / OPTIONS belong.
+ *   2. A CAPTURED BLOCK ONLY MATTERS TO THE SCENE THAT CAPTURED IT. Every scene
+ *      starts with Scene::ResetHardwareRegisters, which writes DISPCAPCNT =
+ *      0x80000000 (the enable bit, every field zero) and nothing else in the game
+ *      writes that exact word. The bookkeeping below was never cleared, so the
+ *      Rec Room reached from such a minigame mapped banks C and D to its own
+ *      engine B BG and OBJ (VRAMCNT 0x84 / 0x84) and the first publish after
+ *      that carried the minigame's last two captured frames over its tiles.
+ *
+ * So: the first 0x4000 bytes of the OBJ window are saved before the first
+ * capture is carried over them (that is the menu picture Virtual7C wrote, and
+ * the only thing the ROM puts there that this publish does not), and put back
+ * while bank I owns the window; and the bookkeeping is dropped at a scene
+ * boot. Neither changes a scene that never programs the capture unit. */
+namespace {
+constexpr uint32_t kObjWindow = 0x06600000u;
+constexpr uint32_t kBankIBytes = 0x4000u;   // bank I is 16 KB
+constexpr unsigned kVramCntI = 9;           // VRAMCNT_H is +8, VRAMCNT_I +9
+uint8_t g_bank_i[kBankIBytes];
+int g_bank_i_have;                          // g_bank_i holds bank I's content
+int g_bank_i_home;                          // bank I is engine B OBJ right now
+
+void capture_forget(void) {
+    for (unsigned b = 0; b < 4; ++b) {
+        g_cap[b].len = 0;
+        g_home_have[b] = 0;
+        g_home[b] = 0;
+    }
+    g_bank_i_have = 0;
+    g_bank_i_home = 0;
+}
+}  // namespace
+
+void ppu_vram_publish(void) {
+    /* A SCENE BOOT (see 2 above): drop what the last scene captured. Read
+       before anything else because this is the frame the new scene's banks are
+       mapped on, and ppu_display_capture clears the enable bit at the end of
+       this same frame. */
+    if (*reinterpret_cast<volatile uint32_t *>(kDispCapCnt) == 0x80000000u) {
+        if (std::getenv("SM64DS_CAP_TRACE")) std::fprintf(stderr, "[captrace] scene boot forget\n");
+        capture_forget();
+    }
+
+    /* BANK I OWNS THE OBJ WINDOW (VRAMCNT_I = 0x82, engine B OBJ at 0x06600000):
+       put its content back. Only once the menu picture has been saved. */
+    const uint8_t ci = *reinterpret_cast<volatile uint8_t *>(kVramCnt + kVramCntI);
+    const int i_home = (ci == 0x82) ? 1 : 0;
+    if (i_home != g_bank_i_home) {
+        if (i_home && g_bank_i_have)
+            std::memcpy(reinterpret_cast<void *>(kObjWindow), g_bank_i, kBankIBytes);
+        else if (!i_home && g_bank_i_have)
+            std::memcpy(g_bank_i, reinterpret_cast<const void *>(kObjWindow), kBankIBytes);
+        g_bank_i_home = i_home;
+    }
+
+    for (unsigned b = 0; b < 4; ++b) {
+        if (!g_cap[b].len) continue;         // never captured into
+        const uint8_t cnt = *reinterpret_cast<volatile uint8_t *>(kVramCnt + b);
+        const uint32_t home = bank_home(b, cnt);
+        if (std::getenv("SM64DS_CAP_TRACE")) { static uint32_t lc[4]; if (lc[b] != (uint32_t)cnt + 1 + ((uint32_t)g_home_have[b] << 8)) { lc[b] = (uint32_t)cnt + 1 + ((uint32_t)g_home_have[b] << 8); std::fprintf(stderr, "[captrace] publish block %u cnt %02x home %08x had %d recorded %08x\n", b, (unsigned)cnt, (unsigned)home, g_home_have[b], (unsigned)g_home[b]); } }
+        if (!g_home_have[b]) {
+            /* THE FIRST PASS ONLY RECORDS. The capture that made this block
+               interesting has just landed at the LCDC address, which is where
+               a reader would find it anyway while the bank is still there, so
+               there is nothing to carry yet. */
+            g_home_have[b] = 1;
+            g_home[b] = home;
+            /* MENUS093C (D23): the bank was LCDC when it was captured into and is already engine A BG memory by the first pass (the drawing page
+               maps it the frame after): the captured frame has to be in that window, as it is on the DS */
+            if (home && home != g_cap[b].home0 && (home & 0xFFF80000u) == 0x06000000u && !bank_a_bg_off())
+                std::memcpy(reinterpret_cast<void *>(home + g_cap[b].off),
+                            reinterpret_cast<const void *>(lcdc_addr(b) + g_cap[b].off), g_cap[b].len);
+            continue;
+        }
+        if (home == g_home[b]) continue;
+        g_home[b] = home;
+        if (!home) continue;                 // nowhere this program reads
+        if (home == lcdc_addr(b)) continue;  // the bytes are already there
+        /* the window is about to be overwritten with a captured frame: what
+           the ROM put in bank I's first 16 KB is the one thing in it worth
+           keeping, and it is saved once, here, the first time */
+        if (home == kObjWindow && !g_bank_i_have && !g_bank_i_home) {
+            std::memcpy(g_bank_i, reinterpret_cast<const void *>(kObjWindow), kBankIBytes);
+            g_bank_i_have = 1;
+        }
+        std::memcpy(reinterpret_cast<void *>(home + g_cap[b].off),
+                    reinterpret_cast<const void *>(lcdc_addr(b) + g_cap[b].off),
+                    g_cap[b].len);
+    }
+}
+
+/* ---- WHAT THE CAPTURE UNIT ACTUALLY DID (run hd2, lane PIC) --------------
+ * Four numbers, so the edge-smoothing pass's promise can be CHECKED rather
+ * than believed. The promise is that the picture this game reads back off its
+ * own top screen is the same with the AntiAliasing setting on as with it off,
+ * and it is kept by capturing the PRE-SMOOTHING copy of the frame (ntr/gx.h,
+ * gx_aa_preimage) -- never by deciding when the pass is allowed to run.
+ *
+ * SO THE TWO TO READ TOGETHER ARE `performed` AND `from_preimage`: with the
+ * setting on they must be EQUAL. A capture that read the live framebuffer
+ * instead is, exactly, a frame on which the game saw the setting. `refused`
+ * is the frames the unit was armed on and turned away for one of its own
+ * reasons, which in this game is almost always
+ * Scene::ResetHardwareRegisters' write naming a block that is not in LCDC.
+ *
+ * THE HASH IS THE OTHER HALF. The counts say the right buffer was read;
+ * hashing every captured buffer, in capture order, says the bytes in it are
+ * the same bytes either way. It is FNV-1a over exactly the halfwords written
+ * into VRAM, so two runs agree only if every captured pixel of every captured
+ * frame agrees.
+ *
+ * They cost three increments and one multiply per captured pixel on the
+ * capture path only, which is at most 49152 pixels on the frames this game
+ * actually captures, and nothing at all on a frame that captures nothing. */
+unsigned long long g_cap_performed;   /* frames a capture was written on */
+unsigned long long g_cap_refused;     /* frames armed but not written */
+/* Of the captures performed, how many read the pre-smoothing copy of the frame
+   rather than the live framebuffer. With AntiAliasing on this has to equal
+   g_cap_performed exactly: a capture that read the live framebuffer is a frame
+   the game saw the setting on. With the setting off it is 0. */
+unsigned long long g_cap_from_preimage;
+/* FNV-1a's 64-bit offset basis, 0xcbf29ce484222325. A run that captures
+   nothing prints exactly this, which is how a reader tells "no capture
+   happened" from "a capture happened and hashed to something". */
+unsigned long long g_cap_hash = 14695981039346656037ull;
+
+void ppu_capture_counters(unsigned long long &performed,
+                          unsigned long long &refused,
+                          unsigned long long &hash,
+                          unsigned long long &from_preimage) {
+    performed = g_cap_performed;
+    refused = g_cap_refused;
+    hash = g_cap_hash;
+    from_preimage = g_cap_from_preimage;
+}
+
+}  // namespace ntr
+extern "C" void port_caphr_keep(const uint32_t *src, int stride, int x0, int w, int h, int rx, int ry, int cx0, int cy0, unsigned block);
+namespace ntr {
+
+void ppu_display_capture(const uint32_t *src, int w, int h) {
+    volatile uint32_t *reg = reinterpret_cast<volatile uint32_t *>(kDispCapCnt);
+    const uint32_t cap = *reg;
+    if (!(cap & 0x80000000u)) return;
+
+    /* THE ENABLE BIT IS CLEARED HERE AND UNCONDITIONALLY, before any decision
+       about whether the capture can be performed. The hardware clears it at the
+       end of the captured frame whatever it captured, and a unit that only
+       cleared it on the paths it understood would spin on the ones it did
+       not. */
+    *reg = cap & ~0x80000000u;
+
+    const unsigned source = (cap >> 29) & 3;
+    if (source != 0) {
+        if (!g_said_srcb) {
+            g_said_srcb = 1;
+            std::fprintf(stderr,
+                         "  [capture] DISPCAPCNT %08x selects capture source "
+                         "%u (B, or A and B blended). Only source A -- engine "
+                         "A's own output -- is modelled, because it is the only "
+                         "one anything in this game programs. Nothing is "
+                         "captured this frame.\n", cap, source);
+            std::fflush(stderr);
+        }
+        ++g_cap_refused;
+        return;
+    }
+    if (!src || w <= 0 || h <= 0) { ++g_cap_refused; return; }
+
+    /* FIELDUI1 (U6): A SCENE PRESENTED NATIVELY IS ONLY THE CENTRED 4:3 RECTANGLE OF A WIDE FRAME. The held frame the title's face page leaves
+       under the drawing page (gx.cpp bgbmp, nearest-sampled back into that same rectangle) used to be a capture of the WHOLE wide frame, so
+       it came back squeezed to 3/4 across (a tall face, a narrow paper with grey bars). The unit now samples the rectangle the scene is
+       drawn in, which on every 4:3 extent is the whole frame (no change there). */
+    int cap_x0 = 0;
+    if (g_present_native && present_w() < w) {
+        cap_x0 = present_x();
+        w = present_w();
+        if (present_h() < h) h = present_h();
+    }
+
+    const unsigned block = (cap >> 16) & 3;
+
+    /* ---- THE DESTINATION HAS TO BE A BLOCK ---------------------------------
+     *
+     * The capture unit writes a VRAM BLOCK, and a bank is only reachable as a
+     * block while it is allocated to LCDC; once its VRAMCNT hands it to an
+     * engine or to the texture unit it is that unit's memory. Every capture
+     * this game asks for on purpose arranges exactly that first: both
+     * dScMgD3DBase_c arms call GX_SetBankForLCDC -- which is GX_VRAMCNT_SetLCDC_, writing
+     * VRAMCNT = 0x80 -- on the destination bank in the same breath as they arm
+     * the register.
+     *
+     * THE ONE WRITE THAT DOES NOT is Scene::ResetHardwareRegisters', and it is
+     * why this is a test rather than a note. It writes DISPCAPCNT = 0x80000000
+     * -- the enable bit with every field zero, so a 128x128 capture into block
+     * 0 at offset 0 -- and it runs at the top of every scene in the game. Block
+     * 0 is VRAM-A, and this port maps TEXTURE SLOT 0 at 0x06800000
+     * (ntr/gx.cpp's TEX_SLOT_BASE), so honouring it unconditionally writes
+     * 32 KB of downsampled framebuffer over the first texture slot on the first
+     * frame of every scene.
+     *
+     * HONEST SCOPING, because this is the one corner of the unit that is not
+     * simply transcribed. The field layout, the auto-clear and the source
+     * selection are GBATEK's and are reproduced as written. Whether the
+     * hardware performs a capture into a bank that is NOT in LCDC is a question
+     * GBATEK did not settle for this lane. The conservative reading is taken --
+     * the destination must be a block -- for three reasons: it is what the
+     * doc's own framing of a "VRAM write block" says; nothing in this ROM ever
+     * asks for the other behaviour deliberately; and the two readings differ
+     * observably in exactly one place, a 32 KB corruption of texture memory
+     * that no ROM can have been written to rely on. Said once on stderr so the
+     * choice is visible in any run that meets it. */
+    const uint8_t dcnt = *reinterpret_cast<volatile uint8_t *>(kVramCnt + block);
+    if ((dcnt & 0x87) != 0x80) {
+        if (!g_said_notlcdc) {
+            g_said_notlcdc = 1;
+            std::fprintf(stderr,
+                         "  [capture] DISPCAPCNT %08x names VRAM block %u, "
+                         "whose VRAMCNT is %02x: it is not allocated to LCDC, "
+                         "so it is not a block right now and nothing is "
+                         "captured into it. (Scene::ResetHardwareRegisters "
+                         "writes 0x80000000 at every scene boot; that names "
+                         "block 0, where this port maps texture slot 0.)\n",
+                         cap, block, dcnt);
+            std::fflush(stderr);
+        }
+        ++g_cap_refused;
+        return;
+    }
+
+    /* bits 20-21. Width is 256 except at size 0, which is the square one. */
+    static const int kW[4] = {128, 256, 256, 256};
+    static const int kH[4] = {128, 64, 128, 192};
+    const unsigned size = (cap >> 20) & 3;
+    const int cw = kW[size], ch = kH[size];
+
+    const uint32_t off = ((cap >> 18) & 3) * 0x8000u;
+    const uint32_t need = (uint32_t)cw * (uint32_t)ch * 2u;
+    if (off + need > kBankSize) {            // would run off the end of the bank
+        ++g_cap_refused;
+        return;
+    }
+
+    /* NEAREST, not averaged; see the note in ntr/ppu.h. The ratio is a whole
+       number at every 4:3 extent the port can be configured at, because
+       configure_aspect anchors a scaled height on a whole multiple of 192 and
+       the native-sentinel width on the same multiple of 256. */
+    const int rx = w / SUB_W, ry = h / SUB_H;
+
+    /* THE FIRST CAPTURE SAYS WHAT IT IS, once, on stderr. This unit is the
+       whole basis of the four dual-screen minigames -- the game READS the
+       picture it writes -- and it is also the one place the render extent
+       reaches a buffer the GAME consumes rather than a buffer the player
+       looks at. So a run that performs a capture states the extent it
+       sampled and the whole-number ratio it sampled at, which is what turns
+       "the capture is still exact at RenderScale 4" from an argument into a
+       line in a log. One line per process, on the success path only: the two
+       refusals above already have theirs. */
+    {
+        static int said;
+        if (!said) {
+            said = 1;
+            std::fprintf(stderr,
+                         "  [capture] DISPCAPCNT %08x: %dx%d from the live "
+                         "%dx%d picture (stride %d) into block %u at +%05x, "
+                         "nearest at %d x %d per DS pixel%s\n",
+                         cap, cw, ch, w, h, SCREEN_W, block, off, rx, ry,
+                         (rx * SUB_W == w && ry * SUB_H == h)
+                             ? " (an exact whole-number downsample)"
+                             : " (the extent is not a whole DS multiple; the "
+                               "sample walks, as it does on every odd aspect "
+                               "this port already shipped)");
+            std::fflush(stderr);
+        }
+    }
+    uint16_t *dst = reinterpret_cast<uint16_t *>(lcdc_addr(block) + off);
+    /* ---- WHAT THE GAME IS ALLOWED TO READ BACK ------------------------------
+     * `src` is the live framebuffer, which may carry the AntiAliasing pass's
+     * edge smoothing. The game must not see a host picture setting, so when
+     * that pass has run this frame it also left the frame AS IT WAS BEFORE IT,
+     * finished by the 2D compositor, and THAT is what is captured. Null at
+     * every other time, which is every run with the setting off, and then this
+     * is the framebuffer it always was.
+     *
+     * DO NOT REPLACE THIS WITH AN ORDER-BASED SHORTCUT. That is what was here
+     * first: the pass asked whether DISPCAPCNT was already armed and refused
+     * to smooth that frame. It is true on a course and FALSE on a running
+     * dual-screen minigame, which arms the unit AFTER gx_render -- measured on
+     * scene 372 driven past its menu, where 669 of 1200 frames captured and
+     * the armed test caught only 169 of them, so five hundred captured frames
+     * carried the smoothing. Reading the copy assumes nothing about when the
+     * game arms the unit, which is the only reason it holds. */
+    if (const uint32_t *held = gx_card_capture_picture()) {
+        /* THE FRAME IS HELD ON THE GRAPHICS CARD (run cardfull, CARD2): the
+           framebuffer is only the 2D overlay of it, so the picture is built
+           here from the card's copy of the 3D as it was BEFORE the smoothing,
+           under that overlay. It is the same frame the copy below is, so with
+           the setting on it counts as having read the pre-smoothing frame. */
+        src = held;
+        if (gx_anti_aliasing()) ++g_cap_from_preimage;
+    } else if (const uint32_t *pre = gx_aa_preimage()) {
+        src = pre;
+        ++g_cap_from_preimage;
+    }
+    /* The running hash is kept in a local across the two loops and stored once
+       at the end: a global read-modify-write per pixel would be the only thing
+       in this loop the compiler cannot keep in a register. */
+    /* THE CENTRE OF EACH DS PIXEL, not its top-left host pixel (GAPFILL1). The DS rasterizes at pixel centres, and above RenderScale 1
+       the top-left host pixel of a ry x rx block sits 3/8 of a DS pixel up and left of that centre. The dual-screen minigames show the
+       live 3D on one screen and this capture on the other, swapping every tick, so an edge the capture rounded the other way from the
+       live picture jumped one DS row every tick (scene 372's whole sky and its top row). At ratio 1 the offset is 0: unchanged. */
+    const int cy0 = ry > 0 ? ry / 2 : 0, cx0 = rx > 0 ? rx / 2 : 0;
+    unsigned long long h1 = g_cap_hash;
+    for (int y = 0; y < ch; ++y) {
+        const int sy = ry > 0 ? y * ry + cy0 : (y * h) / SUB_H;
+        /* w/h are the LIVE image extent; the framebuffer's row stride is always
+           SCREEN_W (the buffer max), which equals w on every fixed tier and is
+           1024 on NTR_WIDE_RT with a 512-wide active image. Index by the stride,
+           sample within the extent. */
+        const uint32_t *row = src + (size_t)(sy < h ? sy : h - 1) * (size_t)SCREEN_W + (size_t)cap_x0;
+        for (int x = 0; x < cw; ++x) {
+            const int sx = rx > 0 ? x * rx + cx0 : (x * w) / SUB_W;
+            const uint32_t p = row[sx < w ? sx : w - 1];
+            /* ARGB8888 -> BGR555, and BIT 15 SET. On hardware the captured
+               alpha bit says "this pixel was opaque"; engine A's finished
+               framebuffer is opaque everywhere -- it starts from the scene's
+               own clear colour -- so the bit is 1 for every captured pixel
+               rather than derived from a channel the host framebuffer does not
+               carry a meaning for. */
+            const uint16_t v =
+                (uint16_t)(0x8000u | (((p >> 3) & 0x1Fu) << 10) |
+                           (((p >> 11) & 0x1Fu) << 5) | ((p >> 19) & 0x1Fu));
+            dst[(size_t)y * cw + x] = v;
+            /* FNV-1a over the halfword actually written, low byte first, in
+               capture order. Two runs of the same rows agree on this number
+               only if every captured pixel of every captured frame agrees, so
+               it is the whole of "the game read back the same picture". */
+            h1 = (h1 ^ (unsigned long long)(v & 0xFFu)) * 1099511628211ull;
+            h1 = (h1 ^ (unsigned long long)((v >> 8) & 0xFFu)) * 1099511628211ull;
+        }
+    }
+    g_cap_hash = h1;
+    ++g_cap_performed;
+    /* MGHIRES2: the host keeps the render-scale picture this capture was sampled from, for engine B to show it at render scale
+       (ntr/ppu_sub.cpp caphr_overlay); the bytes written above, and so what the game reads, are unchanged */
+    port_caphr_keep(src, SCREEN_W, cap_x0, w, h, rx, ry, cx0, cy0, block);
+    g_cap[block].off = off;
+    g_cap[block].len = need;
+    g_cap[block].home0 = bank_home((unsigned)block, *reinterpret_cast<volatile uint8_t *>(kVramCnt + (unsigned)block));
+    /* MENUS093C (D23): a block that is ALREADY engine A's BG memory (VRAMCNT MST 1) when it is captured into is seen through that window on the
+       DS at once (the title's drawing page maps the bank and captures in the same frame). The first publish pass only records the home, so the
+       bytes would stay at the LCDC address; write the window too. */
+    {
+        const uint8_t cnt = *reinterpret_cast<volatile uint8_t *>(kVramCnt + (unsigned)block);
+        if (std::getenv("SM64DS_CAP_TRACE")) std::fprintf(stderr, "[captrace] capture block %u cnt %02x off %x len %x\n", (unsigned)block, (unsigned)cnt, (unsigned)off, (unsigned)need);
+        if ((cnt & 0x87u) == 0x81u && !bank_a_bg_off())
+            std::memcpy(reinterpret_cast<void *>(0x06000000u + (uint32_t)((cnt >> 3) & 3) * kBankSize + off),
+                        reinterpret_cast<const void *>(lcdc_addr((unsigned)block) + off), (size_t)need);
+    }
+}
+
+}  // namespace ntr

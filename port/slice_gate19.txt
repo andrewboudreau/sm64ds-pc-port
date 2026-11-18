@@ -1,0 +1,71 @@
+# Gate 19: the cannon in the moat wall.
+#
+# ov098's second actor overlay class set: CRATE, CANNON, WATER_BOMB and the
+# two arrow signs. The castle grounds names one, and one only -- CANNON (207),
+# the cannon behind the grate on the west moat wall.
+#
+# THE CONFIG'S NAMES ARE NOT SHIFTED IN ov098 either. All five factories
+# install a vtable whose slot 0 is their own class's InitResources:
+#
+#   _Z36daObjYajirusi_c_classInit_YAJIRUSI_Rv -> _ZTV15daObjYajirusi_c   (both signs share it)
+#   _Z36daObjYajirusi_c_classInit_YAJIRUSI_Lv  -> _ZTV15daObjYajirusi_c
+#   _Z23daObjBlockS_c_classInitv          -> _ZTV5Crate              RTTI daObjBlockS_c
+#   _Z17daCnn_c_classInitv         -> _ZTV7daCnn_c            slot0 Cannon::InitResources
+#   _Z17daWbm_c_classInitv      -> _ZTV7daWbm_c
+#
+# THE CANNON IS DORMANT AND THAT IS THE POINT. Its own Behavior reads the
+# save's cannon-unlock bit before it will open; with a fresh save the lid
+# stays shut, which is exactly what the level looks like before Bob-omb Buddy
+# opens it. Nothing here chases the cannon-entry path.
+src/game/actors/d_a_cnn.cpp
+# FOLDED into src/game/actors/d_a_cnn.cpp (row 20): src/_ZN6Cannon13InitResourcesEv.cpp
+# RETIRED at SLICE1: body now in src/_ZN6CannonD1Ev.cpp. MSVC folds the ROM destructor variants into one symbol, so only one of a class two per-function destructor TUs can be compiled.
+#src/_ZN6CannonD0Ev.cpp
+# _ZN6Cannon8BehaviorEv is NOT here either: it dispatches an mwcc
+# pointer-to-member out of a four-entry state table, the gate-16 case for the
+# fourth time. The dispatch frame and the state seat stay host
+# (port/unmatched/Cannon_Behavior.cpp); the state bodies are matched src.
+# State 1 (the lid opening) went byte-perfect at 2004/b56 in PR #1227:
+# FOLDED into src/game/actors/d_a_cnn.cpp (row 20): src/func_ov098_0213ade8.c
+# FOLDED into src/game/actors/d_a_cnn.cpp (row 20): src/_ZN6Cannon16CleanupResourcesEv.cpp
+# _ZN6Cannon6RenderEv is NOT here: it dispatches Model slots 3 and 5 through
+# a local shadow class, which is ROM numbering, and the host _ZTV17dExtSimpleModel_c is
+# MSVC's. Slot 5 the host array already serves both ways (the dual fill in
+# hal/cxxname_bridge.cpp); slot 3 it cannot -- ROM 3 is UpdateVerts and MSVC 3
+# is Virtual10, which takes a Matrix4x3 the shadow's declaration never passes.
+# Host copy in port/unmatched/Cannon_Render.cpp.
+#
+# THE DESTRUCTORS ARE NOT HERE and slots 16/17 trap by name, the gate-17
+# reading: nothing on the castle grounds destroys a cannon, and
+# src/_ZN6CannonD1Ev.cpp is a real C++ destructor over its own shadow
+# hierarchy -- MSVC would emit it under ??1Cannon@@UAE@XZ and synthesise
+# member destructor calls against a layout that is not the ROM's.
+
+# ---- the overlay's own static initialisers --------------------------------
+src/game/actors/d_a_obj_yajirusi.cpp
+src/game/actors/d_a_obj_block_s.cpp
+# FOLDED into src/game/actors/d_a_cnn.cpp (row 20): src/__sinit_ov098_0213c214.c
+src/game/actors/d_a_wbm.cpp
+
+# ---- the two helpers the cannon's own Behavior closes over -----------------
+# 0213a984 is the save read that keeps the lid shut; 0213b15c is the aim/lid
+# update it runs once the save says otherwise.
+# FOLDED into src/game/actors/d_a_cnn.cpp (row 20): src/func_ov098_0213a984.c
+# FOLDED into src/game/actors/d_a_cnn.cpp (row 20): src/func_ov098_0213b15c.cpp
+
+# --- linkloop round 0 ---
+# FOLDED into src/game/actors/d_a_cnn.cpp (row 20): src/func_ov098_0213aa28.c
+# FOLDED into src/game/actors/d_a_cnn.cpp (row 20): src/func_ov098_0213ad08.c
+# FOLDED into src/game/actors/d_a_cnn.cpp (row 20): src/func_ov098_0213b0a4.cpp
+
+# --- linkloop round 1 ---
+src/runtime/actor/d_actor.cpp
+# RETIRED catchup1 (ACT4b): port/unmatched/hostarm/_ZN8dActor_c10EarthquakeERK7Vector35Fix12IiE.cpp, main's d_actor.cpp body links
+src/game/player/d_a_ply_methods.cpp
+# FOLDED into src/game/player/Player.cpp (row 63): src/func_ov002_020df34c.cpp
+src/game/actors/d_a_bmb.cpp
+
+# --- linkloop round 2 ---
+src/engine/view/d_camera.cpp
+# FOLDED into src/engine/view/d_camera.cpp (row 68): src/func_0200d474.c
+src/runtime/actor/d_bg_actor.cpp

@@ -1,0 +1,29 @@
+diff --git a/src/game/stages/d_scene.cpp b/src/game/stages/d_scene.cpp
+--- a/src/game/stages/d_scene.cpp
++++ b/src/game/stages/d_scene.cpp
+@@ -86,8 +86,25 @@
+    constructors and real destructors, so mwcc emits __sinit_d_scene.cpp to
+    build them in this order and register their destructors (was the
+    handwritten __sinit_02074edc). Other TUs reach them by these names. */
++/* "#if defined", not "#ifdef": port/tools/hostgen.py MSC_ARMS_BOTH reads an "#ifdef _MSC_VER" as the start of a two-arm block. */
++#if defined(_MSC_VER)
++/* host: hal/fader_wipes.cpp owns the storage (0x60 bytes, a HalFaderWipe built in place, larger than this
++   class's 0x10), so this is the declaration and the decorated name reaches it through
++   hal/portsync3_data_aliases.cpp's ?gSceneColorFader@@3UdFdColor_c@@A=_gSceneColorFader. */
++extern dFdColor_c gSceneColorFader;
++#else
+ dFdColor_c gSceneColorFader;
++#endif
+ dFdBrightness_c gSoftResetBrightnessFader;
++#if defined(_MSC_VER)
++/* host: port/unmatched/Fader_HostAbi.h (force-included into this TU) spells the
++   ROM's dFader_c destructor pair as two plain virtuals, slots 0 and 1, so the
++   rest keep their ROM numbers. Constructing gSoftResetBrightnessFader above
++   emits dFader_c's table, which names both, so they are defined here, once.
++   The port never destroys a fader; the bodies are empty. */
++void dFader_c::Destructor1() {}
++void dFader_c::Destructor0() {}
++#endif
+ 
+ void dScene_c::ResetHardwareRegisters()
+ {

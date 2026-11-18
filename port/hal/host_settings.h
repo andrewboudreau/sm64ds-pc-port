@@ -1,0 +1,876 @@
+/* Host player settings, read from settings.json in the bundle directory.
+   This is the launcher's file: its Settings dialog writes it, the game reads
+   it. It holds host preferences only, never anything about the game itself.
+
+   Not an environment variable. For launcher-driven runs the launcher builds
+   the child environment itself, so anything a player exported is silently
+   overridden and never reaches the game. The file next to the exe is the
+   only channel that works.
+
+   Read once, on first use, and then WATCHED: host_settings_poll below
+   re-reads the file when it changes on disk, so the launcher's dialog can
+   adjust the gap and the volume while the game is running. Only the four
+   screen-gap keys, Volume, MouseCapture and a few host-side keys reload
+   live; everything else keeps its boot value, because the dialog's own Mods
+   panel promises a restart for those.
+   A missing, unreadable or malformed file falls back to the defaults in
+   silence at boot, and a reload that cannot read the file keeps the values
+   it has rather than falling back -- the launcher swaps the file in with a
+   rename, but a reader that punished a torn write with the defaults would
+   flash the player's picture black for a frame. */
+#ifndef PORT_HOST_SETTINGS_H
+#define PORT_HOST_SETTINGS_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* SwapCameraTurnDirection: 1 when the player turned it on. Default 0. */
+int host_setting_swap_camera_turn(void);
+
+/* ---- CameraMode: WHICH CAMERA AN INTERACTIVE RUN BOOTS INTO -------------
+   "analog" | "freecam" | "ds" (default), the three modes tests/walk_window.cpp
+   names CAM_ANALOG / CAM_FREE / CAM_DS. Returned as that numbering: 0 analog,
+   1 freecam, 2 ds. The default is ds, on Tango's order, because that is the
+   cartridge's own stepped rotate and it is the mode the bumpers turn in;
+   analog and freecam stay one F1 press (or one menu row) away. A SELFTEST
+   IGNORES IT and stays DS-exact, for the reason the RunMode pin gives: a
+   comparator run must not depend on a preferences file. SM64DS_ANALOG_CAMERA
+   / SM64DS_DS_CAMERA / SM64DS_FREECAM still win over the file, because an
+   environment knob is a per-run request and the file is a standing one. The
+   debug menu's camera row writes the key back through
+   host_setting_save_camera_mode, the way the run row writes RunMode.
+   Boot-latched: F1 and the row move the live mode, the file moves the next
+   boot.
+   HYBRIDCAM1 (Tango, 11-12): the hybrid camera is the default now. It reads
+   back as 3 (hybrid) when the file says ds and CameraHybrid is not false, so
+   every file that never picked a mode (the launcher writes "ds" as its
+   default) lands on it; set / save take 3 and write CameraMode "ds" with
+   CameraHybrid true, and any other pick writes CameraHybrid false. See
+   CAMERA_MODE_KEY in host_settings.cpp. */
+int host_setting_camera_mode(void);
+int host_setting_save_camera_mode(int mode);
+
+/* ---- THE CONTROL BINDINGS, ONE KEY PER ACTION ----------------------------
+   Why they are here at all: a binding has to reach every copy of the game,
+   including one that boots straight into a level with no menu on the way.
+   settings.json is read at boot by every copy of the game the launcher
+   starts, whatever the mode (the launcher runs every one of them out of
+   the bundle directory, and the file sits beside the exe), so a binding
+   here reaches every run.
+
+   KEYBOARD, Win32 virtual-key codes (the number GetAsyncKeyState takes; 'W'
+   is 0x57, VK_SPACE is 0x20). 0 means that action has no keyboard binding.
+   Defaults are the bindings this program has always hardcoded:
+
+     KeyUp        0x57 W        KeyUpAlt     0x26 up arrow
+     KeyDown      0x53 S        KeyDownAlt   0x28 down arrow
+     KeyLeft      0x41 A        KeyLeftAlt   0x25 left arrow
+     KeyRight     0x44 D        KeyRightAlt  0x27 right arrow
+     KeyJump      0x20 space
+     KeyAttack    0x58 X        (punch / kick / Yoshi's tongue: the DS B button)
+     KeyCrouch    0x11 ctrl     (the DS R shoulder)
+     KeyRun       0x10 shift    (the port's own run button; see RunMode)
+     KeyStart     0x0d enter    (scene path only: the minigames' own menus)
+     KeySelect    0x08 backspace (scene path only, keyboard only on the DS
+                                 side too -- every free pad button is spoken
+                                 for, see the scene loop)
+     KeyLook      0x5a Z        (the DS X button: the close-up camera, then
+                                 first-person look, daPly_c::St_CameraZoom;
+                                 Z sits beside the attack key and nothing
+                                 else reads it)
+
+   The four *Alt keys exist so the shipped "WASD and the arrows both walk"
+   default is a fact the launcher can show and change rather than a rule
+   hidden in the game. Either half of a pair may be 0.
+
+   PAD, XInput button masks (XINPUT_GAMEPAD_*: A 0x1000, B 0x2000, X 0x4000,
+   Y 0x8000, LB 0x0100, RB 0x0200, START 0x0010, BACK 0x0020, the d-pad
+   0x0001..0x0008, the stick clicks 0x0040/0x0080). 0 means no pad binding.
+   Defaults are again what the window has always done:
+
+     PadJump      0x1000 A
+     PadAttack    0x2000 B
+     PadCrouch    0x20000 RT -- the right trigger, which has always crouched.
+                            THE TRIGGERS ARE NOT XINPUT BUTTONS: they are 0..255
+                            axes with no mask, so the file names them with two
+                            bits above the XInput word, HOST_PAD_LT 0x10000 and
+                            HOST_PAD_RT 0x20000, and a pull past 100 reads as
+                            the button being down. A PadCrouch of 0 (the value
+                            every launcher before 0.3.4 wrote) still crouches
+                            on RT, so an older file keeps the trigger.
+     PadRun       0x4000 X
+     PadStart     0x0010 START
+     PadSelect    0      -- BACK opens the debug menu, so Select has no pad
+                            default; bind it here if the menu is not wanted
+                            on BACK.
+     PadLook      0x8000 Y -- the DS X button. The face buttons follow the
+                            DS by POSITION: A (bottom) is DS B, B (right) is
+                            DS A, X (left) is DS Y, so the top one, Y, is
+                            DS X.
+
+   KeyLook AND PadLook CAME AFTER 0.4.2. A settings.json written before them
+   names neither, so it reads both defaults like any other missing key, which
+   is how an updating player gets the button. One exception, for exactly
+   those files: when the file already puts another action on the default's
+   key (or pad button), the default would quietly add a camera toggle to a
+   choice the player made, so that half of Look starts unbound instead and
+   the [settings] line says so. A file that names KeyLook / PadLook is obeyed
+   as written, 0 included.
+
+   THE CAMERA BUTTONS. Four more actions, key and pad, that the window used
+   to hard-wire:
+
+     KeyCamCenter 0x43 C    PadCamCenter 0x10000 LT -- CENTRE CAMERA. In the
+                            DS camera it sets the Ctrl 0x4000 bit, the raw DS
+                            L button (CheckInput maps raw 0x0200 to 0x4000),
+                            which _ZN9dCamera_c13func_02009e70Ev tests in held & 0x4300 at
+                            0x02009fdc and answers with the snap-behind; in the
+                            analog and free cameras it swings the view behind
+                            Mario. Before this key existed only C did it and
+                            the pad had no way; LT had no use at all.
+     KeyCamLeft   0x51 Q    PadCamLeft   0x0100 LB -- ROTATE CAMERA LEFT.
+     KeyCamRight  0x45 E    PadCamRight  0x0200 RB -- ROTATE CAMERA RIGHT.
+                            In the DS camera these are the stepped rotate
+                            (_ZN9dCamera_c13func_02009e70Ev's 0x200 / 0x100 bits); in the
+                            analog and free cameras the pad pair zooms out /
+                            in and Q / E turn the view, as they always did.
+     KeyCamMode   0x70 F1   PadCamMode   0x0080 right-stick click -- cycles
+                            the camera mode (analog, free, DS).
+
+   Only Centre is "newer than the file" in the Look sense: a settings.json
+   that never names KeyCamCenter / PadCamCenter gets C / LT, unless the same
+   file already puts another action on that key or button, in which case that
+   half starts unbound and the [settings] line says so. The other three are
+   what the program has always read, so their defaults apply unconditionally
+   and nobody's camera changes. The left stick and the d-pad walk and the
+   right stick turns the camera; those are the pad's shape, not bindings.
+
+   RunButtonKey AND RunButtonPad, the two names that existed before this
+   block, KEEP WORKING AS ALIASES of KeyRun and PadRun. When both spellings
+   are in the file KeyRun / PadRun win; when only the old name is there it is
+   read exactly as before; the save path writes BOTH spellings so a launcher
+   of either vintage reads the choice back. host_setting_run_key and
+   host_setting_run_pad return the same answers as host_setting_key(HOST_KEY_RUN)
+   and host_setting_pad(HOST_PAD_RUN).
+
+   A value outside the code space (keys 0..0xff, pads 0..0xffff) is a typo,
+   not a choice, and reads as the default. A fractional value such as 3.9
+   truncates to 3 (json_int reads the leading integer, the behaviour every
+   integer key in this file has always had) rather than defaulting. Two actions on one key is legal
+   and means both happen; nothing here second-guesses it. The debug menu's
+   own navigation -- the arrows, enter, escape, F5, the d-pad, A, B and BACK
+   -- is fixed and is not in this table.
+
+   Boot-latched, like RunMode: the launcher's dialog promises the restart. */
+enum {
+    HOST_KEY_UP = 0, HOST_KEY_DOWN, HOST_KEY_LEFT, HOST_KEY_RIGHT,
+    HOST_KEY_UP_ALT, HOST_KEY_DOWN_ALT, HOST_KEY_LEFT_ALT, HOST_KEY_RIGHT_ALT,
+    HOST_KEY_JUMP, HOST_KEY_ATTACK, HOST_KEY_CROUCH, HOST_KEY_RUN,
+    HOST_KEY_START, HOST_KEY_SELECT, HOST_KEY_LOOK,
+    HOST_KEY_CAM_CENTER, HOST_KEY_CAM_LEFT, HOST_KEY_CAM_RIGHT, HOST_KEY_CAM_MODE,
+    HOST_KEY_CAM_UP, HOST_KEY_CAM_DOWN, HOST_KEY_CAM_ZOOM_IN, HOST_KEY_CAM_ZOOM_OUT,
+    HOST_KEY_COUNT
+};
+enum {
+    HOST_PAD_JUMP = 0, HOST_PAD_ATTACK, HOST_PAD_CROUCH, HOST_PAD_RUN,
+    HOST_PAD_START, HOST_PAD_SELECT, HOST_PAD_LOOK,
+    HOST_PAD_CAM_CENTER, HOST_PAD_CAM_LEFT, HOST_PAD_CAM_RIGHT, HOST_PAD_CAM_MODE,
+    HOST_PAD_CAM_UP, HOST_PAD_CAM_DOWN, HOST_PAD_CAM_ZOOM_IN, HOST_PAD_CAM_ZOOM_OUT,
+    HOST_PAD_COUNT
+};
+/* The two trigger pseudo-buttons a pad binding may name (see the PAD block
+   above), and the widest value a pad binding may hold. */
+enum { HOST_PAD_LT = 0x10000, HOST_PAD_RT = 0x20000, HOST_PAD_MASK_MAX = 0x3ffff };
+/* CAMPACK1: THE CAMERA'S REMAINING ACTIONS, AND THE MOUSE BUTTONS.
+   Four more camera actions, key and pad (and mouse below):
+     KeyCamUp   0x52 R   PadCamUp   0 -- tilt the view up   (analog / free camera)
+     KeyCamDown 0x46 F   PadCamDown 0 -- tilt the view down (analog / free camera)
+     KeyCamZoomIn / KeyCamZoomOut, PadCamZoomIn / PadCamZoomOut: default unbound.
+   R and F are what the window has always read for the tilt, so they stay the
+   defaults and nobody's camera changes; the pad tilts with the right stick, which
+   is not a binding. Zoom has no key today (the pad bumpers and the wheel zoom the
+   analog and free cameras); the new actions are unbound until the player binds them.
+   In the analog and free cameras they move the eye in / out like the bumpers and
+   the wheel. In the DS-exact camera there is no tilt; zoom in presses the DS
+   close-up (Look) camera, zoom out leaves it, the ROM's own zoom (camera state 9).
+
+   MOUSE BUTTONS. Each action may also sit on a mouse button. The value is the Win32
+   virtual-key code of the button (GetAsyncKeyState takes it): 0 none, 2 right,
+   4 middle, 5 X1 (back), 6 X2 (forward), and since MOUSELOCK1 1 (left) for every
+   action but MouseCamHold. A left bound to an action is that action in play and
+   stays the touch stylus wherever the pointer is a pen (menus, pause, the scene
+   path, a stacked window: tests/walk_window.cpp mo_pen_moment). A value outside
+   that set reads as the default.
+     MouseCamHold   2 (right)  the button that is HELD to steer the camera with mouse
+                    movement, today's right-button look. 0 turns the hold off (use
+                    MouseCapture for look with no button).
+     MouseCamCenter / MouseCamLeft / MouseCamRight / MouseCamUp / MouseCamDown /
+     MouseCamZoomIn / MouseCamZoomOut / MouseCamMode / MouseLook: all default 0.
+   MOUSEBIND1: the game actions too, all default 0 (nobody's controls change):
+     MouseJump / MouseAttack / MouseCrouch / MouseRun / MouseStart / MouseSelect /
+     and the host-side ones. A bound button is read like the action's key,
+     into the same words, so it does what that key does where that key does it. */
+enum {
+    HOST_MOUSE_CAM_HOLD = 0, HOST_MOUSE_CAM_CENTER, HOST_MOUSE_CAM_LEFT, HOST_MOUSE_CAM_RIGHT,
+    HOST_MOUSE_CAM_UP, HOST_MOUSE_CAM_DOWN, HOST_MOUSE_CAM_ZOOM_IN, HOST_MOUSE_CAM_ZOOM_OUT,
+    HOST_MOUSE_CAM_MODE, HOST_MOUSE_LOOK,
+    HOST_MOUSE_JUMP, HOST_MOUSE_ATTACK, HOST_MOUSE_CROUCH, HOST_MOUSE_RUN,
+    HOST_MOUSE_START, HOST_MOUSE_SELECT,
+    HOST_MOUSE_COUNT
+};
+int host_setting_mouse(int action);                     /* VK of the bound button or 0 */
+const char *host_setting_mouse_name(int action);
+int host_setting_set_mouse(int action, int vk);         /* 1 ok, 0 refused (not 0/1/2/4/5/6; 1 refused for MouseCamHold) */
+/* CameraStickZoom: right stick up / down zooms the camera instead of tilting it.
+   Default 0 (off) = today. DS camera: a push is one press of the ROM's close-up. */
+int host_setting_camera_stick_zoom(void);
+int host_setting_set_camera_stick_zoom(int on);
+
+/* The bound code for one action, or 0 for unbound; an index outside the enum
+   is 0 too. host_setting_key_name / host_setting_pad_name give the
+   settings.json spelling of an action ("KeyJump", "PadJump"), for logs. */
+int host_setting_key(int action);
+int host_setting_pad(int action);
+const char *host_setting_key_name(int action);
+const char *host_setting_pad_name(int action);
+
+/* ---- WHICH WAY THE CAMERA TURNS ---------------------------------------
+   The signed step a RIGHTWARD push of a camera control makes to the
+   camera's heading, the angle from Mario to the eye that the Camera actor
+   keeps at +0x17c.
+
+   There is no hardware answer to copy here. The DS turns its camera with
+   the L and R shoulder buttons and has no E key, no Q key, no right stick
+   and no mouse, so every host binding this program has is the port's own
+   choice and always was. The rotation MATH is the ROM's and is byte-gated
+   in src/func_02009e70.cpp; only the question of which host control feeds
+   which of its two directions is ours.
+
+   MEASURED, so the default is not a guess. Walking Mario with the camera
+   left alone, his facing minus the published angle-to-camera is exactly
+   0x8000 on every forward frame, and holding LEFT drives that offset
+   strongly positive while the camera's own heading climbs monotonically as
+   it swings in behind him. A RISING heading is therefore the view panning
+   LEFT. Before this setting existed every rightward control on the host
+   raised it, so pushing right panned the view left. That is the modern
+   third person convention backwards, and a player reported it as exactly
+   that.
+
+   So the default is -1: push right, pan right. The launcher's "Swap left
+   and right camera turning" returns +1, which is what this program did
+   before, for players who prefer it or who got used to it.
+
+   Every horizontal camera control multiplies by this one value, so the
+   keyboard, the stick, the bumpers, the mouse and all three camera modes
+   cannot drift out of step with each other. */
+int host_camera_turn_sign(void);
+
+/* ---- THE DS SCREEN GAP ------------------------------------------------
+   Four optional keys, each with its own default, so a settings.json written
+   before any of them existed reads exactly as one that sets all four to
+   their defaults.
+
+   MinigameGap    1 (default): the hinge between the DS's two screens is
+                  simulated, which is what the game's own code already does
+                  and what makes an object crossing between the screens move
+                  at one speed. 0 pulls the halves together for LAYOUT
+                  purposes only -- the simulation is untouched, so objects go
+                  back to jumping at the seam. The launcher's checkbox is
+                  "remove minigame gap" and is the inverse of this key.
+   GapFillMode    1 ambient (default), 0 solid, 2 the scene's own hand-drawn
+                  band, gap/scene_<id>.bmp. Ignored when GapPeek is 1 -- except
+                  that the art is peek's backdrop either way; see below.
+   GapColor       0xFFRRGGBB for the solid fill. Default 0xFF000000. Ignored
+                  when GapPeek is 1.
+   GapPeek        1 draws the band's own hidden sprites over the scene's own
+                  art if there is any and over PLAIN BLACK if there is not.
+                  Default 0.
+
+   PEEK IGNORES THE FILL MODE. With peek off the band is decoration and the two
+   fill keys are the player's taste in it; with peek on the band is a view of
+   what is really in those rows, and the true state of a row with no sprite in
+   it is empty. Neither fill runs behind that, because a wash blurs into the
+   sprites and a flat colour cannot be told from one. The scene's hand-drawn
+   art DOES, because a picture is read as a picture: peek's backdrop is
+   gap/scene_<id>.bmp when that file is there and black when it is not, and
+   everything over the backdrop is still only what the game submitted.
+   hal/host_settings.cpp and hal/gap_art.h carry the long form. */
+int host_setting_minigame_gap(void);
+int host_setting_gap_fill_mode(void);
+/* AudioQuality (lane AUDIOHQ1): 1 = "hq" 48000 Hz mix with a Hermite resampler (the default), 0 = "ds" 32768 Hz linear, the DS's own. The launcher's setting; read once at start. */
+int host_setting_audio_quality(void);
+unsigned host_setting_gap_color(void);
+int host_setting_gap_peek(void);
+/* PAUSE3: the in-game settings page's setters for the screen gap (the rest of the file's values are read by the launcher's own page). Each
+   applies at once (host_settings_gen steps, the gap latch re-reads it) and queues the key. gap_look: 0 solid, 1 blur (ambient), 2 peek
+   (GapPeek on, the fill keeps its mode). gap_color is 0xRRGGBB. */
+int host_setting_set_minigame_gap(int on);
+int host_setting_gap_look(void);
+int host_setting_set_gap_look(int look);
+int host_setting_set_gap_color(unsigned rgb);
+
+
+
+/* ---- MouseCapture: HOLD THE POINTER AND STEER WITH IT --------------------
+   Default 1 since MOUSELOCK1 (Tango, 11-07: "an on by default toggle"); a
+   settings.json that saved false keeps false. Off, the mouse is a stylus and
+   the camera only follows it while the RIGHT BUTTON IS HELD (see the MOUSE
+   banner in tests/walk_window.cpp). With this key on, an ordinary
+   adventure window HOLDS the pointer -- hidden, pinned to the middle of the
+   picture and clipped to the window -- and bare mouse movement turns the
+   camera with no button at all, the way a modern third-person game does.
+
+   THIS IS A HOST PREFERENCE AND NOT A MOD. Nothing about the game changes:
+   the deltas land on the same two variables the right-button drag has always
+   fed, at the same 48-and-24 binangs a pixel, through the same
+   host_camera_turn_sign. With the key off not one win32 call is made and the
+   two extra tests read false, so off is the old program.
+
+   WHERE IT DOES NOT ENGAGE, and every one of these is a pointer the player
+   would otherwise have to go and find:
+     * while the debug menu is open -- which is what makes ESCAPE the release,
+       since escape opens the menu;
+     * while the window is not the foreground one, so alt-tab hands the
+       pointer back and coming back takes it again;
+     * on the SCENE path at all (the minigames), where the mouse IS the
+       stylus and taking it would take the game;
+     * in a STACKED window, where the bottom half of the picture is a live
+       touchscreen for the same reason;
+     * in the DS-EXACT camera mode, where the mouse does not steer anything,
+       so holding the pointer would cost the player something and buy nothing;
+     * while the run-button rebind row is capturing;
+     * in a selftest, which has no pointer and no player;
+     * MOUSELOCK1: while the ROM's pause, the level-clear save menu, a message
+       window, a one-screen menu, the settings page, the white door or the
+       Joining plate is up, and on the star select interlude, the title and
+       every other scene frame (tests/walk_window.cpp mo_pen_moment). Those are
+       the same frames a left button bound to a game action stays the stylus.
+
+   It reloads live like the gap and the volume, so the launcher's dialog can
+   turn it on and off with the game already running. */
+int host_setting_mouse_capture(void);
+/* StartFullscreen: 1 when the window opens in F12's borderless fullscreen.
+   Default 0. Boot only. */
+int host_setting_start_fullscreen(void);
+/* DrawDistance: percent (100..10000) of each actor's ROM draw distance. 100 is
+   the ROM's own and the default. Drawing only. */
+int host_setting_draw_distance_pct(void);
+int host_setting_set_draw_distance(int pct);
+
+
+
+
+
+
+
+/* SHELVED1: KeepLives, bool, OFF by default. 1 keeps each save file's life count in the port's own side file (save/lives.json) and gives it back when that file starts; 0 is the DS, which starts every file with 4 lives. Live; SM64DS_KEEP_LIVES=0/1 overrides the file for a proof run. */
+int host_setting_keep_lives(void);
+int host_setting_set_keep_lives(int on);
+/* RABBIT1: FixOriginalBugs, bool, ON by default. 1 applies the port's fixes for the cartridge's own bugs (the glowing rabbits name their rank by catch order, English only); 0 is the cartridge's text byte for byte. Live; SM64DS_FIX_ORIGINAL_BUGS=0/1 overrides the file. */
+int host_setting_fix_original_bugs(void);
+int host_setting_set_fix_original_bugs(int on);
+/* CAMCOLL1: CameraCollision, bool, ON by default. 1 = the analog and free camera's eye stops at walls, floors and ceilings (0.9.3);
+   0 = it passes through them like 0.9.2. The DS camera is the ROM's either way. Live; SM64DS_CAMERA_COLLISION=0/1 overrides the file. */
+int host_setting_camera_collision(void);
+int host_setting_set_camera_collision(int on);
+/* DOODLEWIDE1: WideDrawingPage, bool, ON by default. 1 makes the title's drawing page as wide as a window wider than 4:3 at the DS pixel scale (the DS 256 x 192
+   canvas centred inside it, strokes anywhere on the paper); 0 is the DS canvas, the biggest 4:3 box at full height. Read when the drawing page opens;
+   SM64DS_WIDE_DRAWING=0/1 overrides the file for a proof run. */
+int host_setting_wide_drawing(void);
+int host_setting_set_wide_drawing(int on);
+/* PEACHJINGLE1: PeachJingle, bool, ON by default. 1 plays the cartridge's NCS_BGM_PEACH tune (sound id 70) when a star quota message (0x178..0x17e, "You've recovered N Power Stars") opens, locally only; 0 is the DS, silent. Live; SM64DS_PEACH_JINGLE=0/1 overrides the file. */
+int host_setting_peach_jingle(void);
+int host_setting_set_peach_jingle(int on);
+/* PROFILE1: host_setting_launcher_nick is the launcher's Nickname setting, cleaned to letters, digits and single spaces, trimmed, 16 bytes at most. */
+const char *host_setting_launcher_nick(void);
+
+/* Aspect: the presentation ratio, WIDTH DIVIDED BY HEIGHT. 0 (the default) is
+   the explicit native sentinel -- the 4:3 window the port has always opened;
+   1.7777778 is 16:9. A NUMBER rather than a Widescreen boolean because a
+   boolean cannot express ultrawide, and a ratio means an odd monitor needs no
+   new mode name. Absent, unparseable, negative or otherwise not a positive
+   number all read as 0; a positive value is CLAMPED into [1.0, 4.0], so 9.0 is
+   4.0 and not an error. The ceiling is 4.0 rather than 3.0 so that 32:9
+   (3.5555556) survives the sanitiser as itself instead of being letterboxed to
+   3.0; aspect_sanitise in the .cpp carries why 4.0 is the right stop.
+
+   BOOT-LATCHED, unlike the keys around it: the aspect is chosen once and
+   threaded into the framebuffer, so a mid-run reload cannot move it.
+   walk_window's boot is the only reader and hands the answer to
+   ntr::configure_aspect. SM64DS_ASPECT overrides the file with a ratio;
+   SM64DS_WIDESCREEN still works as the legacy boolean (0 native, anything else
+   16:9) and is consulted only when SM64DS_ASPECT is unset. */
+double host_setting_aspect(void);
+
+
+
+
+/* ---- PadLayouts: A LEARNED BUTTON MAP FOR ONE NON-XINPUT CONTROLLER ------
+   The DirectInput backend (hal/pad_backend.cpp) maps a pad's raw button
+   indices and axes onto the XInput mask through a built-in table keyed by
+   the pad's USB vendor:product id, with a positional guess for anything the
+   table does not know. A player reported the guess wrong on their pad: only
+   the d-pad worked and the face buttons came out rotated. The fix is a map
+   the player teaches the game one press at a time (the debug menu's "pad
+   layout" row), and this is where that map is kept between runs.
+
+   THE FILE SHAPE. One optional key, an array of flat objects:
+
+     "PadLayouts": [
+       { "vid": 1118, "pid": 654, "name": "USB Gamepad",
+         "a": 2, "b": 1, "x": 3, "y": 0, "lb": 4, "rb": 5,
+         "back": 8, "start": 9, "lthumb": 10, "rthumb": 11,
+         "lt_btn": 6, "rt_btn": 7, "lt_axis": -1, "rt_axis": -1,
+         "lx_axis": 0, "ly_axis": 1, "rx_axis": 2, "ry_axis": 5,
+         "lx_sign": 1, "ly_sign": -1, "rx_sign": 1, "ry_sign": -1 }
+     ]
+
+   The field names are pad_backend.cpp's PadLayout, so the two cannot drift.
+   vid and pid are the USB ids in DECIMAL (the file's integer reader reads
+   decimal). Button fields are DirectInput button indices 0..31, -1 for "this
+   pad has no such button". Axis fields are 0 X, 1 Y, 2 Z, 3 Rx, 4 Ry, 5 Rz,
+   -1 for none. The four sign fields are 1 or -1 and say which way the raw
+   axis moves for a rightward (or upward) push, because DirectInput's Y grows
+   downward and a learned pad may wire any axis either way. name is for a
+   person reading the file; the game ignores it.
+
+   LENIENT LIKE EVERY OTHER KEY. An object whose vid or pid is missing or out
+   of 1..65535 is dropped. Any other field that is missing or out of range
+   reads as the generic fallback's value for that field, so a half-edited
+   object still gives a usable pad rather than none. At most
+   HOST_PAD_LAYOUT_MAX objects are kept; later ones are ignored. A file with no
+   PadLayouts key reads exactly as before the key existed.
+
+   THE SAVE keeps the whole array: host_setting_save_pad_layout replaces the
+   object with the same vid:pid or appends one, then rewrites the PadLayouts
+   value in place and carries every other key of the file untouched, the way
+   the run and camera saves do. Boot-latched for the file's purposes, but the
+   pad backend is told the new map directly by the caller so the pad answers
+   with it at once; a restart re-reads it from here. */
+struct HostPadLayout {
+    int vid, pid;
+    int a, b, x, y, lb, rb, back, start, lthumb, rthumb;
+    int lt_btn, rt_btn, lt_axis, rt_axis;
+    int lx_axis, ly_axis, rx_axis, ry_axis;
+    int lx_sign, ly_sign, rx_sign, ry_sign;
+    char name[64];
+};
+enum { HOST_PAD_LAYOUT_MAX = 8 };
+/* The generic fallback's values into *out (vid and pid 0, name ""), the
+   same row pad_backend.cpp uses for an unknown pad. */
+void host_pad_layout_default(struct HostPadLayout *out);
+/* 1 and *out filled when the file names a layout for vid:pid, else 0. */
+int host_setting_pad_layout(int vid, int pid, struct HostPadLayout *out);
+/* How many layouts the file carries, and the i'th of them (1, or 0 when i
+   is out of range), so a caller can hand all of them to the pad backend. */
+int host_setting_pad_layout_count(void);
+int host_setting_pad_layout_at(int i, struct HostPadLayout *out);
+/* Upsert by vid:pid and persist. Returns 1 when the file on disk now says
+   so; the in-memory table moves either way. Fields out of range are
+   clamped to the fallback's value before anything is written. Refuses
+   (returns 0, nothing moves) when vid or pid is 0 or the table is full of
+   other pads. */
+int host_setting_save_pad_layout(const struct HostPadLayout *layout);
+
+/* ---- THE LIVE RE-READ -------------------------------------------------
+   host_settings_poll: call once per frame from the host loop. Internally it
+   looks at the file's write time only every 30th call, so its steady-state
+   cost is a counter compare. When the file HAS changed it re-reads the four
+   screen-gap keys, Volume and MouseCapture, and returns 1 exactly when one of
+   them now answers differently; every other return is 0. Nothing else
+   reloads: the Mods panel tells the player those need a restart, and making
+   the file watcher agree with the dialog is the whole contract.
+
+   host_settings_gen steps once per poll that returned 1. hal/screen_gap.cpp
+   folds it into its layout latch key, which is how a fill-mode or colour
+   change rebuilds a layout whose every other input is unchanged.
+
+   host_setting_volume is the file's Volume key, 0..100, or -1 when the file
+   has never named one. -1 means the boot-time SM64DS_VOLUME environment
+   value (the launcher passes the same number both ways) stays in charge. */
+int host_settings_poll(void);
+int host_settings_gen(void);
+int host_setting_volume(void);
+
+
+
+
+/* ---- FrameRate: HOW MANY PICTURES A SECOND. PRESENTATION ONLY. ----------
+   Default 0, and 0 is the ROM: one picture per game tick, exactly what the
+   port has always drawn. A NUMBER rather than a boolean for the Aspect
+   reason -- 60, 90, 120 and 144 are all real monitors and a boolean cannot
+   name them.
+
+   IT DOES NOT MOVE THE GAME'S CLOCK, and that is the whole point. The game
+   owns its own rate and writes it down: data_0208ee44 is vblanks per tick
+   (1 = 60, 2 = 30, 3 = 20) and every scene sets it in its own InitResources,
+   so the 3D levels tick 30 times a second and the minigames 60 whatever this
+   key says. What the key buys is EVEN HOLD TIMES. The port presents through a
+   plain StretchDIBits with no vsync anywhere, so a 30 Hz picture on a 144 Hz
+   display is held 5, 5, 5, 5, 4 refreshes, and the eye reads that unevenness
+   as judder on top of the 30.
+
+   ACCEPTED: 0 for native, the string "display" for the primary display's
+   refresh rate read once at boot, or a whole number of pictures a second
+   CLAMPED TO 240. Absent, unparseable, negative, and any positive value
+   BELOW 60 all read as 0. 60 is the floor because 60 is the fastest the
+   ROM's own clock ever runs (divider 1, every minigame), so a smaller number
+   would ask the port to present less often than the game ticks, which a
+   presentation layer may not do. Above 240 is CLAMPED rather than rejected,
+   the Aspect rule again: 1000 becomes 240, which is a picture, where
+   rejecting it would be a surprise.
+
+   LIVE (run hunt8, lane FPSLIVE1): the pacer, the presenter's timer grid and
+   SmoothMotion follow a change at the end of a tick, with no restart. The
+   change comes either from host_setting_save_frame_rate (the in-game settings
+   page) or from the launcher rewriting settings.json (host_settings_poll
+   re-reads the key). SM64DS_FRAME_RATE overrides the file with the same
+   grammar, "display" included, for the BOOT value only: once a live change
+   has happened the override no longer sits in front. An unparseable override
+   is still an override and says native, which is the answer an unparseable
+   file value gives.
+
+   WHAT IT LEAVES ALONE, and this is the contract the vanilla proof rests on:
+   the game tick, the input sample, the geometry, the raster, the fader, the
+   sound frame and the radio round accounting. The extra presents hand
+   Windows the SAME finished framebuffer again. NOTHING IS INTERPOLATED at
+   this rung -- with the key on, the picture repeats -- so the only thing that
+   changes is WHEN the pixels are handed over.
+
+   host_setting_frame_rate returns the target pictures per second, or 0 for
+   native. */
+int host_setting_frame_rate(void);
+/* Steps each time host_setting_frame_rate's answer changes while running. */
+int host_setting_frame_rate_gen(void);
+/* The settings page's call: sets the rate for this run at once and writes the
+   FrameRate key. rate is 0 (native) or 60..240; other values are sanitised the
+   way the file's are. Returns 1 when the file now says so. */
+int host_setting_save_frame_rate(int rate);
+
+/* ---- SmoothMotion: THE PICTURES BETWEEN TWO TICKS, BLENDED (run interp1) --
+   Default 0, and 0 is today: every extra picture FrameRate asks for is the
+   same finished frame again. 1 draws each extra picture on a 3D level from the
+   tick's own recorded geometry with the moving things (the camera, Mario, the
+   enemies, their bones) blended between the previous tick and this one
+   (ntr/gx.h, gx_interp_*). PRESENTATION ONLY: the game still ticks, reads its
+   input and draws its geometry once per tick. It acts only when FrameRate is
+   above the tick rate, so with FrameRate absent it does nothing at all. The
+   world on screen then trails the newest tick by up to one tick (33 ms on a
+   course). Boot-latched. Accepted: 1 / true on, anything else off.
+   SM64DS_SMOOTH_MOTION overrides. */
+int host_setting_smooth_motion(void);
+
+/* ---- MinigameUpscale: THE PIXEL-ART UPSCALER ON THE MINIGAMES' 2D (run after093, lane MGHIRES1) --
+   Default 0, the DS pixels sharp as they are. 1 runs the EPX / Scale2x-Scale3x rules on each minigame screen's finished
+   2D before the two screens are stacked, at a render scale of 2 or more (ntr/ppu_sub.cpp hr_build, engine B). It only
+   moves a neighbour's colour into a pixel's corner: no new colours, gameplay untouched. Accepted: 1 / true on, anything
+   else off. SM64DS_MG_UPSCALE overrides. */
+int host_setting_minigame_upscale(void);
+
+/* ---- MinigameHiRes: THE MINIGAMES' TURNED AND MOVING 2D AT RENDER SCALE (run after093, lane MGHIRES1) --
+   Default 0. At a render scale of 2 or more a minigame's turned or scaled sprites and BGs are sampled at every host pixel
+   and its sprites between two ticks (Smooth Motion) sit at their sub-pixel places, on both screens (ntr/ppu_sub.cpp
+   hr_build, hal/message_compositor.cpp mghr_a_*). The DS pixel itself is unchanged. 0 is the DS-pixel picture. It costs
+   picture time (about 1 to 3 ms a picture on the busiest minigames here: Wiggler and Loves Me...? keep a tenth to a
+   quarter of their pictures between ticks at 144 Hz with Smooth Motion on), which is why it is off unless asked for.
+   Accepted: 1 / true on, anything else off. SM64DS_MG_HIRES overrides. */
+int host_setting_minigame_hires(void);
+/* MGHIRES2: the settings page's setters for the two keys (live, saved like the other page rows) */
+int host_setting_set_minigame_hires(int on);
+int host_setting_set_minigame_upscale(int on);
+
+/* ---- THE THREE PICTURE-QUALITY KEYS (run hd1) ---------------------------
+   One block, because they are one promise: with every one of them absent the
+   game's picture, timing and behaviour are what the build without them
+   produced, byte for byte where it can be measured. They are opt-in host
+   renderer settings and never fixes to the ROM's own behaviour.
+
+   RenderScale: HOW MANY HOST ROWS PER DS ROW the 3D picture is rendered at.
+   A vertical multiplier of the DS panel's 192 rows, so 2 is 512x384, 3 is
+   768x576 and 4 is 1024x768, and the width follows the run's aspect. 0 is
+   the explicit default sentinel and means exactly what the port does today
+   (2 at the native 4:3 Aspect; whatever ntr::configure_aspect derives under
+   a wide one), so a settings.json written before this key existed, and a
+   file that will not parse, both read as the shipped picture. Absent,
+   unparseable and negative all read as 0; a positive value is CLAMPED into
+   1..8 (RESSCALE1; 1..4 before), the Aspect rule, so 9 is 8 and not an
+   error. 5 is 960 rows, 6 is 1152, 7 is 1344 and 8 is 1536. 1 is the DS's own
+   256x192 and is a real choice, which is why it is not folded into 0.
+   BOOT-LATCHED: the size is threaded into the framebuffer at boot and a
+   mid-run change would be a reallocation nobody tests. SM64DS_RENDER_SCALE
+   overrides the file with the same grammar.
+
+   One more boot-latched key in this group switches a host-side texture
+   loader: 1 on, 0 (the default) the ROM's own textures. The loader reads
+   a directory under the asset root (SM64DS_ASSET_ROOT), or under the
+   working directory when there is no asset root, and an environment
+   variable can name a different one outright. A second one overrides
+   the on/off key: unset is the file's answer, empty or "0" forces it
+   off, anything else forces it on, the grammar the other switch keys
+   already use. The directory getter never returns null; it returns the
+   directory the loader would read from whether or not the key is on,
+   and the pointer is a static buffer that is valid for the whole run.
+
+   SmoothModels: the model subdivision level, 0..3. 0 is the default and is
+   the ROM's own geometry. Absent, unparseable and negative read as 0 and
+   anything above 3 is clamped to 3, the Aspect rule again.
+   SM64DS_SMOOTH_MODELS overrides the file.
+
+   All three are read once and latched, like Aspect and FrameRate, and the
+   launcher's rows promise a restart. */
+int host_setting_render_scale(void);
+/* RESSCALE1: the in-game Settings row. The saved value for the NEXT boot (the running picture stays latched): the value the
+   page last set, else host_setting_render_scale(). The setter sanitises (0..8) and writes RenderScale to settings.json. */
+int host_setting_render_scale_saved(void);
+int host_setting_set_render_scale(int n);
+int host_setting_smooth_models(void);
+
+/* ---- THE TWO PICTURE-SMOOTHING KEYS (run hd2) ---------------------------
+   The same promise as the block above and the same grammar: absent means the
+   picture the build without them produced, byte for byte where it can be
+   measured, and both are opt-in host renderer settings rather than fixes to
+   anything the ROM does.
+
+   TextureFilter: HOW A TEXEL IS CHOSEN when the raster samples a texture.
+   0 is the default and is the sampler the port has always used -- nearest,
+   one texel per pixel, the DS's own look. 1 is bilinear: the four texels
+   around the sample point, blended. 2 is trilinear: bilinear plus a chain of
+   progressively halved copies of each texture, with the two nearest sizes
+   blended, which is what stops a floor running away into the distance from
+   sparkling. Absent, unparseable and negative read as 0 and anything above 2
+   is clamped to 2, the Aspect rule. At 0 no chain is built and no extra
+   memory is held. SM64DS_TEXTURE_FILTER overrides the file.
+
+   AntiAliasing: HOW THE STAIRCASE ALONG A POLYGON EDGE IS SOFTENED.
+   0 is the default and is no pass at all. 1 is edge smoothing: after the 3D
+   picture is drawn and before any 2D layer is composited over it, a filter
+   walks the pixels the 3D engine drew, finds the ones on a contrast edge and
+   blends them along it. It touches only pixels the 3D engine drew, so text,
+   the HUD and the touch-screen art are untouched. Absent, unparseable and
+   negative read as 0 and anything above 1 is clamped to 1.
+   SM64DS_ANTI_ALIASING overrides the file.
+
+   Both are read once and latched, for the reason the block above is: the
+   filter mode sizes the texture cache's mip chains at the first bind and the
+   smoothing pass sizes a full-picture scratch buffer, so both are settled
+   before the first frame and the launcher's rows promise a restart. */
+int host_setting_texture_filter(void);
+int host_setting_anti_aliasing(void);
+
+/* ---- THE THREE PRESENT KEYS (run hd2, lane GPU1) ------------------------
+   The same promise as the two blocks above and the same grammar: absent means
+   the picture the build without them produced, byte for byte where it can be
+   measured. These three are not about what the picture IS, only about how the
+   finished picture reaches the screen.
+
+   PresentBackend: WHICH PATH HANDS THE FINISHED PICTURE OVER. 0 is the
+   default and is the one the port has always used -- one GDI call,
+   StretchDIBits, straight into the window. 1 is Direct3D 11: the same
+   finished picture is uploaded to the graphics card and drawn once as a
+   rectangle, which is what makes a real vsync and a real scaling filter
+   possible at all. Absent, unparseable, 0 itself and negative read as 0 and
+   anything above 1 is clamped to 1, the Aspect rule. It NEVER FAILS: if the
+   card, the driver or the swap chain will not have it, the run says so in one
+   plain line and finishes on the GDI path. SM64DS_PRESENT_BACKEND overrides.
+
+   PresentFilter: HOW THE PICTURE IS STRETCHED to the window, and READ ONLY
+   WHEN THE BACKEND IS 1. 0 is the default and is nearest, the DS's hard pixel
+   edges, which is what the GDI path does today. 1 is smooth, an ordinary
+   bilinear stretch. 2 is sharp: the picture is blown up by a whole number
+   with hard edges first and only the leftover fraction is blended, which
+   keeps the blocky look at a window size that is not a whole multiple.
+   Clamped into 0..2. SM64DS_PRESENT_FILTER_D3D overrides -- NOT
+   SM64DS_PRESENT_FILTER, which has belonged to the GDI path's halftone knob
+   since before this key existed.
+
+   VSync: WHETHER THE PICTURE WAITS FOR THE MONITOR, and READ ONLY WHEN THE
+   BACKEND IS 1, because the GDI path has no vsync to switch on. 0 is the
+   default and is no wait, which is what the port has always done. 1 waits,
+   which removes tearing. Clamped into 0..1. SM64DS_VSYNC overrides.
+   IT CAN STAND ITSELF DOWN: this game advances one fixed step per tick and
+   never catches up, so a wait that does not fit inside the frame's budget
+   would slow the GAME rather than drop a picture. The present path measures
+   that and switches the wait off, with one line, rather than let it happen.
+   It also stands down for the whole run when FrameRate is set, because that
+   key presents the same picture several times inside one tick.
+
+   All three are read once and latched, like the blocks above, and the
+   launcher's rows promise a restart. */
+int host_setting_present_backend(void);
+int host_setting_present_filter(void);
+int host_setting_vsync(void);
+
+/* ---- THE IMPROVED MINIMAP (two keys) ---------------------------------------
+
+   ImprovedMinimap: the corner map panel's player-facing option. ABSENT MEANS
+   ON, which is not this file's usual shape and is deliberate: it is the
+   owner's order for the feature ("on by default"). 0 turns it off and
+   restores the panel exactly as it was. SM64DS_IMPROVED_MINIMAP overrides the
+   file in either direction.
+
+   IT IS PINNED OFF ON EVERY COMPARATOR ROUTE unless the environment asks for
+   it by name. A selftest run and a scene sweep row are the two shapes every
+   baseline capture in this tree is taken in, and a feature that changed what
+   they draw would move a hundred recorded hashes for a reason that has
+   nothing to do with the code under test. So the getter answers 0 for those
+   routes, the same belt-and-braces pin the run mode and the camera mode take
+   in tests/walk_window.cpp, and one explicit SM64DS_IMPROVED_MINIMAP=1 turns
+   it back on for a run that means to look at it.
+
+   MinimapScale: how much bigger than today the map is drawn. 1 is what the
+   port draws today (the half size inset, 128x96). IT IS A FREE NUMBER, not
+   one of a set of rows: the owner asked to grab the map's corner and drag it
+   to whatever size suits his window, so the drag writes back whatever he let
+   go at. The launcher keeps its 1 / 1.25 / 1.5 / 2 / 3 / 4 picker and all six
+   are still exact.
+
+   The one thing a size has to be is a whole number of pixels in both axes.
+   The map keeps its 4:3 shape, so its drawn width must be a multiple of four
+   and every value is quantised onto that grid -- steps of a thirty-second of
+   a multiplier. A value off the grid moves to the nearest one on it and the
+   move is announced once. The DRAWING layer clamps further, to the largest
+   size whose whole decorated panel still fits in the picture, because only it
+   knows the picture's size. SM64DS_MINIMAP_SCALE overrides the file and is the
+   size a run starts at; a run that never drags stays pinned there exactly,
+   which is every scripted run, and a drag takes the size over from the moment
+   it happens. The pin used to outrank the drag for the whole run, and that
+   made the drag do nothing at all under a shortcut that set it.
+
+   ImprovedMinimap is read once and latched. MinimapScale is read live,
+   because the drag moves it while the game is running.
+
+   _set_live moves the size for this run only and is what a drag calls on
+   every frame; _save also writes MinimapScale back to settings.json through
+   the same writer the debug menu's run and camera rows use, carrying every
+   other key across untouched, and is what the mouse-up calls. */
+int host_setting_improved_minimap(void);
+double host_setting_minimap_scale_value(void);
+void host_setting_minimap_scale_ratio(int *num, int *den);
+void host_setting_minimap_scale_set_live(double s);
+int host_setting_save_minimap_scale(double s);
+
+
+/* ---- THE RENDERER KEY (run hd2, lane GPU2) -------------------------------
+   Renderer: WHICH RASTERISER DRAWS THE 3D PICTURE. 0 is the default and is
+   the software one the port has always had, which is also the only path with
+   a byte-exact reference behind it. 1 is Direct3D 11: the SOLID part of the
+   3D picture -- the opaque pass, which is nearly all of the work -- is drawn
+   on the graphics card into offscreen colour, depth and polygon-id targets
+   and read straight back into the same buffers the software pass would have
+   filled, so the see-through polygons, the drop shadows, the edge smoothing,
+   the 2D layers, the touch screen and the display capture all carry on
+   unchanged over it. Absent, unparseable, 0 itself and negative read as 0 and
+   anything above 1 is clamped to 1, the Aspect rule. SM64DS_RENDERER
+   overrides.
+
+   IT IS INDEPENDENT OF PresentBackend. Either can be on without the other;
+   with both on the process makes exactly ONE Direct3D device and both share
+   it (hal/gpu_device.h).
+
+   IT IS NOT PIXEL FOR PIXEL THE SOFTWARE PICTURE and cannot be: two
+   rasterisers with different fill rules settle a shared edge differently.
+   What is measured instead is how far apart the two are, frame by frame, on
+   the same triangle list (ntr/gx.cpp, SM64DS_RENDERER_AB).
+
+   IT NEVER FAILS: if the card, the driver or a readback will not have it, the
+   run says so in one plain line and draws that frame and every later one in
+   software. Read once and latched, like the blocks above; the launcher's row
+   promises a restart. */
+int host_setting_renderer(void);
+
+/* ---- THE SAVE MENU ON THE TOP SCREEN (one key) -----------------------------
+
+   SaveMenuOnTop: while the level-clear save menu is up after a Power Star,
+   the big picture is COMPOSED out of both DS screens instead of showing one
+   of them. The top screen's course-clear text goes at the top, the bottom
+   screen's three button plates go in the middle at the largest size the
+   space between allows, and the top screen's coin total goes at the very
+   bottom. Nothing else of either screen is drawn. The frame the menu is
+   answered, by a click on any row or by Start, the ordinary picture is back.
+
+   ABSENT MEANS ON. It is a mod the owner asked for and recommended on, the
+   same default ImprovedMinimap carries and for the same reason. 0 is the
+   picture the port drew before this key existed, to the pixel.
+
+   IT IS PINNED OFF ON EVERY COMPARATOR ROUTE (a window selftest or a scene
+   run) unless SM64DS_SAVE_MENU_ON_TOP names it, so no recorded baseline moves.
+   The environment overrides the file in either direction and outranks the pin.
+
+   It is read once and latched, like ImprovedMinimap and Aspect. */
+int host_setting_save_menu_on_top(void);
+
+/* ---- LIVE SETTINGS (run menu1, lane SETLIVE1) -----------------------------
+   The setters below change a value in the running game at once and queue the
+   settings.json write (about every half second at most while a slider moves;
+   host_settings_save_flush forces it). hal/settings_live.h is the id-based
+   API the in-game page uses; these are what it stands on. Each set returns 1
+   when the value was accepted, 0 when it was out of range (nothing changed).
+
+   host_settings_ctl_gen moves whenever a binding, run mode, camera mode or one
+   of the numbers below changes, by a set or by a launcher edit seen by the
+   poll. A frame loop that compares it with the last value it saw knows when to
+   re-copy its working values. */
+int host_setting_run_mode(void);   /* 0 button, 1 analog, 2 auto */
+int host_setting_run_key(void);
+int host_setting_run_pad(void);
+int host_settings_ctl_gen(void);
+int host_settings_cam_gen(void);   /* moves when CameraMode is set or reloaded, not on F1 */
+void host_settings_save_tick(void);
+int host_settings_save_pending(void);
+int host_settings_save_flush(void);
+/* Dev builds only (a proof knob that sets picks for one row): from now on nothing is written to settings.json in this
+   session; the working values still move. */
+void host_settings_session_only(void);
+
+int host_setting_set_key(int action, int vk);
+/* why the last set_key / set_pad was refused ("" if it was not): Start cannot
+   lose both its key and its button */
+const char *host_setting_refusal(void);
+/* the name of the cross-process mutex around settings.json read-modify-write
+   (the launcher takes the same one); for the smoke test */
+void host_settings_lock_name(const char *path, char *out, int cap);
+int host_setting_set_pad(int action, int mask);
+int host_setting_set_run_mode(int mode);
+int host_setting_set_camera_mode(int mode);
+int host_setting_set_swap_camera_turn(int on);
+int host_setting_set_invert_camera_y(int on);
+int host_setting_set_stick_deadzone(int pct);          /* 0..50, 24 = today */
+int host_setting_set_run_threshold(int pct);           /* 30..100, 89 = ROM */
+int host_setting_set_camera_sensitivity(int pct);      /* 10..400, 100 = today */
+int host_setting_set_mouse_sensitivity(int pct);       /* 10..400, 100 = today */
+int host_setting_set_mouse_capture(int on);
+int host_setting_set_volume(int pct);                  /* 0..100 */
+int host_setting_set_minimap_scale(double s);
+
+int host_setting_stick_deadzone_raw(void);   /* of 32767; 7849 by default */
+int host_setting_stick_deadzone_pct(void);   /* 24 by default */
+int host_setting_stick_digital(void);        /* 12000 by default, scales with it */
+int host_setting_run_threshold_pct(void);    /* 89 by default */
+int host_setting_run_threshold_is_default(void);
+int host_setting_run_remap(int mag);         /* 0..0x1000 in, 0..0x1000 out */
+double host_setting_run_norm(void);          /* 0.87 by default (MP fold) */
+int host_setting_invert_camera_y(void);
+int host_setting_camera_sensitivity(void);
+int host_setting_mouse_sensitivity(void);
+/* SKYCAM1 phase 2: CameraStickAccel / CameraStickDecel, 0..10, 0 by default (instant, the 1.0.6 feel). How many tenths of a second
+   the right stick's analog / free camera turn takes to reach full speed after a push, and to stop after the stick is let go.
+   The mouse and the DS camera are untouched. Live. */
+int host_setting_camera_stick_accel(void);
+int host_setting_camera_stick_decel(void);
+int host_setting_set_camera_stick_accel(int v);
+int host_setting_set_camera_stick_decel(int v);
+/* SKIPINTRO1: SkipOpening, bool, OFF by default: a new file skips its opening and starts at the castle with the opening marked seen. Live. */
+int host_setting_skip_opening(void);
+int host_setting_set_skip_opening(int on);
+
+#ifdef __cplusplus
+}
+#endif
+
+#ifdef __cplusplus
+namespace port {
+}
+#endif
+
+#endif /* PORT_HOST_SETTINGS_H */

@@ -1,0 +1,23 @@
+diff --git a/include/dScMgMCarlo_c.h b/include/dScMgMCarlo_c.h
+--- a/include/dScMgMCarlo_c.h
++++ b/include/dScMgMCarlo_c.h
+@@ -125,7 +125,18 @@
+         STATE_EXIT_DELAY
+     };
+ 
+-    virtual ~dScMgMCarlo_c() {}
++    /* The destructor pair spelled as two plain virtuals on the host, plus
++       the non-virtual destructor declaration the src/ definitions need; the
++       whole ruling is in include/ModelBase.h. An override takes its base's
++       slots, so these carry the SAME TWO NAMES the base declares -- a fresh
++       name would append a slot instead of claiming one. */
++#ifdef _MSC_VER
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~dScMgMCarlo_c() {}   /* no slot */
++#else
++    virtual ~dScMgMCarlo_c() {}   /* D1 and D0 */
++#endif
+ 
+     /* This class's own override, read off the ROM's vtable: the one slot where
+        the table differs from dScMgSingle3DBase_c's. Spelled WITHOUT the `virtual`

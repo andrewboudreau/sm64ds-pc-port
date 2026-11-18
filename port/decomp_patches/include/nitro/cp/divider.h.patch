@@ -1,0 +1,72 @@
+diff --git a/include/nitro/cp/divider.h b/include/nitro/cp/divider.h
+--- a/include/nitro/cp/divider.h
++++ b/include/nitro/cp/divider.h
+@@ -12,37 +12,59 @@
+ #include "types.h"
+ #include "nitro/hw/registers.h"
+ 
++/* The unit's operand and control stores. On the DS a store to DIVCNT,
++ * DIV_NUMER or DIV_DENOM (SQRTCNT or either SQRT_PARAM half) is what starts
++ * the unit. The host maps the register window as plain memory and runs the
++ * unit only for a store that reaches port/ntr/io.cpp's io_write, which is what
++ * tools/hostgen.py rewrites register stores spelled in a source file into.
++ * These inline helpers are spelled in a header hostgen does not rewrite, so on
++ * the host they make that same call themselves; the results stay plain reads
++ * of the latched result registers, as on hardware. io_write brings the window
++ * up itself, so a static initialiser that divides before main is covered. */
++#ifdef _MSC_VER
++#ifdef __cplusplus
++extern "C" {
++#endif
++void ntr_cp_reg_write(u32 addr, u64 value, unsigned width);
++#ifdef __cplusplus
++}
++#endif
++#define CP_REG_STORE(T, addr, v) ntr_cp_reg_write((u32)(addr), (u64)(T)(v), (unsigned)sizeof(T))
++#else
++#define CP_REG_STORE(T, addr, v) (*(volatile T *)(addr) = (v))
++#endif
++
+ #define CP_DIV_32_32BIT_MODE 0
+ #define CP_DIV_64_32BIT_MODE 1
+ #define CP_DIV_64_64BIT_MODE 2
+ 
+ static inline void CP_SetDivImm32_32(u32 numer, u32 denom) {
+-    *(volatile u32 *)REG_DIV_NUMER_ADDR = numer;
+-    *(volatile u64 *)REG_DIV_DENOM_ADDR = denom;
++    CP_REG_STORE(u32, REG_DIV_NUMER_ADDR, numer);
++    CP_REG_STORE(u64, REG_DIV_DENOM_ADDR, denom);
+ }
+ 
+ static inline void CP_SetDiv32_32(u32 numer, u32 denom) {
+-    REG_DIVCNT = CP_DIV_32_32BIT_MODE;
++    CP_REG_STORE(u16, 0x04000280, CP_DIV_32_32BIT_MODE);
+     CP_SetDivImm32_32(numer, denom);
+ }
+ 
+ static inline void CP_SetDivImm64_32(u64 numer, u32 denom) {
+-    *(volatile u64 *)REG_DIV_NUMER_ADDR = numer;
+-    *(volatile u64 *)REG_DIV_DENOM_ADDR = denom;
++    CP_REG_STORE(u64, REG_DIV_NUMER_ADDR, numer);
++    CP_REG_STORE(u64, REG_DIV_DENOM_ADDR, denom);
+ }
+ 
+ static inline void CP_SetDiv64_32(u64 numer, u32 denom) {
+-    REG_DIVCNT = CP_DIV_64_32BIT_MODE;
++    CP_REG_STORE(u16, 0x04000280, CP_DIV_64_32BIT_MODE);
+     CP_SetDivImm64_32(numer, denom);
+ }
+ 
+ static inline void CP_SetDivImm64_64(u64 numer, u64 denom) {
+-    *(volatile u64 *)REG_DIV_NUMER_ADDR = numer;
+-    *(volatile u64 *)REG_DIV_DENOM_ADDR = denom;
++    CP_REG_STORE(u64, REG_DIV_NUMER_ADDR, numer);
++    CP_REG_STORE(u64, REG_DIV_DENOM_ADDR, denom);
+ }
+ 
+ static inline void CP_SetDiv64_64(u64 numer, u64 denom) {
+-    REG_DIVCNT = CP_DIV_64_64BIT_MODE;
++    CP_REG_STORE(u16, 0x04000280, CP_DIV_64_64BIT_MODE);
+     CP_SetDivImm64_64(numer, denom);
+ }
+ 

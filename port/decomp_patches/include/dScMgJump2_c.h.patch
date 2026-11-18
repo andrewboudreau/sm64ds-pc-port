@@ -1,0 +1,41 @@
+diff --git a/include/dScMgJump2_c.h b/include/dScMgJump2_c.h
+--- a/include/dScMgJump2_c.h
++++ b/include/dScMgJump2_c.h
+@@ -38,6 +38,9 @@
+ #include "dExtSimpleModel_c.h"
+ #include "Heyho.h"
+ #include "Jump2Popup.h"
++#ifdef _MSC_VER
++#pragma pack(push, 4) /* host only: MSVC aligns pointer-to-member fields to 8, mwccarm to 4 */
++#endif
+ 
+ struct dScMgJump2_c : dScMgD3DBase_c {
+     /* DEFINED IN THE CLASS BODY, DELIBERATELY -- not a style choice.
+@@ -53,7 +56,18 @@
+        DECLARED but not defined here is StartRound below, which lives in
+        src/minigames/d_s_mg_jump2.cpp, so _ZTV12dScMgJump2_c is still emitted
+        by that one translation unit and by no other. */
+-    virtual ~dScMgJump2_c() {}
++    /* The destructor pair spelled as two plain virtuals on the host, plus
++       the non-virtual destructor declaration the src/ definitions need; the
++       whole ruling is in include/ModelBase.h. An override takes its base's
++       slots, so these carry the SAME TWO NAMES the base declares -- a fresh
++       name would append a slot instead of claiming one. */
++#ifdef _MSC_VER
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~dScMgJump2_c() {}   /* no slot */
++#else
++    virtual ~dScMgJump2_c() {}   /* D1 and D0 */
++#endif
+     virtual void StartRound(int arg);  /* slot 18 */
+     virtual int CanEndState(int mode); /* slot 19 */
+ 
+@@ -109,4 +123,7 @@
+ typedef char dScMgJump2_c_size_must_be_0x5a78[sizeof(dScMgJump2_c) == 0x5a78 ? 1 : -1];
+ #endif
+ 
++#ifdef _MSC_VER
++#pragma pack(pop)
+ #endif
++#endif

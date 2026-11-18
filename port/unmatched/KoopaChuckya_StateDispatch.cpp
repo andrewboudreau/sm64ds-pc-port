@@ -1,0 +1,275 @@
+/* HOST COPIES of CHUCKYA's two pointer-to-member dispatchers (gate 182,
+ * ov062), the seat of the twenty state records they read, and the one
+ * name-and-abort stub KOOPA's link needs.
+ *
+ * CHUCKYA (190, daHolhei_c) drives a TWENTY-state machine through ten 16-byte
+ * State objects in ov062 bss (0x0211de70..0x0211df00), each two mwcc
+ * {function, delta} records: the ENTER half at +0 and the MAIN half at +8.
+ * Chuckya_ChangeState stores a State pointer at this+0x364 and dispatches the
+ * ENTER half once; Chuckya::Behavior dispatches the MAIN half every frame. Both
+ * matched TUs form the pointer-to-member over a FORWARD-DECLARED struct
+ * (`struct C; typedef int (C::*PMF)();` / `struct Klass;`), so MSVC hands them
+ * the general (worst-case-inheritance) PMF representation, a multi-word value
+ * plus a this-adjust thunk, not the single code pointer a complete
+ * single-inheritance class gets -- the KnockDownPlank/MontyMole/Scuttlebug
+ * case exactly. Each body below is the matched source's control flow line for
+ * line; only the dispatch is read as a plain { fn, delta } and the fn called
+ * with `this`.
+ *
+ * RECORD GEOMETRY, READ OFF THE ROM'S OWN DISPATCH MATH (not the source):
+ * Behavior at 0x021170c8: `ldr r1,[r4,#0x364]; ldr r0,[r1,#8]` -- the MAIN
+ * half IS the record at State+8, fn at +0 of the record, delta at +4
+ * (`add r3,r1,#8; ldr r1,[r3,#4]`), the virtual-bit arithmetic inline.
+ * ChangeState at 0x02116ce4: `ldr r3,[r0,#0x364]; ldr r2,[r3]` -- the ENTER
+ * half is the record at State+0. No table indexing anywhere -- the dispatchers
+ * take record POINTERS, so there is no stride to misread.
+ *
+ * THE SEAT (the Scuttlebug/MontyMole "seat the source before the copy" order)
+ * --------------------------------------------------------------------------
+ * The twenty SOURCE statics live at ov062 0x0211d900..0x0211d998 (8 bytes
+ * each); __sinit_d_a_holhei.cpp -- which gate 32 already runs -- copies them
+ * into the ten bss State objects. The ovdata mount lays the source blocks down
+ * with their fn words as DS CODE ADDRESSES (the mount's pointer pass rebases
+ * only pointers into other mounted DATA). port_chuckya_states_seat() rewrites
+ * each source fn word with its host body BEFORE that sinit runs, validating
+ * each mounted word against the ROM address first (WRONG-BYTES abort), so a
+ * mount pointing at the wrong bytes says so instead of copying an
+ * overlay-image address into the live objects. All twenty .delta halves are 0
+ * (verified against the overlay image; no reloc at any +4). All twenty state
+ * bodies are matched src (slice_gate182.txt). Called from
+ * hal/actor_overlays.cpp between port_ov062_syms_patch() and
+ * __sinit_d_a_holhei.cpp().
+ *
+ * KOOPA (203, daNknk_c) NEEDS NO SEAT AND NO BEHAVIOR COPY: its matched
+ * Behavior is a plain switch machine, no pointer-to-member anywhere. Its
+ * Render is the ModelAnim slot-5 collision -- port/unmatched/Koopa_Render.cpp.
+ *
+ * THE STUB THAT IS NO LONGER A STUB
+ * ---------------------------------
+ * func_ov062_02117724 (0x270 bytes) is the shell-dust Particle helper three
+ * matched Koopa Behavior helpers (func_ov062_02118718/02118b4c/02118cdc) bl
+ * into when the actor's state byte at +0x398 reads 3. This file described it
+ * as UNMATCHED, first as an abort stub and then as a host copy over a "TRUE
+ * FLOOR at 5 divergences". Both readings are dead: src/func_ov062_02117724.c
+ * is a verified byte-match on main (PR #1474, 8ec808874, 2026-08-13) and run
+ * linkw wave 9 (lane w9-harvest) linked it here. CHUCKYA never calls it.
+ */
+#include <cstdio>
+#include <cstdlib>
+
+#include "dExtAnmModel_c.h"
+#include "hal/pmf_tc.h"
+#include "daHolhei_c.h"
+
+extern "C" {
+
+struct PortPmf { unsigned fn; int delta; };
+
+/* ---- Chuckya Behavior's C-linkage helpers, all matched src or hosted ---- */
+int _ZN12dEnemyBase_c26UpdateKillByInvincibleCharER10dBgCh_ActrR14dExtAnmModel_cj(
+    void *self, void *wm, void *anim, unsigned int n);
+unsigned short DecIfAbove0_Short(unsigned short *p);
+void _ZN8dActor_c9UpdatePosEP5dCc_c(void *self, void *cc);
+int _ZN12dEnemyBase_c15IsGoingOffCliffER10dBgCh_Actrisbbi(
+    void *self, void *wm, int a, short b, int c, int d, void *e);
+void _ZN12dEnemyBase_c12UpdateWMClsnER10dBgCh_Actrj(void *self, void *wm,
+                                              unsigned int j);
+   /* the held/thrown-player step */
+void _ZN5dCc_c5ClearEv(void *self);
+void _ZN5dCc_c6UpdateEv(void *self);
+void _ZN15dExtFrameCtrl_c7AdvanceEv(void *self);
+void _ZN10daHolhei_c16UpdateHeldShadowEv(void *c);      /* the held-by-player short-circuit */
+      /* the post step */
+      /* the shadow drop */
+extern signed char gCurrentSublevel;       /* the current level id */
+
+/* func_ov062_02117724's own callees (all matched arm9 TUs) + the sin/cos table */
+void func_0201267c(int a, char *b);      /* the shell-scrape sound */
+int _ZN8Particle6System3NewEjjiiiPK11Vector3_16fPN5dPa_c7level_c10callback_cE(
+    int a, int b, int x, int y, int z, int v, int cb);
+void _ZN8Particle19SetSelfDestructFlagEj(int id);
+char *_ZN8Particle6System12FromUniqueIDEj(int id);
+extern short FX_SinCosTable_[];            /* the shared sin/cos fixed-point table */
+
+/* the State objects Behavior compares this+0x364 against (mounted bss) */
+extern unsigned char data_ov062_0211de70[], data_ov062_0211de90[],
+    data_ov062_0211dea0[], data_ov062_0211dec0[], data_ov062_0211ded0[],
+    data_ov062_0211dee0[], data_ov062_0211df00[];
+
+/* the twenty state bodies, all matched src (called by host pointer with
+   `this` as arg 0, which is what they expect) */
+int _ZN10daHolhei_c19func_ov062_021161a8Ev(void *c); int _ZN10daHolhei_c19func_ov062_02116238Ev(void *c);
+int _ZN10daHolhei_c19func_ov062_02116274Ev(void *c); int _ZN10daHolhei_c19func_ov062_021162b8Ev(void *c);
+int _ZN10daHolhei_c19func_ov062_0211632cEv(void *c); int _ZN10daHolhei_c19func_ov062_02116368Ev(void *c);
+int _ZN10daHolhei_c19func_ov062_021163b0Ev(void *c); int _ZN10daHolhei_c19func_ov062_02116498Ev(void *c);
+int _ZN10daHolhei_c19func_ov062_021164e8Ev(void *c); int _ZN10daHolhei_c19func_ov062_021165e0Ev(void *c);
+int _ZN10daHolhei_c19func_ov062_021165e8Ev(void *c); int _ZN10daHolhei_c19func_ov062_02116784Ev(void *c);
+int _ZN10daHolhei_c19func_ov062_021167c0Ev(void *c); int _ZN10daHolhei_c19func_ov062_02116850Ev(void *c);
+int _ZN10daHolhei_c19func_ov062_02116894Ev(void *c); int _ZN10daHolhei_c19func_ov062_02116980Ev(void *c);
+int _ZN10daHolhei_c19func_ov062_02116a08Ev(void *c); int _ZN10daHolhei_c19func_ov062_02116b80Ev(void *c);
+int _ZN10daHolhei_c19func_ov062_02116bf8Ev(void *c); int _ZN10daHolhei_c19func_ov062_02116c78Ev(void *c);
+
+/* the twenty SOURCE records the sinit copies from (data, {fn, 0}) */
+extern PortPmf data_ov062_0211d900, data_ov062_0211d908, data_ov062_0211d910,
+    data_ov062_0211d918, data_ov062_0211d920, data_ov062_0211d928,
+    data_ov062_0211d930, data_ov062_0211d938, data_ov062_0211d940,
+    data_ov062_0211d948, data_ov062_0211d950, data_ov062_0211d958,
+    data_ov062_0211d960, data_ov062_0211d968, data_ov062_0211d970,
+    data_ov062_0211d978, data_ov062_0211d980, data_ov062_0211d988,
+    data_ov062_0211d990, data_ov062_0211d998;
+
+}  /* extern "C" */
+
+/* Chuckya_ChangeState IS NOT A HOST COPY ANY MORE. Run link100 lane PMF2 put
+   src/Chuckya_ChangeState.cpp back on port/slice_pmf2.txt (batch 2): with /vmg /vmm
+   global MSVC's pointer-to-member IS the ROM's 8-byte {function, delta}
+   pair, the matched TU compiles to the same tail jump this body was, and
+   the seat in this file aborts the binary on a nonzero delta so the two
+   agree word for word. The reading above is kept as the derivation. */
+/* HOST COPY RETIRED, run link100 lane PMFB7 gate 2. src/_ZN7Chuckya8BehaviorEv.cpp
+   dispatches its own field now: with /vmg /vmm (block R8) MSVC's pointer to
+   member IS the ROM's eight-byte {code, adjust} pair, so the widening this
+   banner was written for does not happen. The per-frame half of every state
+   cell holds a zero-argument __fastcall face; the enter half does not change,
+   because the helper that dispatches it tail-jumps. Measurements in
+   port/slice_pmfb7.txt and lane PMFB7's report (run link100). */
+
+/* ---- THE SEAT --------------------------------------------------------------
+   The twenty source fn words in FEEDER ORDER (0x0211d900..0x0211d998), each
+   {slot, rom, host} triple matched against its own reloc destination in
+   config/arm9/overlays/ov062/relocs.txt (from:0x0211d900 -> 0x02116784 and so
+   on down the run). Rewritten BEFORE __sinit_d_a_holhei.cpp copies them into
+   the ten bss State objects. */
+/* ---- RUN link100 LANE PMFB7 GATE 2: THE PER-FRAME RECORDS ARE FACES -------
+ * Chuckya's matched TU dispatches its state cell's +8 half as a real
+ * pointer to member -- mov eax,[cell+8] / test eax,eax / je /
+ * mov ecx,[cell+12] / add ecx,this / call eax, the ROM's own offsets, receiver
+ * in ecx, NOTHING pushed, ARITY ZERO, /Zp4 diff 0 lines
+ * (lane PMFB7, run link100). The seat used to install plain
+ * cdecl bodies that take their self off the stack, so each PER-FRAME record now
+ * holds a zero-argument __fastcall face that forwards the receiver as the one
+ * cdecl argument the ROM's own state body takes -- the same call the cell held
+ * before, made through ecx instead of the stack.
+ *
+ * THE ENTER RECORDS DO NOT CHANGE: they are reached by the class's state-change
+ * helper, which MSVC compiles as a one-call forwarder ending in `jmp`, so the
+ * caller's own frame is reused and a plain cdecl body is right there.
+ *
+ * WHICH RECORD IS WHICH is read out of the class's own __sinit
+ * (lane PMFB7, run link100), never assumed.
+ */
+static void __fastcall pmfb7_ov062_021167c0(void *self, void *dead_edx)
+{
+    (void)dead_edx;   /* record 0211d908, the per-frame half */
+    ((void (*)(void *))(void *)_ZN10daHolhei_c19func_ov062_021167c0Ev)(self);
+}
+static void __fastcall pmfb7_ov062_0211632c(void *self, void *dead_edx)
+{
+    (void)dead_edx;   /* record 0211d910, the per-frame half */
+    ((void (*)(void *))(void *)_ZN10daHolhei_c19func_ov062_0211632cEv)(self);
+}
+static void __fastcall pmfb7_ov062_021165e8(void *self, void *dead_edx)
+{
+    (void)dead_edx;   /* record 0211d918, the per-frame half */
+    ((void (*)(void *))(void *)_ZN10daHolhei_c19func_ov062_021165e8Ev)(self);
+}
+static void __fastcall pmfb7_ov062_02116274(void *self, void *dead_edx)
+{
+    (void)dead_edx;   /* record 0211d928, the per-frame half */
+    ((void (*)(void *))(void *)_ZN10daHolhei_c19func_ov062_02116274Ev)(self);
+}
+static void __fastcall pmfb7_ov062_021163b0(void *self, void *dead_edx)
+{
+    (void)dead_edx;   /* record 0211d930, the per-frame half */
+    ((void (*)(void *))(void *)_ZN10daHolhei_c19func_ov062_021163b0Ev)(self);
+}
+static void __fastcall pmfb7_ov062_02116bf8(void *self, void *dead_edx)
+{
+    (void)dead_edx;   /* record 0211d938, the per-frame half */
+    ((void (*)(void *))(void *)_ZN10daHolhei_c19func_ov062_02116bf8Ev)(self);
+}
+static void __fastcall pmfb7_ov062_02116a08(void *self, void *dead_edx)
+{
+    (void)dead_edx;   /* record 0211d950, the per-frame half */
+    ((void (*)(void *))(void *)_ZN10daHolhei_c19func_ov062_02116a08Ev)(self);
+}
+static void __fastcall pmfb7_ov062_02116894(void *self, void *dead_edx)
+{
+    (void)dead_edx;   /* record 0211d960, the per-frame half */
+    ((void (*)(void *))(void *)_ZN10daHolhei_c19func_ov062_02116894Ev)(self);
+}
+static void __fastcall pmfb7_ov062_021161a8(void *self, void *dead_edx)
+{
+    (void)dead_edx;   /* record 0211d970, the per-frame half */
+    ((void (*)(void *))(void *)_ZN10daHolhei_c19func_ov062_021161a8Ev)(self);
+}
+static void __fastcall pmfb7_ov062_021164e8(void *self, void *dead_edx)
+{
+    (void)dead_edx;   /* record 0211d990, the per-frame half */
+    ((void (*)(void *))(void *)_ZN10daHolhei_c19func_ov062_021164e8Ev)(self);
+}
+
+static const struct { PortPmf *slot; unsigned rom; int (*host)(void *); }
+g_chuckya_states[] = {
+    {&data_ov062_0211d900, 0x02116784, _ZN10daHolhei_c19func_ov062_02116784Ev},
+    {&data_ov062_0211d908, 0x021167c0, (int (*)(void *))(void *)pmfb7_ov062_021167c0},
+    {&data_ov062_0211d910, 0x0211632c, (int (*)(void *))(void *)pmfb7_ov062_0211632c},
+    {&data_ov062_0211d918, 0x021165e8, (int (*)(void *))(void *)pmfb7_ov062_021165e8},
+    {&data_ov062_0211d920, 0x02116850, _ZN10daHolhei_c19func_ov062_02116850Ev},
+    {&data_ov062_0211d928, 0x02116274, (int (*)(void *))(void *)pmfb7_ov062_02116274},
+    {&data_ov062_0211d930, 0x021163b0, (int (*)(void *))(void *)pmfb7_ov062_021163b0},
+    {&data_ov062_0211d938, 0x02116bf8, (int (*)(void *))(void *)pmfb7_ov062_02116bf8},
+    {&data_ov062_0211d940, 0x02116c78, _ZN10daHolhei_c19func_ov062_02116c78Ev},
+    {&data_ov062_0211d948, 0x02116238, _ZN10daHolhei_c19func_ov062_02116238Ev},
+    {&data_ov062_0211d950, 0x02116a08, (int (*)(void *))(void *)pmfb7_ov062_02116a08},
+    {&data_ov062_0211d958, 0x02116980, _ZN10daHolhei_c19func_ov062_02116980Ev},
+    {&data_ov062_0211d960, 0x02116894, (int (*)(void *))(void *)pmfb7_ov062_02116894},
+    {&data_ov062_0211d968, 0x021162b8, _ZN10daHolhei_c19func_ov062_021162b8Ev},
+    {&data_ov062_0211d970, 0x021161a8, (int (*)(void *))(void *)pmfb7_ov062_021161a8},
+    {&data_ov062_0211d978, 0x02116368, _ZN10daHolhei_c19func_ov062_02116368Ev},
+    {&data_ov062_0211d980, 0x021165e0, _ZN10daHolhei_c19func_ov062_021165e0Ev},
+    {&data_ov062_0211d988, 0x02116498, _ZN10daHolhei_c19func_ov062_02116498Ev},
+    {&data_ov062_0211d990, 0x021164e8, (int (*)(void *))(void *)pmfb7_ov062_021164e8},
+    {&data_ov062_0211d998, 0x02116b80, _ZN10daHolhei_c19func_ov062_02116b80Ev},
+};
+
+extern "C" void port_chuckya_states_seat(void)
+{
+    static int done;
+    if (done)
+        return;
+    done = 1;
+    for (unsigned i = 0; i < sizeof g_chuckya_states /
+                             sizeof g_chuckya_states[0]; ++i) {
+        PortPmf *p = g_chuckya_states[i].slot;
+        if ((unsigned)(p->fn) < 0x02000000u || (unsigned)(p->fn) >= 0x02400000u) continue;  /* PORTSYNC3: a mount word that is not a DS code address: the class TU owns the live table */
+        if (p->fn != g_chuckya_states[i].rom || p->delta != 0) {
+            std::fprintf(stderr, "FATAL: Chuckya state source %u: the mount "
+                         "holds %08x/%d, the ROM's own table says %08x/0 -- "
+                         "WRONG BYTES\n", i, p->fn, p->delta,
+                         g_chuckya_states[i].rom);
+            std::abort();
+        }
+        p->fn = PORT_PMF_TC(g_chuckya_states[i].host);
+    }
+}
+
+/* ---- THE HOST COPY THAT USED TO BE HERE IS GONE (run linkw wave 9, lane
+   w9-harvest) ----------------------------------------------------------------
+   ov062 0x02117724 is KOOPA's state-3 shell-dust Particle helper, bl'd from
+   three matched Koopa helpers (func_ov062_02118718/02118b4c gate on
+   `if (state==3)`, func_ov062_02118cdc on `if (state==1)`).  This file used to
+   define it, under a banner that read "It is UNMATCHED -- no C in src/" and a
+   nearmiss note calling the byte-match "a TRUE FLOOR at 5 divergences".
+
+   Both statements were true of every tree this branch can see and FALSE of
+   main.  src/func_ov062_02117724.c is a verified byte-match, landed on main in
+   PR #1474 (8ec808874, 2026-08-13); the floor was cracked and the near-miss
+   note was never re-read from here because this branch forked at 7b2f913fe on
+   2026-08-04.  The matched TU is now carried by port/slice_w9harvest.txt and
+   the host copy is deleted -- the three callers reach the real decomp.
+
+   Nothing else in this file referenced it; its callee declarations above
+   (func_0201267c, Particle::System::New / SetSelfDestructFlag / FromUniqueID,
+   FX_SinCosTable_) are kept because the matched TU declares the same call
+   surface and this file's own narrative reads against it. */

@@ -1,0 +1,39 @@
+diff --git a/include/dScMgTrampoline2_c.h b/include/dScMgTrampoline2_c.h
+--- a/include/dScMgTrampoline2_c.h
++++ b/include/dScMgTrampoline2_c.h
+@@ -24,10 +24,24 @@
+ #include "Trmp2Spinner.h"
+ #include "TrmpScorePopup.h"
+ 
++#ifdef _MSC_VER
++#pragma pack(push, 4) /* host only: MSVC aligns pointer-to-member fields to 8, mwccarm to 4 */
++#endif
+ struct dScMgTrampoline2_c : dScMgD3DBase_c {
+     typedef void (dScMgTrampoline2_c::*State)();
+ 
+-    virtual ~dScMgTrampoline2_c() {}
++    /* The destructor pair spelled as two plain virtuals on the host, plus
++       the non-virtual destructor declaration the src/ definitions need; the
++       whole ruling is in include/ModelBase.h. An override takes its base's
++       slots, so these carry the SAME TWO NAMES the base declares -- a fresh
++       name would append a slot instead of claiming one. */
++#ifdef _MSC_VER
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~dScMgTrampoline2_c() {}   /* no slot */
++#else
++    virtual ~dScMgTrampoline2_c() {}   /* D1 and D0 */
++#endif
+     virtual void StartRound(int arg);               /* slot 18 */
+     virtual int  CanEndState(int mode);              /* slot 19 */
+     virtual int  OnGraphCallback0();                        /* slot 23 */
+@@ -93,6 +107,9 @@
+     s32 Behavior();           /* slot 6 -- ov006 0x02123340 */
+     s32 Render();             /* slot 9 -- ov006 0x021231ac */
+ };
++#ifdef _MSC_VER
++#pragma pack(pop)
++#endif
+ 
+ #ifndef SM64DS_PLATFORM_PC
+ /* ROM layout under mwccarm; host ABI divergence is tracked separately. */

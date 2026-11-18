@@ -1,0 +1,18 @@
+diff --git a/include/daBtfly_c.h b/include/daBtfly_c.h
+--- a/include/daBtfly_c.h
++++ b/include/daBtfly_c.h
+@@ -107,7 +107,14 @@
+                                  State6. */
+ #ifdef __cplusplus
+     /* methods */
++    #ifdef _MSC_VER
++    /* host two-arm destructor spelling; ruling in include/ModelBase.h */
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~daBtfly_c();   /* no slot */
++    #else
+     virtual ~daBtfly_c();
++    #endif
+     virtual int InitResources();
+     virtual int CleanupResources();                  /* slot  3 */
+     virtual int Behavior();

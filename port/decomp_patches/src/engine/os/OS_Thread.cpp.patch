@@ -1,0 +1,19 @@
+diff --git a/src/engine/os/OS_Thread.cpp b/src/engine/os/OS_Thread.cpp
+--- a/src/engine/os/OS_Thread.cpp
++++ b/src/engine/os/OS_Thread.cpp
+@@ -56,8 +56,15 @@
+ 
+ /* NitroSDK linker constants: the address is the value (the LCF assigns
+  * SDK_SYS_STACKSIZE = 0 and SDK_IRQ_STACKSIZE = 0x600). */
++#ifdef _MSC_VER
++/* host: MSVC cannot give a symbol an absolute address, so the two LCF
++ * values stand in as constants (the casts below read them unchanged). */
++#define SDK_SYS_STACKSIZE 0
++#define SDK_IRQ_STACKSIZE 0x600
++#else
+ extern void SDK_SYS_STACKSIZE(void);
+ extern void SDK_IRQ_STACKSIZE(void);
++#endif
+ 
+ extern OSSwitchThreadCallback OSi_SystemCallbackInSwitchThread;
+ extern OSThread **OSi_CurrentThreadPtr;

@@ -1,0 +1,27 @@
+diff --git a/src/game/actors/d_a_grock.cpp b/src/game/actors/d_a_grock.cpp
+--- a/src/game/actors/d_a_grock.cpp
++++ b/src/game/actors/d_a_grock.cpp
+@@ -308,6 +308,9 @@
+                 Vector3_16 rot = mPrevAngle;
+                 rnd = (u32)RandomIntInternal(&data_0209e650.value);
+                 rot.y = rot.y + (rnd >> 16) % 0xc00;
++#ifdef _MSC_VER
++                daGrock_c *port_rock = 0;
++#endif
+                 if (mType == kGrockStarSpawner && mSpawnCount >= 5 && mStarRockOut == 0) {
+                     daGrock_c *child;
+ 
+@@ -317,7 +320,13 @@
+                     mSpawnCount = 0;
+                     if (child)
+                         child->mSpawnerID = uniqueID;
++#ifdef _MSC_VER
++                    port_rock = child;
++#endif
+                 } else {
++#ifdef _MSC_VER
++                    port_rock = (daGrock_c *)
++#endif
+                     dActor_c::Spawn(0xdd, kGrockRolling, mPos, &rot, mAreaId, -1);
+                 }
+             }

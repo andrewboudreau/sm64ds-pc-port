@@ -1,0 +1,50 @@
+# The ov098 data the castle grounds' CANNON names.
+#
+# The gate-18 shape (see ov085_syms.txt for the long version): an ACTOR
+# overlay is mounted PER SYMBOL with --pack, the list is the overlay's whole
+# data span, the vtables are left out because they are host arrays the
+# registry fills, and every *_SpawnInfo is pinned to the record's real 0x1c.
+#
+# ov098 IS ALSO WHERE THE GATE-9 HARNESS USED TO LIE. data_ov098_0213c380 is
+# the arrow signs' {model, kcl, ?} entry table and data_ov098_0213c384 is the
+# same table's second column, which on the DS is just base+4 -- an offset
+# alias a host cannot spell. The smoke faked it with a second array; --pack
+# lays the two symbols four bytes apart the way the ROM does, so both walks
+# read one table. The fiction stays only in port/tests/smoke_actor.cpp, which
+# does not mount the overlay.
+data_ov098_0213bf60:0x4 data_ov098_0213bf64:0x4 data_ov098_0213bf68:0x28
+data_ov098_0213bf90:0xc _ZTI15daObjYajirusi_c:0xc _ZTS15daObjYajirusi_c:0x14
+data_ov098_0213c380:0x4 data_ov098_0213c384:0x4 data_ov098_0213c388:0x10
+g_profile_YAJIRUSI_L:0x1c g_profile_YAJIRUSI_R:0x1c MgShellSmash_SpawnInfo:0x1c
+data_ov098_0213c458:0x8 data_ov098_0213c460:0x8 data_ov098_0213c468:0x8
+data_ov098_0213c470:0x8 data_ov098_0213c478:0x8 data_ov098_0213c480:0x8
+data_ov098_0213c488:0x8 data_ov098_0213c490:0x8 data_ov098_0213c498:0x8
+data_ov098_0213c4a0:0x8 data_ov098_0213c4a8:0x8 data_ov098_0213c4b0:0x8
+data_ov098_0213c4b8:0x8 data_ov098_0213c4c0:0x8 data_ov098_0213c4c8:0xc
+_ZTI13daObjBlockS_c:0xc
+_ZTS13daObjBlockS_c:0x10 g_profile_BLOCK_S:0x1c
+# _ZTV16daObjFallBlock_c (0x0213c5bc, 0x80) left this list at run linkfull lane
+# VARIANT5, the vtable rule above: it is a host array now,
+# hal/actor_classes_ov098.cpp, and --pack pads its span so the run keeps the
+# ROM spacing.
+data_ov098_0213c63c:0x8
+data_ov098_0213c644:0x8 data_ov098_0213c64c:0x8 data_ov098_0213c654:0x8
+data_ov098_0213c65c:0x8 _ZTS7daCnn_c:0xc _ZTI7daCnn_c:0xc
+g_profile_CANNON:0x1c data_ov098_0213c71c:0x8 data_ov098_0213c724:0x8 data_ov098_0213c72c:0x8
+_ZTS7daWbm_c:0xc _ZTI7daWbm_c:0xc g_profile_WATERBOMB:0x1c
+data_ov098_0213c78c:0x74 gYajirusiLCollisionFile! gYajirusiRModelFile!
+gYajirusiLModelFile! gYajirusiRCollisionFile! data_ov098_0213c820@0x0213c820:0xc
+data_ov098_0213c82c@0x0213c82c:0xc data_ov098_0213c838@0x0213c838:0xc data_ov098_0213c844@0x0213c844:0xc
+  data_ov098_0213c860@0x0213c860:0xc
+data_ov098_0213c86c@0x0213c86c:0xc  
+data_ov098_0213c8f0@0x0213c8f0:0xc  
+data_ov098_0213c924@0x0213c924:0xc
+# PORTSYNC3 name-only rows (the class TU defines the storage):
+gBrokenBlockSModelFile! gBrokenBlockSCollisionFile! data_ov098_0213c878! data_ov098_0213c8e8! data_ov098_0213c8fc! data_ov098_0213c91c! data_ov098_0213c930!
+
+# catchup1 Stage D (PLY4 blocker 1): name-only rows. A linked decomp TU defines each
+# of these objects, so the mount carries no storage for them, but the NAME stays in the
+# list so tools/ovdata.py still rebases ROM pointers into them onto the TU object
+# (SYM4 f1916fd9b2f had deleted the tokens outright, which sent those pointers to gap
+# blocks or left raw DS addresses).
+data_ov098_0213c4e0:0x10! data_ov098_0213c4f0:0x10!

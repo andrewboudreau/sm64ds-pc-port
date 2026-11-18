@@ -1,0 +1,22 @@
+diff --git a/include/dScMgCup_c.h b/include/dScMgCup_c.h
+--- a/include/dScMgCup_c.h
++++ b/include/dScMgCup_c.h
+@@ -55,7 +55,18 @@
+ 
+ struct dScMgCup_c : dScMgSingle3DBase_c {
+     dScMgCup_c();
++    /* The destructor pair spelled as two plain virtuals on the host, plus
++       the non-virtual destructor declaration the src/ definitions need; the
++       whole ruling is in include/ModelBase.h. An override takes its base's
++       slots, so these carry the SAME TWO NAMES the base declares -- a fresh
++       name would append a slot instead of claiming one. */
++#ifdef _MSC_VER
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~dScMgCup_c();   /* no slot */
++#else
+     virtual ~dScMgCup_c();
++#endif
+ 
+     /* Eight states, dispatched by Behavior through sCupStateTable.
+        The spellings are not in the ROM. */

@@ -1,0 +1,18 @@
+diff --git a/include/daObjNumber_c.h b/include/daObjNumber_c.h
+--- a/include/daObjNumber_c.h
++++ b/include/daObjNumber_c.h
+@@ -33,7 +33,14 @@
+        1: next fall below the floor emits particle 0xd2 and dies. */
+     u8  mState;                      /* 0x14e */
+ 
++    #ifdef _MSC_VER
++    /* host two-arm destructor spelling; ruling in include/ModelBase.h */
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~daObjNumber_c() {}   /* no slot */
++    #else
+     virtual ~daObjNumber_c() {}
++    #endif
+ 
+     /* SpawnNumber hands the popup its owner: record the owner's uniqueID
+        and the vertical offset to follow it at. Returns this. */

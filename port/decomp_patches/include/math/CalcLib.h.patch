@@ -1,0 +1,16 @@
+diff --git a/include/math/CalcLib.h b/include/math/CalcLib.h
+--- a/include/math/CalcLib.h
++++ b/include/math/CalcLib.h
+@@ -71,7 +71,12 @@
+ }
+ #endif
+ 
++#if defined(_MSC_VER) && defined(__cplusplus)
++/* host: src/Vec3_VertAngle.cpp defines it inside extern "C" (main db050aa54fa); MSVC refuses the mismatch (C2732) */
++extern "C" short Vec3_VertAngle(const Vector3 *, const Vector3 *);
++#else
+ /* C++ linkage: defined in a C++ file and called only from C++. */
+ short Vec3_VertAngle(const Vector3 *, const Vector3 *);
++#endif
+ 
+ #endif

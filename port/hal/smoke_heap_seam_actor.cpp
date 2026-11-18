@@ -1,0 +1,130 @@
+// port/hal/smoke_heap_seam_actor.cpp -- the heap and fBase_c seam rows of
+// lane SMOKELINK4B's remaining-rows list, section D, for smoke_actor, a third smoke
+// and smoke_persist: the two faces and seven alias rows of the eleven-row
+// group that are not plain SRC additions.
+//
+// Lane SMOKELINK5, run link100 wave 10 round 5.
+//
+// FOUR OF THE ELEVEN ARE PLAIN SRC ROWS, added to PORT_SMOKE_ACTOR_SRC
+// directly and not copied here, because each is a real C++ method whose
+// decorated name IS what the wall's decorated row names once the file
+// compiles:
+//   src/engine/heap/Heap.cpp     -> ?CreateSolidHeap@Heap_t@mHeap@@SAPAU12@IPAU12@H@Z
+//   src/engine/heap/Heap.cpp            -> ?_Deallocate@Heap_t@mHeap@@QAEXPAX@Z
+//   src/engine/heap/Heap.cpp             -> ?ResizeToFit@Heap_t@mHeap@@QAEIXZ (backs the
+//                                                   flat face below; not itself on the wall)
+// (the fourth, src/engine/heap/Heap.cpp, was already on this
+// batch's PORT_SMOKE_ACTOR_SRC before this commit -- it is what the
+// MaxAllocationUnitSize alias pair below points at).
+//
+// TWO ARE FACES, because the flat ABI and the decorated member ABI disagree
+// (__cdecl with the receiver on the stack against __thiscall with the
+// receiver in ecx), copied character for character from where the window
+// build already carries the same face:
+//   _ZN5mHeap6Heap_t11ResizeToFitEv          hal/lk4_solidheap_seat.cpp:540
+//   _ZN7fBase_c18MarkForDestructionEv  hal/method_faces.cpp:189-190 (src/
+//       _ZN7fBase_c18MarkForDestructionEv.cpp, already on this batch's
+//       PORT_SMOKE_ACTOR_SRC, defines the decorated fBase_c::MarkForDestruction
+//       this face calls; that src file is the DECORATED member, not the flat
+//       name the wall wants, which is exactly why a face and not an alias)
+//
+// FIVE ARE ALIAS PAIRS, three of them chained through an intermediate
+// decorated spelling the way hal/lk4_solidheap_seat.cpp already chains them
+// for the window targets (that file is not taken whole here: it also seats
+// eleven ExpandingHeap/SolidHeap virtuals and four Destroy-family rows this
+// batch does not ask for). Copied character for character:
+//   ?Allocate@Memory@@SAPAXIHPAUHeap_t@mHeap@@@Z
+//       -> ?Allocate@Memory@@YAPAXIHPAUHeap_t@mHeap@@@Z   hal/lk4_solidheap_seat.cpp:188
+//       (itself the real definition src/_ZN6Memory8AllocateEjiPN5mHeap6Heap_tE.cpp
+//       emits -- that file's own private `class Heap` shadow is what makes it
+//       PAVHeap rather than PAUHeap; the src file is already on this batch's
+//       PORT_SMOKE_ACTOR_SRC)
+//   ?InitializeSolidHeapAsDefault@Heap_t@mHeap@@SAPAU12@IPAU12@H@Z
+//       -> ?InitializeSolidHeapAsDefault@Heap_t@mHeap@@SAPAXIPAU12@H@Z   hal/lk4_solidheap_seat.cpp:183
+//   __ZN5mHeap6Heap_t28InitializeSolidHeapAsDefaultEjPS0_i
+//       -> ?InitializeSolidHeapAsDefault@Heap_t@mHeap@@SAPAXIPAU12@H@Z   hal/cxx_aliases.cpp:3300
+//       (both point at the same decorated symbol, which
+//       src/engine/heap/Heap.cpp -- already on
+//       this batch's PORT_SMOKE_ACTOR_SRC -- defines)
+//   ?MaxAllocationUnitSize@Heap_t@mHeap@@QAEHXZ
+//       -> ?MaxAllocationUnitSize@Heap_t@mHeap@@QAEIXZ   hal/cxx_aliases.cpp:3017
+//   __ZN5mHeap6Heap_t21MaxAllocationUnitSizeEv
+//       -> ?MaxAllocationUnitSize@Heap_t@mHeap@@QAEIXZ   NOT an existing row anywhere
+//       in the tree (measured: grep for "MaxAllocationUnitSizeEv=" across
+//       port/ before writing this line found nothing). It is the same
+//       flat-plus-decorated pattern as the RestoreFromTemporary and
+//       InitializeSolidHeapAsDefault rows beside it, pointing at the same
+//       already-real decorated symbol src/engine/heap/Heap.cpp
+//       (already on this batch's PORT_SMOKE_ACTOR_SRC) defines, so it extends
+//       an established mechanism rather than inventing one.
+//   __ZN5mHeap6Heap_t20RestoreFromTemporaryEv
+//       -> ?RestoreFromTemporary@Heap_t@mHeap@@SAXXZ   hal/cxx_aliases.cpp:3301
+//       (src/engine/heap/Heap.cpp, already on this batch's
+//       PORT_SMOKE_ACTOR_SRC, defines the decorated side)
+//   _FindListContainHeap
+//       -> ?FindNested@NestedHeapIterator@@SAPAU1@PAX@Z   hal/cxx_aliases.cpp:3299
+//       (src/_ZN18NestedHeapIterator10FindNestedEPv.cpp, already on this
+//       batch's PORT_SMOKE_ACTOR_SRC, defines the decorated side)
+//
+// No target carries both this file and hal/lk4_solidheap_seat.cpp,
+// hal/cxx_aliases.cpp or hal/method_faces.cpp, so none of these definitions or
+// pragmas can collide.
+
+#include "Heap.h"
+#include "SolidHeap.h"
+#include "fBase_c.h"
+#include <new>
+
+// CreateSolidHeap's and CreateSolidHeapAllocator's own bodies (src/
+// _ZN5mHeap6Heap_t15CreateSolidHeapEjPS0_i.cpp and src/
+// _ZN5mHeap6Heap_t24CreateSolidHeapAllocatorEPvjj.cpp, both added to this batch's
+// PORT_SMOKE_ACTOR_SRC) call these two flat names AS FREE FUNCTIONS with the
+// "this" pointer as an explicit first argument -- the shape a placement
+// constructor takes when its caller is C rather than a `new` expression.
+// src/engine/heap/Heap.cpp and src/
+// _ZN18SolidHeapAllocatorC1EPvj.cpp (also on this batch) define the REAL,
+// decorated C++ constructors; a plain SRC addition of those two files does
+// not, by itself, produce a symbol under the flat spelling, because a
+// constructor is never called through an ordinary function pointer -- it has
+// to be placement-new'd. These two faces are that placement, not a second
+// definition: no code runs that the two src files do not already contain.
+extern "C" SolidHeap *_ZN5mHeap11SolidHeap_tC1EPvjPNS_6Heap_tEP15NNSiFndHeapHead(
+    SolidHeap *self, void *start, u32 size, Heap *root,
+    NNSFndHeapHandle allocator)
+{ return new (self) SolidHeap(start, size, root, allocator); }
+
+/* _ZN18SolidHeapAllocatorC1EPvj's face RETIRED at catchup1 (SYM4): decomp
+   main a140fabccdf replaced the coined allocator with NitroSystem's frame
+   heap (that address is InitFrameHeap now) and no caller asks for the
+   placement constructor any more. */
+
+extern "C" unsigned int _ZN5mHeap6Heap_t11ResizeToFitEv(void *thiz)
+{ return ((Heap *)thiz)->Heap::ResizeToFit(); }
+
+extern "C" void _ZN7fBase_c18MarkForDestructionEv(void *self)
+{ ((fBase_c *)self)->fBase_c::MarkForDestruction(); }
+
+#pragma comment(linker, "/alternatename:?Allocate@Memory@@SAPAXIHPAUHeap_t@mHeap@@@Z=?Allocate@Memory@@YAPAXIHPAUHeap_t@mHeap@@@Z")
+#pragma comment(linker, "/alternatename:?InitializeSolidHeapAsDefault@Heap_t@mHeap@@SAPAU12@IPAU12@H@Z=?InitializeSolidHeapAsDefault@Heap_t@mHeap@@SAPAXIPAU12@H@Z")
+#pragma comment(linker, "/alternatename:__ZN5mHeap6Heap_t28InitializeSolidHeapAsDefaultEjPS0_i=?InitializeSolidHeapAsDefault@Heap_t@mHeap@@SAPAXIPAU12@H@Z")
+#pragma comment(linker, "/alternatename:?MaxAllocationUnitSize@Heap_t@mHeap@@QAEHXZ=?MaxAllocationUnitSize@Heap_t@mHeap@@QAEIXZ")
+/* PORTSYNC2 (the 2026-10 main merge): aliascheck reads this pair as a receiver
+   crossing now -- the flat __cdecl name on the left, main's __thiscall member
+   on the right -- so it is a FACE, copied from where the window build carries
+   the same one (hal/player_bridges.cpp, _ZN5mHeap6Heap_t21MaxAllocationUnitSizeEv). */
+extern "C" int _ZN5mHeap6Heap_t21MaxAllocationUnitSizeEv(void *self)
+{ return ((Heap *)self)->Heap::MaxAllocationUnitSize(); }
+#pragma comment(linker, "/alternatename:__ZN5mHeap6Heap_t20RestoreFromTemporaryEv=?RestoreFromTemporary@Heap_t@mHeap@@SAXXZ")
+/* _FindListContainHeap -> NestedHeapIterator::FindNested RETIRED at catchup1
+   (SYM4): FindListContainHeap is the C function itself at decomp main
+   (src/engine/heap/NestedHeapIterator.cpp), so there is no decorated side
+   left to point at. */
+
+// THIRD ORDER, surfaced by CreateSolidHeap's own dependency chain
+// (func_0204ebb8.c, SolidHeap::VDestroy's forward, wants the flat spelling;
+// src/_ZN13HeapAllocator6RemoveEv.cpp -- already on this batch -- compiles
+// the decorated member): the same flat/decorated pair shape as the seven
+// above.
+/* _ZN13HeapAllocator6RemoveEv's face RETIRED at catchup1 (SYM4): that address
+   is NNSi_FndFinalizeHeap at decomp main, a C function its callers call by
+   that name, so no receiver crossing is left to bridge. */

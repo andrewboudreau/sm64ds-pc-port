@@ -1,0 +1,72 @@
+diff --git a/src/engine/gx/GX.cpp b/src/engine/gx/GX.cpp
+index fcbc670ba93..44602c28f09 100644
+--- a/src/engine/gx/GX.cpp
++++ b/src/engine/gx/GX.cpp
+@@ -32,6 +32,27 @@ extern u32 data_020a60c0;                    // size of the first block
+ extern const u16 data_02086314[8];           // texture-palette LCDC block, by bank combination
+ extern const GXTexStartAddr data_02086324[]; // texture blocks, by bank combination
+ 
++#ifdef _MSC_VER
++/* Port patch: the host keeps texture and texture-palette VRAM as SLOT space,
++ * not bank space. Its renderer reads texture slot N at 0x06800000 + N*128K
++ * and the palette slots from 0x06880000 (port/ntr/gx.cpp TEX_SLOT_BASE and
++ * PLTT_SLOT_BASE), whichever banks the game gave the slots, because no host
++ * reader follows VRAMCNT for them. The Begin calls below aim at the LCDC
++ * address of the bank that holds slot 0, which is the slot base only when that
++ * bank is A (textures) or E (palettes). The title gives its palettes F or G
++ * alone, so its uploads landed at 0x06890000 or above while every bind read
++ * zeros at 0x06880000: the black Power Star, Mario head and menu art. So on
++ * the host the Begin calls keep the ROM's bank bookkeeping and point the copy
++ * at the slot base, and the End calls drop the renderer's texture decode
++ * cache, since the bytes under its keys just changed (what the host's old
++ * GX::EndLoadTex and GX::EndLoadTexPltt stand-ins did). */
++#define GX_HOST_TEX_SLOT_BASE  0x06800000u
++#define GX_HOST_PLTT_SLOT_BASE 0x06880000u
++namespace ntr {
++void gx_invalidate_textures();
++}
++#endif
++
+ extern "C" {
+ 
+ void GX_BeginLoadTex() {
+@@ -39,6 +60,11 @@ void GX_BeginLoadTex() {
+     data_020a60ac = data_02086324[data_020a60b8].blk1 << 12;
+     data_020a60bc = data_02086324[data_020a60b8].blk2 << 12;
+     data_020a60c0 = data_02086324[data_020a60b8].szBlk1 << 12;
++#ifdef _MSC_VER
++    data_020a60ac = GX_HOST_TEX_SLOT_BASE;
++    data_020a60bc = 0;
++    data_020a60c0 = 0;
++#endif
+ }
+ 
+ // A copy that straddles the end of the first block is split into two. That
+@@ -73,11 +99,17 @@ void GX_EndLoadTex() {
+     GX_SetBankForTex(data_020a60b8);
+     data_020a60ac = data_020a60bc = data_020a60c0 = 0;
+     data_020a60b8 = 0;
++#ifdef _MSC_VER
++    ntr::gx_invalidate_textures();
++#endif
+ }
+ 
+ void GX_BeginLoadTexPltt() {
+     data_020a60b4 = GX_ResetBankForTexPltt();
+     data_020a60b0 = data_02086314[data_020a60b4 >> 4] << 12;
++#ifdef _MSC_VER
++    data_020a60b0 = GX_HOST_PLTT_SLOT_BASE;
++#endif
+ }
+ 
+ void GX_LoadTexPltt(const void *pSrc, u32 destSlotAddr, u32 szByte) {
+@@ -89,6 +121,9 @@ void GX_EndLoadTexPltt() {
+     GX_SetBankForTexPltt(data_020a60b4);
+     data_020a60b4 = 0;
+     data_020a60b0 = 0;
++#ifdef _MSC_VER
++    ntr::gx_invalidate_textures();
++#endif
+ }
+ 
+ } // extern "C"

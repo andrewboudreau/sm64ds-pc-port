@@ -1,0 +1,37 @@
+diff --git a/include/nitro/cp/context.h b/include/nitro/cp/context.h
+--- a/include/nitro/cp/context.h
++++ b/include/nitro/cp/context.h
+@@ -17,6 +17,14 @@
+ extern "C" {
+ #endif
+ 
++/* host: MSVC aligns a u64 member to 8 where mwccarm aligns it to 4, which
++ * would make this 0x20 bytes and give OSContext and every OSThread an 8-byte
++ * alignment, shifting the thread fields past the context by 4 (id at +0x70,
++ * not the +0x6c the ROM and hal/boot2_thread.cpp use) and CARDiCommon.thread
++ * to +0x40. Pack to 4 so the host layout is the ROM's. */
++#ifdef _MSC_VER
++#pragma pack(push, 4)
++#endif
+ typedef struct CPContext {
+     u64 div_numer; /* 0x00 -- 0x04000290 */
+     u64 div_denom; /* 0x08 -- 0x04000298 */
+@@ -24,6 +32,9 @@
+     u16 div_mode;  /* 0x18 -- 0x04000280 (low 2 bits) */
+     u16 sqrt_mode; /* 0x1a -- 0x040002b0 (low bit) */
+ } CPContext;
++#ifdef _MSC_VER
++#pragma pack(pop)
++#endif
+ 
+ void CP_SaveContext(CPContext *);
+ void CPi_RestoreContext(const CPContext *);
+@@ -32,8 +43,6 @@
+ }
+ #endif
+ 
+-#ifndef SM64DS_PLATFORM_PC
+ typedef char CPContext_size_must_be_0x1c[sizeof(CPContext) == 0x1c ? 1 : -1];
+-#endif
+ 
+ #endif /* NITRO_CP_CONTEXT_H */

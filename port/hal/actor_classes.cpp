@@ -1,0 +1,2736 @@
+// The vtables of the actor classes the registry carries, filled at runtime.
+//
+// THE VTABLE LAW, as gate 9 wrote it (hal/actor_vtables.cpp) and gate 13
+// repeated for the Camera (hal/camera_bridges.cpp):
+//
+//   * MSVC slot order, which for these classes is the ROM's -- include/
+//     ActorBase.h declares the destructor LAST on purpose, so slots 0..15
+//     agree and only the tail can diverge. Every slot below was read out of
+//     the class's own _ZTV in the overlay image with its relocations applied,
+//     not inferred from the header.
+//   * Every entry is a __fastcall thunk: ecx carries `this` exactly as
+//     __thiscall does and the dummy edx absorbs fastcall's second register.
+//     That is the convention the four Process wrappers in port/unmatched/
+//     call through.
+//   * Every thunk calls QUALIFIED, never virtual.
+//   * Slots the port cannot service TRAP BY NAME rather than being left null
+//     or pointing into the overlay image.
+//
+// Filled at runtime rather than written as a static array because the ROM
+// factories install the vtable themselves (`p[0] = (int)_ZTV8daTree_c`), so the
+// symbol has to be an array of the right size in the first place -- and
+// because InitResources can dispatch through the vptr the constructor just
+// installed, which means the table must be up before the first spawn.
+//
+// ---- THE TABLES ARE NOT TWENTY SLOTS LONG ----------------------------------
+//
+// Every array in this file was written [20], the plain ActorBase width, and
+// every ROM table it stands in for is 31 or 32 words. Slot 21 is
+// OnGroundPounded, at byte offset 0x54; a [20] array is 0x50 bytes; so a
+// player ground-pounding an ordinary sign dispatched whatever the linker put
+// next in memory. That is a live crash on castle-grounds furniture, not a
+// latent hazard, and it fires on the objects a player stands on most.
+//
+// The width is not a style choice, it is the class's own base chain, and
+// port/tools/vtspan.py reads it out of the ROM's relocations:
+//
+//   31 slots  a plain Actor subclass. Slot 30 is Actor::
+//             OnAimedAtWithEggReturnVec (arm9 0x020100dc) and the table ends.
+//   32 slots  a Platform subclass. Slot 31 is Platform::Kill (ov002
+//             0x020ee55c) or the class's own override of it.
+//
+// The next-symbol delta is NOT the width: dsd emitted ambiguous data symbols
+// inside several of these tables, so the symbol bound truncates (_ZTV4Bird
+// reads as 10 words and is 31, _ZTV8MetalNet reads as 12 and is 32). Every
+// size below is the reloc run intersected with that bound, per vtspan.
+//
+// ---- the shared half -------------------------------------------------------
+//
+// Ten of the first twenty slots are the same functions in every one of these
+// classes: Actor's four Before/After pairs, ActorBase::OnHeapCreated, and
+// Actor::OnYoshiTryEat. So is the whole 20..30 tail, which is Actor's own
+// interaction list -- Virtual50 plus the nine combat hooks plus the two egg
+// virtuals -- and every one of those bodies is already in the build. They are
+// written once here.
+//
+// SLOT 30 (OnAimedAtWithEggReturnVec) DECLINES rather than forwarding. Its ROM
+// body returns a Vector3 BY VALUE, so the host call needs an sret contract
+// this file has never proved, and the body is not in a slice; a named decline
+// is the honest seat. Same reading as hal/actor_classes_wf.cpp.
+#include "port_d16.h"
+
+#include <cstdio>
+
+/* hal/actor_slot30_seat.cpp -- the shared seat for vtable slot 30,
+   Actor::OnAimedAtWithEggReturnVec. The ROM word in slot 30 of every vtable
+   this file fills IS the arm9 base body 0x020100dc (checked against
+   config/<module>/relocs.txt at vtable+30*4), and that body is now in the
+   link from src/_ZN8dActor_c25OnAimedAtWithEggReturnVecEv.cpp on slice_gate50.
+   The three-parameter __fastcall is the sret contract MSVC uses for a
+   thiscall member returning a 12-byte struct: this in ecx, the hidden result
+   pointer the one (callee-popped) stack argument. Same shape as whomp_s30. */
+extern "C" void *__fastcall port_actor_s30_base(void *self, void *, void *out);
+#include <cstdlib>
+
+#include "dActor_c.h"
+#include "fBase_c.h"
+#include "dtor_faces_cpp.h"
+
+extern "C" {
+int _ZN8dActor_c19BeforeInitResourcesEv(void *self);      /* slot 1  */
+void _ZN8dActor_c18AfterInitResourcesEj(void *self, unsigned a); /* slot 2 */
+int _ZN8dActor_c14BeforeBehaviorEv(void *self);           /* slot 7  */
+/* Slots 8 and 11: the ROM's own words for every Actor-derived table. Both are
+   two-instruction ARM tail-call veneers (`ldr ip,[pc]; bx ip`) that drop into
+   ActorBase's implementation with `this` in r0 and the VirtualFuncSuccess code
+   in r1 still riding, so the matched TUs are declared void() and take neither.
+   See the seat below for why that is sound at 8 and 11 and NOT at 5. */
+void _ZN8dActor_c13AfterBehaviorEj(void);                 /* slot 8,  arm9 0x02010fc8 */
+void _ZN8dActor_c11AfterRenderEj(void);                   /* slot 11, arm9 0x02010f6c */
+int _ZN8dActor_c12BeforeRenderEv(void *self);             /* slot 10 */
+int _ZN8dActor_c13OnYoshiTryEatEv(void *self);            /* slot 18 */
+/* slot 19. The ROM body is a tail-call veneer to KillAndTrackInDeathTable and
+   MSVC emits it as a bare `jmp` too, so the caller's pushed `self` is what the
+   veneer's target reads -- the two-argument call here is what makes that word
+   the right one. Same shape hal/actor_classes_painting.cpp uses. */
+void _ZN8dActor_c13OnTurnIntoEggER7daPly_c(void *self, void *p);  /* slot 19 */
+/* Actor's own interaction list, slots 20..29, all matched arm9 bodies already
+   linked (slice_gate32 and slice_gate50). Read out of the ROM tables, not the
+   header: every one of them appears at these indices in _ZTV8daTree_c and its
+   twenty-four neighbours. */
+int  _ZN8dActor_c9Virtual50Ev(void *self);                      /* slot 20 */
+void _ZN8dActor_c15OnGroundPoundedERS_(void *self, void *o);    /* slot 21 */
+void _ZN8dActor_c11OnAttacked1ERS_(void *self, void *o);        /* slot 22 */
+void _ZN8dActor_c11OnAttacked2ERS_(void *self, void *o);        /* slot 23 */
+void _ZN8dActor_c8OnKickedERS_(void *self, void *o);            /* slot 24 */
+void _ZN8dActor_c8OnPushedERS_(void *self, void *o);            /* slot 25 */
+void _ZN8dActor_c24OnHitByCannonBlastedCharERS_(void *self, void *o); /* slot 26 */
+void _ZN8dActor_c15OnHitByMegaCharER7daPly_c(void *self, void *p);     /* slot 27 */
+void _ZN8dActor_c19OnHitFromUnderneathERS_(void *self, void *o);      /* slot 28 */
+int  _ZN8dActor_c16OnAimedAtWithEggEv(void *self);              /* slot 29 */
+/* slot 31 of a Platform table, ov002 0x020ee55c, already in the build */
+void _ZN10dBgActor_c4KillEv(void *self);
+}
+
+static int __fastcall ac_binit(void *s, void *)
+{ return _ZN8dActor_c19BeforeInitResourcesEv(s); }
+static void __fastcall ac_ainit(void *s, void *, unsigned a)
+{ _ZN8dActor_c18AfterInitResourcesEj(s, a); }
+static int __fastcall ac_bclean(void *s, void *)
+{ return ((dActor_c *)s)->dActor_c::BeforeCleanupResources(); }
+/* Slots 5, 8 and 11 are ARM tail-call veneers on the ROM -- two instructions
+   that drop into ActorBase's implementation with `this` in r0 and the
+   VirtualFuncSuccess code in r1 still riding. This comment used to rule all
+   THREE of them unforwardable, and that ruling is now SPLIT, on the same
+   evidence hal/method_faces.cpp took for _ZTV8dScene_c slots 8 and 11 and
+   hal/w2_dtor_heads.cpp records at its slot-2 entry: what settles a dropped
+   receiver is the CALLEE, not the veneer.
+
+     ?AfterBehavior@fBase_c@@UAEXI@Z    00000000: C2 04 00   ret 4
+     ?AfterRender@fBase_c@@UAEXI@Z      00000000: C2 04 00   ret 4
+
+   Neither reads ecx and neither reads [ebp+8]; /OPT:ICF folds the two onto one
+   address. There is no read for a dropped receiver to be wrong about, so slots
+   8 and 11 now take the ROM's own veneer (below), whose matched TU resolves to
+   the two tagged `ret 4` host definitions in hal/method_faces.cpp -- exactly
+   what the ARM tail jump lands on.
+
+   SLOT 5 STAYS DIRECT and the reason has bytes behind it too:
+   ActorBase::AfterCleanupResources is NOT empty. It walks this->sceneNode
+   (+0x14) and this->behavNode (+0x28) off the processing lists, destroys
+   this->unk4C and this->unk48, dispatches its own virtual destructor and hands
+   the object to Memory::Deallocate -- every one of those a read of the
+   receiver, and its first statement is a test of the ARGUMENT (it only runs on
+   VS_SUCCESS). That is the CRASH half of the dropped-receiver mode, so
+   src/_ZN8dActor_c21AfterCleanupResourcesEj.cpp stays unlinked and this thunk
+   keeps calling the target directly. */
+static void __fastcall ac_aclean(void *s, void *, unsigned a)
+{ ((fBase_c *)s)->fBase_c::AfterCleanupResources(a); }
+static int __fastcall ac_bbeh(void *s, void *)
+{ return _ZN8dActor_c14BeforeBehaviorEv(s); }
+/* slot 8: the ROM's word, Actor::AfterBehavior. The dispatch arrives
+   __thiscall with `this` in ecx and the VirtualFuncSuccess code on the stack;
+   both are named and then deliberately unused, because the veneer takes
+   neither and its target is `ret 4`. Same shape as w2_dtor_heads.cpp's
+   scene_after_behavior. */
+static void __fastcall ac_abeh(void *s, void *, unsigned a)
+{ (void)s; (void)a; _ZN8dActor_c13AfterBehaviorEj(); }
+/* SM64DS_ACTOR_PROBE=2: why an actor did or did not reach its own Render.
+   Actor::BeforeRender is the gate -- it refuses on WRONG_AREA (0x20) and on
+   OFF_SCREEN (0x8) when the actor asked to be culled off screen (0x2) -- and
+   both bits are set by Actor::BeforeBehavior out of the SpawnInfo's own
+   radius and cull distance. Printed once per actor id. */
+static int __fastcall ac_bren(void *s, void *)
+{
+    int r = _ZN8dActor_c12BeforeRenderEv(s);
+    static int on = -1;
+    if (on < 0) {
+        const char *e = std::getenv("SM64DS_ACTOR_PROBE");
+        on = e && e[0] == '2';
+    }
+    if (on) {
+        static unsigned said[64];
+        unsigned id = *(unsigned short *)((char *)s + 0xc);
+        int seen = 0;
+        for (int i = 0; i < 64 && said[i]; ++i)
+            if (said[i] == id) seen = 1;
+        if (!seen) {
+            for (int i = 0; i < 64; ++i)
+                if (!said[i]) { said[i] = id; break; }
+            const char *c = (const char *)s;
+            std::printf("[bren] id %3u -> %d  flags %08x area %d radius %d "
+                        "cull %d view (%d,%d,%d)\n", id, r,
+                        *(const unsigned *)(c + 0xb0),
+                        *(const signed char *)(c + 0xcc),
+                        *(const int *)(c + 0xb8) >> 12,
+                        *(const int *)(c + 0xbc) >> 12,
+                        *(const int *)(c + 0x74) >> 12,
+                        *(const int *)(c + 0x78) >> 12,
+                        *(const int *)(c + 0x7c) >> 12);
+        }
+    }
+    return r;
+}
+/* slot 11: the ROM's word, Actor::AfterRender. Same reading as slot 8. */
+static void __fastcall ac_aren(void *s, void *, unsigned a)
+{ (void)s; (void)a; _ZN8dActor_c11AfterRenderEj(); }
+static int __fastcall ac_heap(void *s, void *)
+{ return ((fBase_c *)s)->fBase_c::OnHeapCreated(); }
+static int __fastcall ac_yoshi(void *s, void *)
+{ return _ZN8dActor_c13OnYoshiTryEatEv(s); }
+static void __fastcall ac_pdes_base(void *s, void *)
+{ ((fBase_c *)s)->fBase_c::OnPendingDestroy(); }
+
+/* Actor's own interaction tail, slots 20..29. Every one of these takes its
+   argument PUSHED by the __thiscall caller, so the thunk needs the dummy edx
+   AND the named parameter or it pops nothing and the caller's frame runs
+   short -- the same three-parameter shape hal/actor_classes_wf.cpp uses. */
+static int __fastcall ac_v50(void *s, void *)
+{ return _ZN8dActor_c9Virtual50Ev(s); }
+static int __fastcall ac_pounded(void *s, void *, void *o)
+{ _ZN8dActor_c15OnGroundPoundedERS_(s, o); return 0; }
+static int __fastcall ac_atk1(void *s, void *, void *o)
+{ _ZN8dActor_c11OnAttacked1ERS_(s, o); return 0; }
+static int __fastcall ac_atk2(void *s, void *, void *o)
+{ _ZN8dActor_c11OnAttacked2ERS_(s, o); return 0; }
+static int __fastcall ac_kicked(void *s, void *, void *o)
+{ _ZN8dActor_c8OnKickedERS_(s, o); return 0; }
+static int __fastcall ac_pushed(void *s, void *, void *o)
+{ _ZN8dActor_c8OnPushedERS_(s, o); return 0; }
+static int __fastcall ac_cannon(void *s, void *, void *o)
+{ _ZN8dActor_c24OnHitByCannonBlastedCharERS_(s, o); return 0; }
+static int __fastcall ac_mega(void *s, void *, void *p)
+{ _ZN8dActor_c15OnHitByMegaCharER7daPly_c(s, p); return 0; }
+static int __fastcall ac_under(void *s, void *, void *o)
+{ _ZN8dActor_c19OnHitFromUnderneathERS_(s, o); return 0; }
+static int __fastcall ac_egg(void *s, void *)
+{ return _ZN8dActor_c16OnAimedAtWithEggEv(s); }
+/* UnchainedChomp's own slot 29, ov100 0x021442d4 (slice_gate21). */
+extern "C" int _ZN11daWanwan2_c16OnAimedAtWithEggEv(void);
+static int __fastcall uc_aimed(void *, void *)
+{ return _ZN11daWanwan2_c16OnAimedAtWithEggEv(); }
+/* slot 19, OnTurnIntoEgg(daPly_c &player). Three parameters, like the rest of
+   this group: the caller PUSHES the player, so the thunk has to pop it. */
+static int __fastcall ac_turn_egg(void *s, void *, void *p)
+{ _ZN8dActor_c13OnTurnIntoEggER7daPly_c(s, p); return 0; }
+/* slot 31, the Platform tail. Only the Platform subclasses below write it. */
+static int __fastcall ac_kill(void *s, void *)
+{ _ZN10dBgActor_c4KillEv(s); return 0; }
+
+/* The trap. Slots 13/14 are the actor's own solid-heap creation and 16/17 are
+   the destructors where a class leaves them unhosted; a named abort is the
+   honest placeholder for a slot the port has not proved. One report serves
+   every trapped slot, and it says WHICH slot fired on WHICH actor in WHICH
+   phase -- the old per-class form printed "slot 13" from whatever slot it sat
+   in, and a woken Bird's destructor spent a session disguised as a slot-13
+   dispatch.
+
+   SLOT 19 IS NO LONGER ONE OF THEM. It used to trap here on the reading that
+   OnTurnIntoEgg was unproved, and that reading is out of date: gate 50 linked
+   dActor_c::OnTurnIntoEgg (arm9 0x02010154) when the PAINTING became the first
+   hosted class to inherit the dActor_c default, and every class in this file
+   inherits the same word. The ROM's own tables say so -- for all
+   twenty-three plain-dActor_c classes here the reloc at vtable+0x4c lands on
+   0x02010154, e.g. _ZTV6Rabbit (ov085 0x021300f8) slot 19 -> 0x02010154 -- and
+   the one class that overrides it (ONEUP_MUSHROOM, _ZN7da1up_c13OnTurnIntoEggER7daPly_c)
+   already writes its own body over the shared fill.
+
+   The cost of the trap was not a diagnostic: a trapped slot RAISES, the
+   quarantine net catches it, and the actor is frozen for the rest of the level
+   (unmatched/func_02043fdc_hostcopy.cpp). dActor_c::OnTurnIntoEgg is a tail-call veneer to
+   KillAndTrackInDeathTable, so what the ROM does when Yoshi swallows one of
+   these is kill it AND track it so it comes back. Trapping the slot turned a
+   respawnable death into a permanent freeze -- the rabbit that never returns. */
+extern "C" {
+extern int data_02099f24[];          /* the frame phase the lists are in */
+extern unsigned char data_020a4b4c;  /* the spawn spine's own step */
+const char *port_actor_class_name(unsigned id);   /* hal/actor_registry */
+/* per-actor decline: quarantine this one actor (freeze) instead of aborting the
+   whole process, unless SM64DS_FAULTS_FATAL. port/unmatched/func_02043fdc_hostcopy.cpp
+   The _for form NAMES the actor, which is what makes the freeze land on the
+   receiver rather than on whoever was being walked when the slot dispatched. */
+void port_actor_slot_decline(const char *what);
+void port_actor_slot_decline_for(void *actor, const char *what);
+}
+
+static void ac_trap_report(void *self, int slot)
+{
+    /* An unhosted vtable slot is a PER-ACTOR decline: this one actor reached a
+       method the port has not proved, but the rest of the level is fine. It
+       dispatches inside fn(actor), so port_actor_slot_decline raises a fault the
+       quarantine net catches -- the actor freezes, the frame goes on. Was a hard
+       std::abort() (the whole process for one actor); SM64DS_FAULTS_FATAL keeps
+       that behaviour for proof runs.
+
+       "THE ACTOR" HAS TO BE `self`, AND FOR THE INTERACTION TAIL IT WAS NOT.
+       Slots 20..31 are dispatched by the ATTACKER, inside the attacker's own
+       phase callback, so the walk is standing on the Player when a brick's
+       slot 21/23/28 declines here. The net freezes whatever it is walking, so
+       it froze the Player: he stops moving, and because a frozen actor is never
+       dispatched again he is never destroyed either, so every later level
+       change fails to converge and is declined for the rest of the session.
+       Naming `self` here is what puts the freeze on the brick. */
+    static char msg[128];
+    unsigned id = self ? *(unsigned short *)((char *)self + 0xc) : 0u;
+    if (slot >= 0)
+        std::fprintf(stderr,
+                     "UNHOSTED: vtable slot %d is not hosted (actor id %u %s, "
+                     "phase %d, spawn step %d)\n",
+                     slot, id, port_actor_class_name(id), data_02099f24[0],
+                     (int)data_020a4b4c);
+    else
+        std::fprintf(stderr,
+                     "UNHOSTED: a dBgActor_c base-table slot dispatched "
+                     "(actor id %u %s, phase %d, spawn step %d)\n",
+                     id, port_actor_class_name(id), data_02099f24[0],
+                     (int)data_020a4b4c);
+    std::snprintf(msg, sizeof msg, "unhosted vtable slot %d on id %u %s",
+                  slot, id, port_actor_class_name(id));
+    port_actor_slot_decline_for(self, msg);
+}
+static int __fastcall ac_trap13(void *s, void *) { ac_trap_report(s, 13); return 0; }
+static int __fastcall ac_trap14(void *s, void *) { ac_trap_report(s, 14); return 0; }
+static int __fastcall ac_trap16(void *s, void *) { ac_trap_report(s, 16); return 0; }
+static int __fastcall ac_trap17(void *s, void *) { ac_trap_report(s, 17); return 0; }
+/* The interaction-tail traps. A class that OVERRIDES one of Actor's 20..31
+   bodies has a body of its own that is not in any slice, so forwarding to
+   Actor's would run the wrong code; declining names the slot and the class
+   instead. Slot 30 declines for every class in this file (sret contract
+   unproved). Their own `ret` is unreachable -- port_actor_slot_decline either
+   aborts under SM64DS_FAULTS_FATAL or raises for the quarantine handler -- so
+   the two-parameter shape here is dead code, not a pop-contract break. */
+#define AC_TRAP(n) \
+    static int __fastcall ac_trap##n(void *s, void *) \
+    { ac_trap_report(s, n); return 0; }
+AC_TRAP(21) AC_TRAP(22)
+AC_TRAP(27) AC_TRAP(28) AC_TRAP(29) AC_TRAP(31)
+#undef AC_TRAP
+/* Slots 23 and 24 take the THREE-parameter shape so they emit `ret 4`, not a
+   bare `ret`. Their one dispatch site each is now thiscall (the receiver in
+   ECX and the single pushed argument popped by the callee -- see
+   unmatched/Actor_OnAttacked2Dispatch.cpp and Actor_OnKickedDispatch.cpp), and
+   a two-parameter trap on those slots would emit a bare `ret` that pops nothing
+   against a caller that pushes one, leaving a stale word. The body is identical
+   to the AC_TRAP shape above -- decline still names the slot and the class --
+   only the pop contract widens to match the seated ac_atk2/ac_kicked bodies. */
+static int __fastcall ac_trap23(void *s, void *, void *)
+{ ac_trap_report(s, 23); return 0; }
+static int __fastcall ac_trap24(void *s, void *, void *)
+{ ac_trap_report(s, 24); return 0; }
+static int __fastcall plat_trap(void *s, void *) { ac_trap_report(s, -1); return 0; }
+
+/* ---- the pieces the hosted D1 destructors tear members down with -----------
+   The ROM's destroy path is ActorBase::AfterCleanupResources: unlink both
+   nodes, drop the dedicated heap, then `this->Destructor()` -- a VIRTUAL
+   dispatch of slot 16 (D1, the complete-object form) -- and only after that
+   returns does it Memory::Deallocate the object itself. So a hosted slot 16
+   is the class's own D0 body minus the final Deallocate: install the class's
+   own vtable, member D1s in reverse declaration order, Actor's D2. The walk
+   proved the path live: a woken Bird's flock climbs past y 3000 and
+   func_ov009_02111234 marks every one of them. */
+extern "C" {
+void _ZN17dExtShadowModel_cD1Ev(void *);
+void _ZN14dExtAnmModel_cD1Ev(void *);
+void _ZN17dExtSimpleModel_cD1Ev(void *);
+void _ZN10dBgCh_ActrD1Ev(void *);
+void _ZN10dCcAcPos_cD1Ev(void *);
+void *_ZN7dCcAc_cD1Ev(void *);
+void _ZN11dExtModel_cD2Ev(void *);
+void *_ZN8dActor_cD2Ev(void *);
+}
+
+/* ---- gate 31: the destructors that were still trapping --------------------
+   NINE of this file's classes left slot 16 on ac_trap16, and the reading was
+   that nothing on the castle grounds ever destroys one of them: the trees and
+   the birds die, the nets and the doors live from the level boot to the level
+   teardown. That held exactly as long as there WAS no level teardown. A level
+   change (gate 31) destroys every actor the level spawned, through the ROM's
+   own path, and the first one aborted on a QUESTION_BLOCK slot 16 in phase 4.
+
+   Four of the nine have a plain-C D1 in src and those are in slice_gate31.txt
+   (CASTLE_WATER, METAL_NET, WATERFALL_MIST, QUESTION_BLOCK). The other five
+   are written in the matched tree as real C++ destructors over SHADOW CLASSES
+   -- the layout spelled as one pad member plus the sub-objects -- so the body
+   is entirely compiler-generated member destruction, and MSVC would generate
+   it against a base destructor no TU in this build defines. Writing them out
+   is the recipe this file already documents for a hosted slot 16 and nothing
+   more: the class's own vtable, member D1s in REVERSE declaration order, then
+   Actor's D2. The member offsets are the shadows' own.
+
+   The vtable store the ROM's D1 opens with is left out on purpose. It exists
+   so a base destructor running mid-chain dispatches the base's virtuals; here
+   the object is one instruction from Memory::Deallocate and nothing dispatches
+   through it again, and writing it would mean naming a host vtable array per
+   class for no reader.
+
+   Slot 17 stays trapped in all nine. The ROM's teardown dispatches 16 and does
+   the Memory::Deallocate itself (port/unmatched/
+   ActorBase_AfterCleanupResources.cpp); a call landing on 17 means something
+   reached the actor through operator delete, which is worth an abort. */
+/* Flag's and Cannon's slot 16 (once ac_d1_flag / ac_d1_cannon, transcribed
+   chains) are the matched src D1s through hal/dtor_faces_cpp.cpp. */
+/* src/game/actors/d_a_star_gate.cpp is the same chain with the deallocate on the end, which
+   is the cross-check that the member is a CommonModel at 0xd4.
+   CommonModel::~CommonModel is itself a vtable store plus ModelBase's D2, and
+   the store is the one this file leaves out, so the chain is spelled at its
+   bottom rather than through a symbol whose only other use would be a host
+   vtable array nobody dispatches through. */
+static int __fastcall ac_d1_door(void *s, void *)
+{
+    _ZN11dExtModel_cD2Ev((char *)s + 0xd4);
+    return (int)(size_t)_ZN8dActor_cD2Ev(s);
+}
+
+/* The four whose D1 is plain C in src (slice_gate31.txt). Each already does
+   its own vtable stores and its own member chain; the thunk is only the
+   __fastcall face the slot needs. */
+extern "C" {
+int *_ZN14daObjMcWater_cD1Ev(int *self);
+int *_ZN14daObjMcWater_cD0Ev(int *self);  /* slot 17, DTOR-PAIRS seat (ov009 0x02111abc) */
+int *_ZN18daObjMc_Metalnet_cD1Ev(int *self);
+int *_ZN18daObjHatenaBlock_cD1Ev(int *self);
+}
+static int __fastcall cw_d1(void *s, void *)
+{ return (int)(size_t)_ZN14daObjMcWater_cD1Ev((int *)s); }
+/* DTOR-PAIRS seat: the water's own D0 spells VT0/VT1; port/CMakeLists.txt
+   compiles that one TU with the ROM's two relocation targets
+   (_ZTV14daObjMcWater_c and the Platform base table as _ZTV10dBgActor_c). */
+static int __fastcall cw_d0(void *s, void *)
+{ return (int)(size_t)_ZN14daObjMcWater_cD0Ev((int *)s); }
+static int __fastcall mn_d1(void *s, void *)
+{ return (int)(size_t)_ZN18daObjMc_Metalnet_cD1Ev((int *)s); }
+static int __fastcall qb_d1(void *s, void *)
+{ return (int)(size_t)_ZN18daObjHatenaBlock_cD1Ev((int *)s); }
+
+/* Fill the ten shared slots plus the three traps; the caller writes its own
+   six. Keeps each class's fill down to the lines that are actually its own. */
+static void ac_fill_shared(void **vt)
+{
+    vt[1] = (void *)ac_binit;
+    vt[2] = (void *)ac_ainit;
+    vt[4] = (void *)ac_bclean;
+    vt[5] = (void *)ac_aclean;
+    vt[7] = (void *)ac_bbeh;
+    vt[8] = (void *)ac_abeh;
+    vt[10] = (void *)ac_bren;
+    vt[11] = (void *)ac_aren;
+    vt[13] = (void *)ac_trap13;
+    vt[14] = (void *)ac_trap14;
+    vt[15] = (void *)ac_heap;
+    vt[18] = (void *)ac_yoshi;
+    vt[19] = (void *)ac_turn_egg;
+    /* Actor's interaction tail. Every table in this file is at least 31 words
+       and every one of them carries these arm9 bodies at these indices unless
+       the class overrides -- the overriders rewrite their own slots below. */
+    vt[20] = (void *)ac_v50;
+    vt[21] = (void *)ac_pounded;
+    vt[22] = (void *)ac_atk1;
+    vt[23] = (void *)ac_atk2;
+    vt[24] = (void *)ac_kicked;
+    vt[25] = (void *)ac_pushed;
+    vt[26] = (void *)ac_cannon;
+    vt[27] = (void *)ac_mega;
+    vt[28] = (void *)ac_under;
+    vt[29] = (void *)ac_egg;
+    vt[30] = (void *)port_actor_s30_base;
+}
+
+// ---- TREE (actor 286, ov002) -----------------------------------------------
+//
+// _ZTV8daTree_c, ov002 0x0210ac00. Five of the six own slots are plain C-named
+// free functions in their TUs (the mwcc form) and two are real MSVC methods
+// against include/Tree.h; the thunks bridge both faces.
+//
+// Behavior takes no argument at all. That is the ROM's shape, not a
+// transcription slip: Tree::Behavior ticks the five GLOBAL CylinderClsn lists
+// at data_ov002_02110a48 rather than anything on `this`, so mwcc's r0 went
+// unread. Twenty-one Tree actors therefore all run the same body and the
+// cylinders are ticked twenty-one times over -- also the ROM's behaviour.
+#include "daTree_c.h"
+extern "C" {
+int _ZN8daTree_c13InitResourcesEv(char *self);
+int _ZN8daTree_c8BehaviorEv(void);
+void _ZN8daTree_c16OnPendingDestroyEv(void);
+int _ZN8daTree_cD1Ev(char *self);
+void *_ZN8daTree_cD0Ev(char *self);
+void *_ZTV8daTree_c[31];
+}
+
+static int __fastcall tree_init(void *s, void *)
+{ return _ZN8daTree_c13InitResourcesEv((char *)s); }
+static int __fastcall tree_clean(void *s, void *)
+{ return ((daTree_c *)s)->daTree_c::CleanupResources(); }
+static int __fastcall tree_behavior(void *, void *)
+{ return _ZN8daTree_c8BehaviorEv(); }
+static int __fastcall tree_render(void *s, void *)
+{ return ((daTree_c *)s)->daTree_c::Render(); }
+static int __fastcall tree_pdes(void *, void *)
+{ _ZN8daTree_c16OnPendingDestroyEv(); return 0; }
+static int __fastcall tree_d1(void *s, void *)
+{ return _ZN8daTree_cD1Ev((char *)s); }
+static int __fastcall tree_d0(void *s, void *)
+{ return (int)(size_t)_ZN8daTree_cD0Ev((char *)s); }
+
+extern "C" void hal_fill_cylinder_withpos_vtable(void);
+extern "C" void hal_fill_moving_cylinder_vtables(void);
+
+extern "C" void hal_fill_tree_vtable(void)
+{
+    void **vt = _ZTV8daTree_c;
+    hal_fill_cylinder_withpos_vtable();
+    ac_fill_shared(vt);
+    vt[0] = (void *)tree_init;
+    vt[3] = (void *)tree_clean;
+    vt[6] = (void *)tree_behavior;
+    vt[9] = (void *)tree_render;
+    vt[12] = (void *)tree_pdes;
+    vt[16] = (void *)PORT_D16(tree_d1);
+    vt[17] = (void *)tree_d0;
+}
+
+// ---- AMBIENT_SOUND_EFFECTS (actor 350, ov002) x5 ---------------------------
+//
+// The spawn table's entry for 350 is g_profile_SET_SE, whose
+// factory word is 0x020f1b94 -- _Z19daSetSE_c_classInitv -- and that
+// function's literal pool installs the vtable at 0x0210b4c8. Its methods are
+// the block at 0x020f198c..0x020f1ac4.
+//
+// The reading is confirmed from the other side: the Behavior in that block
+// calls Sound::PlayLong with data_ov002_0210b498[param] -- an ambient loop
+// table -- and skips it in the three underwater camera modes. That is
+// AMBIENT SOUND EFFECTS.
+//
+// Config used to carry these names one class late (mwcc emits a class as
+// [methods..., Spawn], so the block BEFORE a factory belongs to it), which is
+// why this row was first written against _ZN14EnemySwitchTag*. #1048 shifted
+// the ov002 sound cluster onto its real blocks and the names now agree.
+//
+// It renders nothing (Render is `return 1`) and its five instances are silent
+// while the Sound:: layer is stubbed, so what this row proves is the registry
+// generalising to a second class: five actors spawn, initialise, land on both
+// processing lists and tick every frame.
+#include "daSetSE_c.h"
+extern "C" {
+int _ZN9daSetSE_c6RenderEv(void);
+int _ZN9daSetSE_c16CleanupResourcesEv(void);
+void _ZN9daSetSE_c16OnPendingDestroyEv(void);
+int *_ZN9daSetSE_cD0Ev(int *self);   /* slot 17, gate 207 */
+void *_ZTV9daSetSE_c[31];
+}
+
+static int __fastcall amb_init(void *s, void *)
+{ return ((daSetSE_c *)s)->daSetSE_c::InitResources(); }
+static int __fastcall amb_clean(void *, void *)
+{ return _ZN9daSetSE_c16CleanupResourcesEv(); }
+static int __fastcall amb_behavior(void *s, void *)
+{ return ((daSetSE_c *)s)->daSetSE_c::Behavior(); }
+static int __fastcall amb_render(void *, void *)
+{ return _ZN9daSetSE_c6RenderEv(); }
+static int __fastcall amb_pdes(void *, void *)
+{ _ZN9daSetSE_c16OnPendingDestroyEv(); return 0; }
+static int __fastcall amb_d0(void *s, void *)
+{ return (int)(size_t)_ZN9daSetSE_cD0Ev((int *)s); }
+
+extern "C" void hal_fill_ambient_sound_vtable(void)
+{
+    void **vt = _ZTV9daSetSE_c;
+    ac_fill_shared(vt);
+    vt[0] = (void *)amb_init;
+    vt[3] = (void *)amb_clean;
+    vt[6] = (void *)amb_behavior;
+    vt[9] = (void *)amb_render;
+    vt[12] = (void *)amb_pdes;
+    /* SLOT 17 IS THE ROM'S OWN D0, gate 207. It used to keep the trap on the
+       reading that these two TUs need a shape the port has no reason to build;
+       that is half right. The D1 does -- it is a .cpp real C++ destructor MSVC
+       would emit under ??1AmbientSoundEffects@@UAE@XZ against a layout that is
+       not the ROM's -- but the D0 is flat C whose only placeholders are VT and
+       HEAP, and HEAP is already bound correctly. Gate 204's three conditions
+       all hold and were re-measured on this build; see slice_gate207.txt.
+       Slot 16 is unchanged. */
+    vt[16] = (void *)PORT_D16(hal_cppd1_AmbientSoundEffects);   /* lane DTOR-FACES-CPP */
+    vt[17] = (void *)amb_d0;
+}
+
+/* Silence the unused-static warning for the two shared helpers a class with
+   its own OnPendingDestroy does not take. */
+extern "C" void *hal_actor_shared_pdes(void) { return (void *)ac_pdes_base; }
+
+// ---- Platform, the base three of these classes destruct through ------------
+//
+// Every Platform-derived destructor is the mwcc two-step: install the class's
+// own vtable, run the members that belong to the derived part, install the
+// BASE vtable, run the rest. The base one is ov002 0x0210ae38, which the
+// destructors spell _ZTV10dBgActor_c (Platform is dBgActor_c in the ROM's own
+// RTTI) and which config now calls _ZTV10dBgActor_c -- it read
+// _ZTV17ExclamationSwitch until #1042, a name attached one class late, the
+// same skew AMBIENT_SOUND_EFFECTS ran into. The ROM settles it: slots 16/17 of that
+// table are _ZN10dBgActor_cD1Ev and _ZN10dBgActor_cD0Ev, and slots 0/3/6/9 are
+// ActorBase's own do-nothing bodies, which is exactly a base-class table.
+//
+// It is only ever installed BETWEEN two member teardowns and nothing dispatches
+// through it while it is there, so the port gives it the shared half and traps
+// the rest: if a future class does dispatch, it says which slot.
+//
+// THIRTY-TWO WORDS, not twenty. This is the ROM's Platform base table: 20..30
+// are Actor's own interaction list and 31 is Platform::Kill. The prefill loop
+// stopped at 20 with the array, so the width had to move with it or 20..31
+// would have stayed null.
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync): this file used to define
+   the Platform base table under its own name and declare the dBgActor_c
+   spelling as an extern. The sync renamed the two by address onto ONE name, so
+   the definition here and hal/actor_vtables.cpp's became the same symbol and
+   the link reported it twice (LNK2005). The storage stays in
+   hal/actor_vtables.cpp, which is what the comment in hal_fill_platform_vtable
+   below already names; this file now only declares it.
+extern "C" { void *_ZTV10dBgActor_c[32];   / * vtspan: _ZTV10dBgActor_c * /   */
+extern "C" { extern void *_ZTV10dBgActor_c[32]; }
+extern "C" void hal_fill_platform_vtable(void)
+{
+    static int done;
+    if (done) return;
+    done = 1;
+    /* _ZTV10dBgActor_c (hal/actor_vtables.cpp) is the SAME ROM table under the
+       other name a destructor TU may spell; it was plain zeroed storage, so a
+       dispatch through it while it was the installed vptr called address 0.
+       Both get the same contents. */
+    void **tabs[2] = { _ZTV10dBgActor_c, _ZTV10dBgActor_c };
+    for (int k = 0; k < 2; ++k) {
+        void **vt = tabs[k];
+        for (int i = 0; i < 32; ++i)
+            vt[i] = (void *)plat_trap;
+        ac_fill_shared(vt);
+        vt[12] = (void *)ac_pdes_base;
+        /* Slot 16 KEEPS the trap -- this base table is installed only between
+           two member teardowns and no class's D1 belongs in it -- but the trap
+           still has to carry the destructor slot's calling convention, because
+           ac_trap_report declines and RETURNS rather than aborting. An
+           unwrapped trap here would smash the caller's frame instead of
+           declining, which is the defect hal/port_d16.h describes. Found by
+           port/tools/slot16_guard.py, not by reading. */
+        vt[16] = (void *)PORT_D16(plat_trap);
+        vt[31] = (void *)ac_kill;
+    }
+}
+
+// ---- Enemy, the other ov002 base table the ctor chain installs -------------
+//
+// data_ov002_021081e4 is the Enemy base vtable (ov002, 31 slots, plain Actor
+// shape). hal/actor_vtables.cpp holds the storage: the Enemy ctor
+// (func_ov002_020aed98, spelled _ZN12dEnemyBase_cC2Ev) installs it and the derived
+// factory overwrites it two lines later, and the already-linked
+// _ZN12dEnemyBase_cD1Ev restores it mid-teardown -- installed only between two member
+// teardowns, never dispatched through, the same reading as the Platform base
+// table above.
+//
+// LINKAGE SEAT (lk2). The ROM's table carries exactly two of the class's own
+// bodies: slot 16 the complete-object destructor (_ZN12dEnemyBase_cD1Ev, linked) and
+// slot 17 the deleting one (_ZN12dEnemyBase_cD0Ev, clean flat-C matched src that was
+// in no slice). Seating the pair gives the hosted table the ROM's contents
+// and is the reference edge that pulls D0 into the link; every other slot is
+// an Actor/ActorBase main body the shared half already writes. D0's VT and
+// HEAP placeholders are settled in hal/cxx_aliases.cpp next to the Platform
+// pair's G0 row.
+extern "C" {
+int _ZN12dEnemyBase_cD1Ev(int *self);    /* slot 16 body (ov002 0x020aed74) */
+int *_ZN12dEnemyBase_cD0Ev(int *self);   /* slot 17 body (ov002 0x020aed3c) */
+extern void *data_ov002_021081e4[31];   /* storage: hal/actor_vtables.cpp */
+}
+static int __fastcall en_d1(void *s, void *)
+{ return _ZN12dEnemyBase_cD1Ev((int *)s); }
+static int __fastcall en_d0(void *s, void *)
+{ return (int)(size_t)_ZN12dEnemyBase_cD0Ev((int *)s); }
+
+extern "C" void hal_fill_enemy_base_vtable(void)
+{
+    void **vt = data_ov002_021081e4;
+    for (int i = 0; i < 31; ++i)
+        vt[i] = (void *)plat_trap;
+    ac_fill_shared(vt);
+    vt[12] = (void *)ac_pdes_base;
+    vt[16] = (void *)PORT_D16(en_d1);
+    vt[17] = (void *)en_d0;
+    /* 31 words, no slot 31: the Enemy is a plain Actor, not a Platform. */
+}
+
+// ---- BLACK_BRICK_BLOCK (actor 17, ov002) x1 --------------------------------
+//
+// _ZTV13BigBrickBlock, ov002 0x02108adc. One class body serves six actor ids
+// and switches on its own; 17 is 0x11, the variant that tracks a star and
+// carries the 1.0-scaled KCL. The castle grounds' single instance is at
+// (-3300, -650, 20), under the bridge.
+//
+// Four of the six own slots are real MSVC methods against include/
+// BigBrickBlock.h; InitResources and the two destructors are C-form TUs.
+#include "daObjBlockL_c.h"
+extern "C" {
+int _ZN13daObjBlockL_c13InitResourcesEv(void *self);
+int *_ZN13daObjBlockL_cD1Ev(int *self);
+int *_ZN13daObjBlockL_cD0Ev(int *self);
+void *_ZTV13daObjBlockL_c[32];
+}
+/* The destructors spell the class's own table by its RTTI name. */
+/* PORTSYNC2: both names of this ROM word are one name in main now; the alias would bind a symbol to itself. */ // #pragma comment(linker, "/alternatename:__ZTV13daObjBlockL_c=__ZTV13daObjBlockL_c")
+static int __fastcall bbb_init(void *s, void *)
+{ return _ZN13daObjBlockL_c13InitResourcesEv(s); }
+static int __fastcall bbb_clean(void *s, void *)
+{ return ((daObjBlockL_c *)s)->daObjBlockL_c::CleanupResources(); }
+static int __fastcall bbb_behavior(void *s, void *)
+{ return ((daObjBlockL_c *)s)->daObjBlockL_c::Behavior(); }
+extern "C" void port_actor_render_probe(const char *cls, void *model);
+static int __fastcall bbb_render(void *s, void *)
+{
+    port_actor_render_probe("BLACK_BRICK_BLOCK", (char *)s + 0xd4);
+    return ((daObjBlockL_c *)s)->daObjBlockL_c::Render();
+}
+static int __fastcall bbb_d1(void *s, void *)
+{ return (int)(size_t)_ZN13daObjBlockL_cD1Ev((int *)s); }
+static int __fastcall bbb_d0(void *s, void *)
+{ return (int)(size_t)_ZN13daObjBlockL_cD0Ev((int *)s); }
+
+/* Slot 21, OnGroundPounded(Actor &other). The declared third parameter is the
+   pounder: the caller pushes it and a __fastcall thunk only pops what it
+   declares, so two parameters would leave it on the stack. The body reads it
+   (its `a->f8` is the pounder's +8) and dispatches slot 31 as a C++ virtual,
+   which is why 31 is seated below rather than left trapped. */
+extern "C" void _ZN13daObjBlockL_c15OnGroundPoundedER8dActor_c(void *self, void *other);
+static int __fastcall bbb_pounded(void *s, void *, void *other)
+{ _ZN13daObjBlockL_c15OnGroundPoundedER8dActor_c(s, other); return 0; }
+/* Slot 22, OnAttacked1(Actor &attacker): a Bob-omb's blast or a thrown crate
+   against the brick. _Z19func_ov002_020ef228P10dBgCh_ActrP8dActor_c finds the owner of the wall the
+   attacker touches and dispatches its slot 22 as a C++ virtual (thiscall: the
+   receiver in ECX, the attacker pushed). The ROM word at 0x02108adc + 22*4 =
+   0x02108b34 relocates to 0x020b37ec (config/arm9/overlays/ov002/relocs.txt),
+   BigBrickBlock::OnAttacked1: unless the receiver is id 0x11 it calls its own
+   slot 31, Kill, as a C++ virtual (thiscall), so it lands on bbb_kill. The
+   matched src links through port/slice_boobrick1.txt; its _MSC_VER arm only
+   respells the valueless early exit MSVC refuses. Three parameters, so it pops
+   the pushed attacker like the other seats on slots 21..28 here. */
+static int __fastcall bbb_atk1(void *s, void *, void *o)
+{ ((daObjBlockL_c *)s)->daObjBlockL_c::OnAttacked1(*(dActor_c *)o); return 0; }
+/* Slot 23, OnAttacked2(Actor &attacker): a bro's PUNCH (St_PunchKick steps 0/1
+   -> _ZN7daPly_c19func_ov002_020d8a50Ei which==0/1 -> _Z19func_ov002_020ef070PvPc dispatches slot 23).
+   The ROM word at 0x02108adc + 23*4 = 0x02108b38 relocates to 0x020b3788
+   (config/arm9/overlays/ov002/relocs.txt), BigBrickBlock::OnAttacked2: it reads
+   the attacker at +8 and breaks the block through Kill (slot 31). It was
+   trapped once, so a punch on a brick declined slot 23 -- an AV that, raised in
+   the Player's own punch callback, soft-locked the bro exactly the way the Yoshi
+   eat-cap face did (before the quarantine-attribution fix froze the brick
+   instead of the Player, the block still never broke). Its src reached Kill
+   through a cdecl `fn(c)` then, so a host copy carried it; the src is a real
+   method whose Kill() is a C++ virtual now (thiscall, so it lands on
+   bbb_kill), and the ROM body itself is the seat, linked through
+   port/slice_w31_rs5a.txt. Its _MSC_VER arm only respells the valueless early
+   exits MSVC refuses. Three parameters, matching the thiscall dispatcher
+   (Actor_OnAttacked2Dispatch.cpp), like bbb_atk1 above. */
+static int __fastcall bbb_atk2(void *s, void *, void *o)
+{ ((daObjBlockL_c *)s)->daObjBlockL_c::OnAttacked2(*(dActor_c *)o); return 0; }
+/* Slot 24, OnKicked(Actor &attacker): a bro's KICK (St_PunchKick step 2 and
+   SweepKick -> _ZN7daPly_c19func_ov002_020d8a50Ei which==2/3 -> _Z19func_ov002_020eeeb8PvPc dispatches
+   slot 24). The matched body _ZN13BigBrickBlock8OnKickedER8dActor_c reaches Kill through a C++
+   VIRTUAL (already thiscall), so its src links directly (slice_gate16.txt) and
+   lands on bbb_kill unchanged. Same trap, same freeze as the punch above; both
+   dispatchers were already converted to thiscall, so seating both is safe now. */
+extern "C" void _ZN13daObjBlockL_c8OnKickedER8dActor_c(void *self, void *attacker);
+static int __fastcall bbb_kicked(void *s, void *, void *o)
+{ _ZN13daObjBlockL_c8OnKickedER8dActor_c(s, o); return 0; }
+/* Slot 31, Kill(). No arguments, so nothing to pop. */
+extern "C" void _ZN13daObjBlockL_c4KillEv(char *self);
+static int __fastcall bbb_kill(void *s, void *)
+{ _ZN13daObjBlockL_c4KillEv((char *)s); return 0; }
+/* Slot 27, OnHitByMegaChar(daPly_c &): IncMegaKillCount on the player, then this
+   class's own slot 31. GATE 227. port/ov002_frontier.txt read this body and
+   slot 24's together and ruled both "convention-clean, held out only by the
+   marker": it reaches slot 31 through a C++ VIRTUAL, already thiscall, so it
+   lands on the two-parameter bbb_kill unchanged. Slot 22's src reached slot 31
+   through a cdecl `fn(c)` when this was written, and trapped for that reason
+   and not for the marker; it is a C++ virtual now and seated (bbb_atk1). The table word at 0x02108adc + 27*4 = 0x02108b48
+   relocates to 0x020b36b4 in config/arm9/overlays/ov002/relocs.txt, and
+   symbols.txt gives that address its own kind:function(arm,size=0x28) entry.
+   Three-parameter, like every other seat on slots 21..28 in this file. */
+extern "C" void _ZN13daObjBlockL_c15OnHitByMegaCharER7daPly_c(void *self, void *player);
+static int __fastcall bbb_mega(void *s, void *, void *p)
+{ _ZN13daObjBlockL_c15OnHitByMegaCharER7daPly_c(s, p); return 0; }
+
+extern "C" void hal_fill_black_brick_block_vtable(void)
+{
+    void **vt = _ZTV13daObjBlockL_c;
+    hal_fill_platform_vtable();
+    ac_fill_shared(vt);
+    vt[0] = (void *)bbb_init;
+    vt[3] = (void *)bbb_clean;
+    vt[6] = (void *)bbb_behavior;
+    vt[9] = (void *)bbb_render;
+    vt[12] = (void *)ac_pdes_base;
+    vt[16] = (void *)PORT_D16(bbb_d1);
+    vt[17] = (void *)bbb_d0;
+    /* A 32-slot Platform table, and BLACK_BRICK_BLOCK overrides six of the
+       tail: 21 OnGroundPounded (ov002 0x020b382c), 22 OnAttacked1 (0x020b37ec),
+       23 OnAttacked2 (0x020b3788), 24 OnKicked (0x020b36dc), 27 OnHitByMegaChar
+       (0x020b36b4) and 31 Kill (0x020b38a0). Every address here is the ov002
+       relocation for base 0x02108adc + 4N, not a recovered name: actor id 15
+       is spelled BrickBlock in the registry but installs THIS table (RTTI
+       13daObjBlockL_c, the Large one), so a name-led read seats the wrong
+       class's bodies. Slots 28/29/30 relocate to main (0x0201012c, 0x02010124,
+       0x020100dc), the shared arm9 Actor bodies, and keep the shared thunks
+       ac_fill_shared just wrote.
+
+       21 and 31 are seated. 21 is the ground pound three players reported, and
+       it DELEGATES to 31: seating 21 alone would have moved the decline one
+       level down into Kill and still frozen the Player, which looks fixed and
+       is not. Both bodies are sliced with it (slice_gate16.txt) and 31's whole
+       closure was already linked.
+
+       23 AND 24 ARE NOW SEATED, the bro-punch and bro-kick paths. A bro's
+       punch-kick combo dispatches slot 23 (OnAttacked2) on the first two hits
+       and slot 24 (OnKicked) on the third (_ZN7daPly_c19func_ov002_020d8a50Ei which 0/1 vs
+       2/3), and SweepKick dispatches 24; all delegate to Kill (slot 31). Both
+       were trapped, so a punch or kick on a brick declined here and took the AV
+       that soft-locks the bro -- the same interaction-tail freeze as slot 21's
+       ground pound. Their dispatchers were already converted to thiscall
+       (Actor_OnAttacked2Dispatch.cpp, Actor_OnKickedDispatch.cpp) and
+       ac_trap23/ac_trap24 already carried the three-parameter ret-4 shape, so
+       the only thing left was the bodies: 24's src links directly (its slot-31
+       call is a C++ virtual), 23's rides a thiscall host copy
+       (unmatched/BigBrickBlock_OnAttacked2.cpp) because its src reaches slot 31
+       through a cdecl `fn(c)`. Slot 22 (OnAttacked1, 0x020b37ec) stayed
+       trapped here because a bro's punch/kick never dispatches it and its body
+       then reached slot 31 through the same cdecl `fn(c)`.
+       SLOT 22 IS SEATED NOW (run linkfull, lane BOOBRICK1). A Bob-omb's blast
+       and a thrown crate DO dispatch it (_Z19func_ov002_020ef228P10dBgCh_ActrP8dActor_c), and the trap froze
+       the brick and left the Bob-omb exploding every four frames (the 0.4.2
+       report). Its src has since become a real method whose Kill() is a C++
+       virtual, so the ROM body itself is the seat; see bbb_atk1 above.
+       SLOT 23'S HOST COPY IS RETIRED (run linkfull, lane RS5A). Its src is the
+       same kind of real method now, so slot 23 seats the ROM body too; see
+       bbb_atk2 above.
+       SLOT 27 IS SEATED NOW (gate 227). It was the other half of that reading:
+       convention-clean, reaching slot 31 through a C++ virtual, and held out
+       only by the inferred-stub marker that lane STUBADJ has since ruled. See
+       the bbb_mega block above. */
+    vt[21] = (void *)bbb_pounded;
+    vt[22] = (void *)bbb_atk1;    /* BOOBRICK1 */
+    vt[23] = (void *)bbb_atk2;
+    vt[24] = (void *)bbb_kicked;
+    vt[27] = (void *)bbb_mega;      /* gate 227 */
+    vt[31] = (void *)bbb_kill;
+}
+
+// ---- STAR_MARKER (actor 180, ov002) ----------------------------------------
+//
+// _ZTV10StarMarker, ov002 0x0210aab8 (RTTI daStarBase_c). The invisible marker
+// that holds a course star's spot. daStarBase_c is a native class, so the
+// constructor installs its compiled table ??_7daStarBase_c@@6B@ and the
+// registry row has no fill; the host table _ZTV12daStarBase_c this block used
+// to fill with forwarders onto the same bodies was never dispatched.
+//
+// InitResources/CleanupResources declare data_ov002_0210d9a8 as a C++ `extern
+// char`, which MSVC mangles to ?data_ov002_0210d9a8@@3DA; the mounted symbol is
+// the C-linkage _data_ov002_0210d9a8. Alias it, byte-faithful.
+#pragma comment(linker, "/alternatename:?data_ov002_0210d9a8@@3DA=_data_ov002_0210d9a8")
+
+// ---- BLUE_COIN_SWITCH (actor 10, ov002) ------------------------------------
+//
+// _ZTV16daObjBC_Switch_c, ov002 0x0210b26c (RTTI daObjBC_Switch_c). The switch
+// that, when ground-pounded, turns the level's blue-coin markers into collecta-
+// ble blue coins for a few seconds. A Platform subclass whose six own slots are
+// all extern-C C-linkage TUs (the .cpp Render is extern "C" too), so every thunk
+// calls the mangled name directly. Its Behavior is a plain state machine with no
+// pointer-to-member and no message path. The same 32-slot Platform table
+// BigBrickBlock has, hosted as a [20] the fill covers -- nothing dispatches a
+// slot past 19 (slot 31 is Platform::Kill, reached only by KillAndTrackIn-
+// DeathTable, which the ROM never triggers here).
+extern "C" {
+int _ZN16daObjBC_Switch_c13InitResourcesEv(void *self);
+int _ZN16daObjBC_Switch_c16CleanupResourcesEv(void *self);
+int _ZN16daObjBC_Switch_c8BehaviorEv(void *self);
+int _ZN16daObjBC_Switch_c6RenderEv(char *self);
+int *_ZN16daObjBC_Switch_cD1Ev(int *self);
+int *_ZN16daObjBC_Switch_cD0Ev(int *self);
+void *_ZTV16daObjBC_Switch_c[32];
+}
+/* the destructors spell the class's own table by its RTTI name */
+static int __fastcall bcs_init(void *s, void *)
+{ return _ZN16daObjBC_Switch_c13InitResourcesEv(s); }
+static int __fastcall bcs_clean(void *s, void *)
+{ return _ZN16daObjBC_Switch_c16CleanupResourcesEv(s); }
+static int __fastcall bcs_behavior(void *s, void *)
+{ return _ZN16daObjBC_Switch_c8BehaviorEv(s); }
+static int __fastcall bcs_render(void *s, void *)
+{
+    port_actor_render_probe("BLUE_COIN_SWITCH", (char *)s + 0xd4);
+    return _ZN16daObjBC_Switch_c6RenderEv((char *)s);
+}
+static int __fastcall bcs_d1(void *s, void *)
+{ return (int)(size_t)_ZN16daObjBC_Switch_cD1Ev((int *)s); }
+static int __fastcall bcs_d0(void *s, void *)
+{ return (int)(size_t)_ZN16daObjBC_Switch_cD0Ev((int *)s); }
+extern "C" void hal_fill_blue_coin_switch_vtable(void)
+{
+    void **vt = _ZTV16daObjBC_Switch_c;
+    hal_fill_platform_vtable();
+    ac_fill_shared(vt);
+    vt[0] = (void *)bcs_init;
+    vt[3] = (void *)bcs_clean;
+    vt[6] = (void *)bcs_behavior;
+    vt[9] = (void *)bcs_render;
+    vt[12] = (void *)ac_pdes_base;
+    vt[16] = (void *)PORT_D16(bcs_d1);
+    vt[17] = (void *)bcs_d0;
+    /* 32 slots. Slot 31 is Platform::Kill (ov002 0x020ee55c), not overridden
+       here, and 20..30 are Actor's own list ac_fill_shared already wrote. */
+    vt[31] = (void *)ac_kill;
+}
+
+// ---- SIGN_POST (actor 184, ov002) x5 ---------------------------------------
+//
+// _ZTV8SignPost, ov002 0x02109af8 (RTTI: daObjTatefuda_c -- tatefuda is a
+// signboard). Five of them around the grounds. This is the first class whose
+// InitResources RAYCASTS THE LEVEL: it drops a ground ray from 100 units above
+// the object record's Y and plants the post on whatever it finds, so the five
+// signs read back the same floor the Player stands on.
+//
+// It also carries three collision objects at once -- a MovingMeshCollider for
+// the solid post, a MovingCylinderClsn for the read trigger, and a WithMeshClsn
+// of its own -- which is the shape every Platform actor after it has.
+//
+// THE TALK PATH IS GUARDED, and this is the one place a slot is not the ROM's.
+// Behavior's read branch runs when the Player is in range with its 0xc8 word
+// set, and func_ov002_020bb060 ends in the Message system (Message::Show and
+// the dialogue box's OAM/font machinery), none of which the port hosts. The
+// guard is in hal/actor_vtables.cpp at that function, not here: the sign
+// still turns to face the player and still blocks him, it just does not open
+// a box that has nothing to draw with.
+#include "daObjTatefuda_c.h"
+extern "C" {
+int _ZN15daObjTatefuda_c8BehaviorEv(char *self);
+int *_ZN15daObjTatefuda_cD1Ev(int *self);
+int *_ZN15daObjTatefuda_cD0Ev(int *self);
+void *_ZTV15daObjTatefuda_c[32];
+}
+/* PORT_HOST_ABI: two names of ONE ROM table, read off the ROM rather than
+   off a comment (lane ALIASCHK). ov002 0x02109af8 carries its own RTTI
+   record: the word at 0x02109af4 relocates to the typeinfo at 0x02109ab4,
+   whose word[1] points at the Itanium name string at 0x02109ac0 =
+   "15daObjTatefuda_c", so 15daObjTatefuda_c is the ROM's own RTTI spelling
+   of that class. The ROM bodies whose literal pools load it are
+   _Z25daObjTatefuda_c_classInitv, _ZN8SignPostD0Ev, _ZN8SignPostD1Ev. Read out of
+   extracted/overlays/overlay_0002.bin; the LHS is not a config symbol
+   anywhere, so the alias cannot be defeated by a later slice. */
+/* PORTSYNC2: both names of this ROM word are one name in main now; the alias would bind a symbol to itself. */ // #pragma comment(linker, "/alternatename:__ZTV15daObjTatefuda_c=__ZTV15daObjTatefuda_c")
+static int __fastcall sp_init(void *s, void *)
+{ return ((daObjTatefuda_c *)s)->daObjTatefuda_c::InitResources(); }
+static int __fastcall sp_clean(void *s, void *)
+{ return ((daObjTatefuda_c *)s)->daObjTatefuda_c::CleanupResources(); }
+static int __fastcall sp_behavior(void *s, void *)
+{ return _ZN15daObjTatefuda_c8BehaviorEv((char *)s); }
+/* SM64DS_ACTOR_PROBE=1: one line per class the first time its Render runs,
+   with what the Model has to draw with -- the BMD the file pointer resolved
+   to and the model matrix's own translation row, which Platform writes in
+   SCENE units. A class that never prints is being culled before Render;
+   one that prints with a null file has a load problem instead. */
+extern "C" void port_actor_render_probe(const char *cls, void *model)
+{
+    static int on = -1;
+    if (on < 0) on = std::getenv("SM64DS_ACTOR_PROBE") != 0;
+    if (!on) return;
+    /* 32, not 8: the registry carried five classes when this was written and
+       carries twenty now, so the old cap stopped reporting before it reached
+       the ones landed last -- silently, which is the worst way for a probe to
+       go quiet. The transforms pointer is new for the same reason: it is what
+       dExtModel_c::SetFile allocates and what a Model's own Virtual10 copies
+       out of, so a null there is a load that did not finish. */
+    static const char *said[32];
+    static int n;
+    for (int i = 0; i < n; ++i)
+        if (said[i] == cls) return;
+    if (n < 32) said[n++] = cls;
+    const int *m = (const int *)((const char *)model + 0x1c);
+    std::printf("[actor] %-17s model %p file %p transforms %p "
+                "mat.t (%d,%d,%d) scene\n",
+                cls, model, *(void *const *)((const char *)model + 0x0c),
+                *(void *const *)((const char *)model + 0x14),
+                m[9] >> 12, m[10] >> 12, m[11] >> 12);
+}
+
+static int __fastcall sp_render(void *s, void *)
+{
+    port_actor_render_probe("SIGN_POST", (char *)s + 0xd4);
+    return ((daObjTatefuda_c *)s)->daObjTatefuda_c::Render();
+}
+static int __fastcall sp_d1(void *s, void *)
+{ return (int)(size_t)_ZN15daObjTatefuda_cD1Ev((int *)s); }
+static int __fastcall sp_d0(void *s, void *)
+{ return (int)(size_t)_ZN15daObjTatefuda_cD0Ev((int *)s); }
+
+extern "C" void port_sign_post_states_seat(void);   /* port/unmatched */
+
+/* ---- the sign's own interaction tail, gate 227 ----------------------------
+   The four ROM words of _ZTV8SignPost's tail. The comment inside the fill
+   below used to say these were "matched in src and in no slice"; the reason
+   they were in no slice is that all four carry the inferred-stub marker, and
+   port/tools/inferred_stub_guard.py refuses a guess. Lane STUBADJ ruled all
+   four REAL DECOMP against the ROM under the pinned mwccarm 2004/b56 with
+   --strict-relocs, and this lane re-read each table word at
+   0x02109af8 + 4*slot in config/arm9/overlays/ov002/relocs.txt and confirmed
+   the destination, the function entry and the argument count before writing a
+   face. slice_gate227.txt carries the per-body evidence.
+
+   ARITY, which is the thing that has to be right. hal's contract above (see
+   ac_pounded and the comment over it) is that slots 21..28 are dispatched by a
+   __thiscall caller that PUSHES its one argument, so their faces take the
+   dummy edx AND the named parameter and pop it; slot 31 takes nothing. The
+   ROM agrees body by body: 0x020bb27c, 0x020bb23c and 0x020bb374 all read r1,
+   0x020bb3b8 reads only r0.
+
+   SLOT 22 IS THE ONE THAT NEEDED A SECOND LOOK. Its body dispatches its own
+   slot 31 (ldr r1,[r0]; ldr r1,[r1,#0x7c]; blx r1), and src spells that as a
+   C++ virtual call, which MSVC emits as thiscall with the receiver in ECX and
+   nothing pushed -- so it lands on the two-parameter sp_kill correctly.
+   BLACK_BRICK_BLOCK's slot 22 reached ITS slot 31 through a raw `fn(c)`
+   function pointer when this was written, a cdecl call that would leave ECX
+   garbage, which is why the block's 22 trapped and the sign's did not. That
+   src is a C++ virtual now too, and the block's 22 is seated (bbb_atk1). */
+extern "C" {
+void _ZN15daObjTatefuda_c15OnGroundPoundedER8dActor_c(char *self, void *attacker);  /* 21 OnGroundPounded */
+void _ZN15daObjTatefuda_c11OnAttacked1ER8dActor_c(void *self, void *attacker);  /* 22 OnAttacked1     */
+void _ZN15daObjTatefuda_c15OnHitByMegaCharER7daPly_c(char *self, void *player);    /* 27 OnHitByMegaChar */
+int  _ZN15daObjTatefuda_c4KillEv(char *self);                  /* 31 Kill            */
+}
+static int __fastcall sp_pounded(void *s, void *, void *o)
+{ _ZN15daObjTatefuda_c15OnGroundPoundedER8dActor_c((char *)s, o); return 0; }
+static int __fastcall sp_atk1(void *s, void *, void *o)
+{ _ZN15daObjTatefuda_c11OnAttacked1ER8dActor_c(s, o); return 0; }
+static int __fastcall sp_mega(void *s, void *, void *p)
+{ _ZN15daObjTatefuda_c15OnHitByMegaCharER7daPly_c((char *)s, p); return 0; }
+static int __fastcall sp_kill(void *s, void *)
+{ return _ZN15daObjTatefuda_c4KillEv((char *)s); }
+
+extern "C" void hal_fill_sign_post_vtable(void)
+{
+    void **vt = _ZTV15daObjTatefuda_c;
+    /* the sinit copied the ROM's own five {Init, Main} pairs into
+       data_ov002_0210e084, which means DS code addresses; seat the host
+       bodies over them (the ovdata contract, see the file header there) */
+    port_sign_post_states_seat();
+    hal_fill_platform_vtable();
+    ac_fill_shared(vt);
+    vt[0] = (void *)sp_init;
+    vt[3] = (void *)sp_clean;
+    vt[6] = (void *)sp_behavior;
+    vt[9] = (void *)sp_render;
+    vt[12] = (void *)ac_pdes_base;
+    vt[16] = (void *)PORT_D16(sp_d1);
+    vt[17] = (void *)sp_d0;
+    /* SIGN_POST is a 32-slot Platform table and the worst instance of the [20]
+       bug in this file: the array ended at 0x50, _ZTV13OneUpMushroom starts
+       0x50 later with no padding, and slot 22 therefore landed on the 1-up's
+       slot 2 -- Actor::AfterInitResources, called with a sign as `this`. Slot
+       21 crashed outright (the confirmed level-3 repro).
+       Four of the tail are the sign's OWN bodies: 21 OnGroundPounded (ov002
+       0x020bb27c, the post sinking a notch and playing bank-3 sound 0x62), 22
+       OnAttacked1 (0x020bb23c), 27 OnHitByMegaChar (0x020bb374) and 31 Kill
+       (0x020bb3b8). They used to decline by name rather than run Actor's
+       shared body, which is not what a sign does. GATE 227 SEATS ALL FOUR --
+       the marker was the only thing holding them out, and it is ruled; see the
+       block above the fill for the arity and the table words. */
+    vt[21] = (void *)sp_pounded;
+    vt[22] = (void *)sp_atk1;
+    vt[27] = (void *)sp_mega;
+    vt[31] = (void *)sp_kill;
+}
+
+// ---- ONE_UP_MUSHROOM (actor 276, ov002) x3 ---------------------------------
+//
+// _ZTV13OneUpMushroom, ov002 0x021083c8 (RTTI: da1up_c). Three of them on the
+// castle roof at param 0x00f3, which is mushroom type 3.
+//
+// Two slots are this class's own rather than Actor's, and they are the reason
+// the class exists: slot 18 (OnYoshiTryEat) returns 4 -- "swallow me" -- and
+// slot 19 (OnTurnIntoEgg) is the collect path, GiveLives plus the 1UP logo
+// actor. Both are hosted; nothing on this level reaches them while the
+// character is Mario.
+//
+// Behavior is the HOST COPY in port/unmatched/OneUpMushroom_Behavior.cpp: the
+// ROM's dispatches the mushroom type through an mwcc pointer-to-member table
+// and MSVC has no representation for one. See that file's header.
+#include "da1up_c.h"
+extern "C" {
+int _ZN7da1up_c8BehaviorEv(void *self);       /* port/unmatched */
+void _ZN7da1up_c16OnPendingDestroyEv(void);
+int *_ZN7da1up_cD1Ev(int *self);
+int *_ZN7da1up_cD0Ev(int *self);
+int _ZN7da1up_c13OnYoshiTryEatEv(void);                       /* OnYoshiTryEat */
+void _ZN7da1up_c13OnTurnIntoEggER7daPly_c(char *self, int arg);       /* OnTurnIntoEgg */
+void *_ZTV13OneUpMushroom[31];
+}
+/* PORT_HOST_ABI: two names of ONE ROM table, read off the ROM rather than
+   off a comment (lane ALIASCHK). ov002 0x021083c8 carries its own RTTI
+   record: the word at 0x021083c4 relocates to the typeinfo at 0x0210837c,
+   whose word[1] points at the Itanium name string at 0x02108370 =
+   "7da1up_c", so 7da1up_c is the ROM's own RTTI spelling of that class. The
+   ROM bodies whose literal pools load it are _Z32da1up_c_classInit_SCALEUP_KINOKOv,
+   _Z29da1up_c_classInit_ONEUPKINOKOv, _ZN7da1up_cD0Ev. Read out of
+   extracted/overlays/overlay_0002.bin; the LHS is not a config symbol
+   anywhere, so the alias cannot be defeated by a later slice. */
+#pragma comment(linker, "/alternatename:__ZTV7da1up_c=__ZTV13OneUpMushroom")
+
+static int __fastcall oum_init(void *s, void *)
+{ return ((da1up_c *)s)->da1up_c::InitResources(); }
+static int __fastcall oum_clean(void *s, void *)
+{ return ((da1up_c *)s)->da1up_c::CleanupResources(); }
+static int __fastcall oum_behavior(void *s, void *)
+{ return _ZN7da1up_c8BehaviorEv(s); }
+static int __fastcall oum_render(void *s, void *)
+{
+    port_actor_render_probe("ONE_UP_MUSHROOM", (char *)s + 0x300);
+    return (int)((da1up_c *)s)->da1up_c::Render();
+}
+static int __fastcall oum_pdes(void *, void *)
+{ _ZN7da1up_c16OnPendingDestroyEv(); return 0; }
+static int __fastcall oum_d1(void *s, void *)
+{ return (int)(size_t)_ZN7da1up_cD1Ev((int *)s); }
+static int __fastcall oum_d0(void *s, void *)
+{ return (int)(size_t)_ZN7da1up_cD0Ev((int *)s); }
+static int __fastcall oum_yoshi(void *, void *)
+{ return _ZN7da1up_c13OnYoshiTryEatEv(); }
+static int __fastcall oum_egg(void *s, void *, int a)
+{ _ZN7da1up_c13OnTurnIntoEggER7daPly_c((char *)s, a); return 0; }
+
+extern "C" void port_one_up_mushroom_types_seat(void);   /* port/unmatched */
+
+extern "C" void hal_fill_one_up_mushroom_vtable(void)
+{
+    void **vt = _ZTV13OneUpMushroom;
+    /* same as the sign: __sinit_ov002_02100adc left fourteen DS code
+       addresses in data_ov002_0210dc00 */
+    port_one_up_mushroom_types_seat();
+    ac_fill_shared(vt);
+    vt[0] = (void *)oum_init;
+    vt[3] = (void *)oum_clean;
+    vt[6] = (void *)oum_behavior;
+    vt[9] = (void *)oum_render;
+    vt[12] = (void *)oum_pdes;
+    vt[16] = (void *)PORT_D16(oum_d1);
+    vt[17] = (void *)oum_d0;
+    vt[18] = (void *)oum_yoshi;
+    vt[19] = (void *)oum_egg;
+}
+
+// ---- CylinderClsnWithPos ---------------------------------------------------
+//
+// Not an actor, but the Tree's InitResources constructs one per instance and
+// the constructor installs _ZTV8dCcPos_c by name. Four slots
+// (arm9 0x0208e6bc: D1, D0, GetPos, GetOwnerID) and the last two really do
+// dispatch -- every cylinder the Tree threads onto _ZN5dCc_c8listHeadE shares that
+// list with the Player's own, and the cylinder pass asks each node where it
+// is and who owns it. A zeroed table would be a call through null the first
+// time Mario walked near a trunk.
+extern "C" {
+void *_ZTV8dCcPos_c[4];
+void *_ZN8dCcPos_cD1Ev(void *self);
+void *_ZN8dCcPos_cD0Ev(void *self);
+void *_ZN8dCcPos_c6GetPosEv(void *self);
+}
+#include "dCcPos_c.h"
+
+static void *__fastcall ccp_d1(void *s, void *)
+{ return _ZN8dCcPos_cD1Ev(s); }
+static void *__fastcall ccp_d0(void *s, void *)
+{ return _ZN8dCcPos_cD0Ev(s); }
+static void *__fastcall ccp_getpos(void *s, void *)
+{ return _ZN8dCcPos_c6GetPosEv(s); }
+static unsigned __fastcall ccp_ownerid(void *s, void *)
+{ return ((dCcPos_c *)s)->dCcPos_c::GetOwnerID(); }
+
+extern "C" void hal_fill_cylinder_withpos_vtable(void)
+{
+    _ZTV8dCcPos_c[0] = (void *)ccp_d1;
+    _ZTV8dCcPos_c[1] = (void *)ccp_d0;
+    _ZTV8dCcPos_c[2] = (void *)ccp_getpos;
+    _ZTV8dCcPos_c[3] = (void *)ccp_ownerid;
+}
+
+// ---- the two ACTOR-ATTACHED cylinder tables --------------------------------
+//
+// Same treatment, same reason, and the reason is what killed the tree-grab
+// chain on frame 0. _ZTV7dCcAc_c (arm9 0x0208e6d4) and
+// _ZTV10dCcAcPos_c (0x0208e704) are declared in
+// hal/actor_vtables.cpp as bare zeroed arrays and nothing filled them,
+// because until now nothing in the port dispatched a cylinder virtual --
+// every consumer read the objects' fields directly.
+//
+// CylinderClsn::Process is the consumer that does. It asks EVERY node on
+// _ZN5dCc_c8listHeadE for GetPos and GetOwnerID, and the castle grounds put seven
+// actor-attached cylinders on that list from the first frame: six
+// MovingCylinderClsn (the SIGN_POSTs' read triggers and the RABBITs) and one
+// MovingCylinderClsnWithPos, behind the 21 CylinderClsnWithPos the trees
+// thread. The tree table was filled and the actor ones were not, so the pass
+// walked 21 good nodes and then called address zero. That is the frame-0
+// crash the chain was backed out for; PORT_TRACE_CYL=1 in
+// port/unmatched/CylinderClsn_Process.cpp prints the list with both slots.
+//
+// Slot order is the ROM's, per include/MovingCylinderClsn.h: [0] D1, [1] D0,
+// [2] GetPos, [3] GetOwnerID. WithPos overrides GetPos only -- its ROM slot 3
+// is a 12-byte interworking veneer onto the parent's GetOwnerID, so the port
+// installs the parent's shim there rather than inventing an override.
+extern "C" {
+void *_ZTV7dCcAc_c[];
+void *_ZTV10dCcAcPos_c[];
+void *_ZN7dCcAc_cD1Ev(void *self);
+void *_ZN7dCcAc_cD0Ev(void *self);
+void *_ZN10dCcAcPos_cD0Ev(void *self);
+/* WithPos::GetPos is a C file (it just returns this + 0x34), so it carries
+   the plain C name rather than the method mangling the parent's .cpp emits */
+void *_ZN10dCcAcPos_c6GetPosEv(void *self);
+/* the WithPos D1 is already declared above, returning void */
+}
+#include "dCcAcPos_c.h"
+
+static void *__fastcall mcc_d1(void *s, void *)
+{ return _ZN7dCcAc_cD1Ev(s); }
+static void *__fastcall mcc_d0(void *s, void *)
+{ return _ZN7dCcAc_cD0Ev(s); }
+static void *__fastcall mcc_getpos(void *s, void *)
+{ return &((dCcAc_c *)s)->dCcAc_c::GetPos(); }
+static unsigned __fastcall mcc_ownerid(void *s, void *)
+{ return ((dCcAc_c *)s)->dCcAc_c::GetOwnerID(); }
+
+static void *__fastcall mccp_d1(void *s, void *)
+{ _ZN10dCcAcPos_cD1Ev(s); return s; }
+static void *__fastcall mccp_d0(void *s, void *)
+{ return _ZN10dCcAcPos_cD0Ev(s); }
+static void *__fastcall mccp_getpos(void *s, void *)
+{ return _ZN10dCcAcPos_c6GetPosEv(s); }
+
+extern "C" void hal_fill_moving_cylinder_vtables(void)
+{
+    _ZTV7dCcAc_c[0] = (void *)mcc_d1;
+    _ZTV7dCcAc_c[1] = (void *)mcc_d0;
+    _ZTV7dCcAc_c[2] = (void *)mcc_getpos;
+    _ZTV7dCcAc_c[3] = (void *)mcc_ownerid;
+
+    _ZTV10dCcAcPos_c[0] = (void *)mccp_d1;
+    _ZTV10dCcAcPos_c[1] = (void *)mccp_d0;
+    _ZTV10dCcAcPos_c[2] = (void *)mccp_getpos;
+    _ZTV10dCcAcPos_c[3] = (void *)mcc_ownerid;  /* inherited */
+}
+
+// ============================================================================
+// GATE 17: the LEVEL OVERLAY'S OWN CLASSES
+// ============================================================================
+//
+// Four classes that exist only on the castle grounds. mwcc emits a class as
+// [methods..., Spawn], so the block BEFORE a factory belongs to it, and each
+// factory's own literal pool names the vtable it installs:
+//
+//   _Z19daSBird_c_classInitv        -> _ZTV4Bird             = ov009 0x02113958
+//   _Z24daObjMcWater_c_classInitv -> _ZTV14daObjMcWater_c  = ov009 0x02113a18
+//   _Z28daObjMc_Metalnet_c_classInitv    -> _ZTV8MetalNet         = ov009 0x02113ae0
+//   _Z20daMcFlag_c_classInitv        -> _ZTV4Flag             = ov009 0x02113ba0
+//
+// The ROM's own RTTI agrees from the other side: 0x02113ae0 is
+// daObjMc_Metalnet_c and 0x02113ba0 is daMcFlag_c, and config now carries both
+// spellings for each table. It used to attach these names one class late from
+// Bird onward, which is why this gate was first written against func_ov009_*
+// for the water and _ZN11CastleWater*/_ZN8DockPole* for the net and the flag;
+// #1041 shifted them onto the blocks they belong to.
+//
+// SLOT 17 USED TO TRAP FOR ALL FOUR. Nothing on the castle grounds destroys
+// one -- every InitResources here returns 1 on this level -- and the water's
+// own D0 (src/game/actors/d_a_obj_mc_water.cpp) spells its two vtables VT0 and VT1, the
+// same placeholder names src/_ZN12dBgCh_SphCrrD1Ev.cpp uses for three completely
+// different tables, so one shared host definition would have satisfied both
+// with the wrong bytes. Since lane DTOR-PAIRS-C all four D0s ride from src:
+// the water's relocs (from:0x02111ab4 -> 0x02113a18, from:0x02111ab8 ->
+// 0x0210ae38) name its two tables, and port/CMakeLists.txt compiles that one
+// TU with VT0=_ZTV14daObjMcWater_c;VT1=_ZTV10dBgActor_c, per source.
+
+// ---- BIRD (actor 343, ov009) x2 --------------------------------------------
+extern "C" {
+int _ZN9daSBird_c13InitResourcesEv(void *self);
+int _ZN9daSBird_c8BehaviorEv(void *self);            /* host copy: hal/ov009_boot */
+int _ZN9daSBird_c6RenderEv(void *self);
+int _ZN9daSBird_c16CleanupResourcesEv(void);
+void _ZN9daSBird_c16OnPendingDestroyEv(void);
+int *_ZN9daSBird_cD0Ev(int *self);                  /* slot 17, DTOR-PAIRS seat (ov009 0x021111d8) */
+void *_ZTV9daSBird_c[31];
+}
+/* The Bird's own D0 spells its table by the RTTI name. */
+/* PORTSYNC2: both names of this ROM word are one name in main now; the alias would bind a symbol to itself. */ // #pragma comment(linker, "/alternatename:__ZTV9daSBird_c=__ZTV9daSBird_c")
+static int __fastcall bird_init(void *s, void *)
+{ return _ZN9daSBird_c13InitResourcesEv(s); }
+static int __fastcall bird_clean(void *, void *)
+{ return _ZN9daSBird_c16CleanupResourcesEv(); }
+static int __fastcall bird_behavior(void *s, void *)
+{ return _ZN9daSBird_c8BehaviorEv(s); }
+static int __fastcall bird_render(void *s, void *)
+{ port_actor_render_probe("BIRD", (char *)s + 0xd4);
+  return _ZN9daSBird_c6RenderEv(s); }
+static int __fastcall bird_pdes(void *, void *)
+{ _ZN9daSBird_c16OnPendingDestroyEv(); return 0; }
+static int __fastcall bird_d0(void *s, void *)
+{ return (int)(size_t)_ZN9daSBird_cD0Ev((int *)s); }
+/* SLOT 16 IS LIVE: a woken bird's state 0 spawns its flock, state 3 climbs,
+   and past y 3000 func_ov009_02111234 marks every member -- the turn walk
+   died right here while this slot was a trap. The body is
+   src/_ZN4BirdD0Ev.cpp minus its final Memory::Deallocate, which
+   AfterCleanupResources performs itself after the dispatch returns. */
+/* slot 16: the matched src D1 through hal/dtor_faces_cpp.cpp (lane DTOR-FACES-CPP). */
+
+extern "C" void hal_fill_bird_vtable(void)
+{
+    void **vt = _ZTV9daSBird_c;
+    ac_fill_shared(vt);
+    vt[0] = (void *)bird_init;
+    vt[3] = (void *)bird_clean;
+    vt[6] = (void *)bird_behavior;
+    vt[9] = (void *)bird_render;
+    vt[12] = (void *)bird_pdes;
+    vt[16] = (void *)PORT_D16(hal_cppd1_Bird);
+    /* Slot 17, the ROM's own deleting destructor (DTOR-PAIRS seat): the
+       matched flat-C body behind the ecx->arg adapter, the
+       lk2_platform_dtor_seat.cpp shape. Nothing on a mounted level
+       dispatches 17 (AfterCleanupResources dispatches 16 and frees
+       itself), so this is the ROM's word where the trap stood, and the
+       reference edge that links the TU. */
+    vt[17] = (void *)bird_d0;
+}
+
+// ---- CASTLE_WATER (actor 338, ov009) x1 ------------------------------------
+//
+// The moat, one instance at the origin. Its InitResources is the reason this
+// class matters to anything but the picture: it loads a KCL of its own, hands
+// it to MovingMeshCollider with the actor's matrix and a 1.0 scale, Enables it
+// onto the level's collider list, and then CLAMPS THE GLOBAL WATER LEVEL --
+// data_0209f32c = min(data_0209f32c, self.y - 100.0) -- which is the word the
+// Player's own state machine reads to decide it is swimming.
+extern "C" {
+int _ZN14daObjMcWater_c13InitResourcesEv(void *self);
+int _ZN14daObjMcWater_c16CleanupResourcesEv(void *self);
+int _ZN14daObjMcWater_c8BehaviorEv(void *self);
+int _ZN14daObjMcWater_c6RenderEv(void *self);
+void *_ZTV14daObjMcWater_c[32];        /* ov009 0x02113a18 */
+}
+/* The water's own D0 spells this table by the class name. */
+#pragma comment(linker, "/alternatename:__ZTV11CastleWater=__ZTV14daObjMcWater_c")
+
+static int __fastcall cw_init(void *s, void *)
+{ return _ZN14daObjMcWater_c13InitResourcesEv(s); }
+static int __fastcall cw_clean(void *s, void *)
+{ return _ZN14daObjMcWater_c16CleanupResourcesEv(s); }
+static int __fastcall cw_behavior(void *s, void *)
+{ return _ZN14daObjMcWater_c8BehaviorEv(s); }
+static int __fastcall cw_render(void *s, void *)
+{ port_actor_render_probe("CASTLE_WATER", (char *)s + 0xd4);
+  return _ZN14daObjMcWater_c6RenderEv(s); }
+
+extern "C" void hal_fill_castle_water_vtable(void)
+{
+    void **vt = _ZTV14daObjMcWater_c;
+    hal_fill_platform_vtable();
+    ac_fill_shared(vt);
+    vt[0] = (void *)cw_init;
+    vt[3] = (void *)cw_clean;
+    vt[6] = (void *)cw_behavior;
+    vt[9] = (void *)cw_render;
+    vt[12] = (void *)ac_pdes_base;
+    vt[16] = (void *)PORT_D16(cw_d1);
+    vt[17] = (void *)cw_d0;
+    /* 32 slots; slot 31 is Platform::Kill unchanged in the ROM table. dsd left
+       an ambiguous symbol at word 14, so the symbol bound reads 14 here -- the
+       reloc run is what says 32. */
+    vt[31] = (void *)ac_kill;
+}
+
+// ---- METAL_NET (actor 339, ov009) x3 ---------------------------------------
+//
+// The three climbable nets under the bridge. Same shape as the water -- a
+// Platform with a MovingMeshCollider -- which is why the two were easy to
+// mistake for one class twice over while the names sat one block off.
+extern "C" {
+int _ZN18daObjMc_Metalnet_c13InitResourcesEv(void *self);
+int _ZN18daObjMc_Metalnet_c8BehaviorEv(void *self);
+int _ZN18daObjMc_Metalnet_c6RenderEv(void *self);
+int _ZN18daObjMc_Metalnet_c16CleanupResourcesEv(void *self);
+void _ZN18daObjMc_Metalnet_c16OnPendingDestroyEv(void);
+int *_ZN18daObjMc_Metalnet_cD0Ev(int *self);              /* slot 17, DTOR-PAIRS seat (ov009 0x02111e08) */
+void *_ZTV8MetalNet[32];
+}
+/* PORT_HOST_ABI: two names of ONE ROM table, read off the ROM rather than
+   off a comment (lane ALIASCHK). ov009 0x02113ae0 carries its own RTTI
+   record: the word at 0x02113adc relocates to the typeinfo at 0x02113a98,
+   whose word[1] points at the Itanium name string at 0x02113aa4 =
+   "18daObjMc_Metalnet_c", so 18daObjMc_Metalnet_c is the ROM's own RTTI
+   spelling of that class. The ROM bodies whose literal pools load it are
+   _Z28daObjMc_Metalnet_c_classInitv, _ZN11PyramidLift13InitResourcesEv,
+   _ZN11PyramidLift16CleanupResourcesEv. Read out of
+   extracted/overlays/overlay_0009.bin; the LHS is not a config symbol
+   anywhere, so the alias cannot be defeated by a later slice. */
+#pragma comment(linker, "/alternatename:__ZTV18daObjMc_Metalnet_c=__ZTV8MetalNet")
+
+static int __fastcall mn_init(void *s, void *)
+{ return _ZN18daObjMc_Metalnet_c13InitResourcesEv(s); }
+static int __fastcall mn_clean(void *s, void *)
+{ return _ZN18daObjMc_Metalnet_c16CleanupResourcesEv(s); }
+static int __fastcall mn_behavior(void *s, void *)
+{ return _ZN18daObjMc_Metalnet_c8BehaviorEv(s); }
+static int __fastcall mn_render(void *s, void *)
+{ port_actor_render_probe("METAL_NET", (char *)s + 0xd4);
+  return _ZN18daObjMc_Metalnet_c6RenderEv(s); }
+static int __fastcall mn_pdes(void *, void *)
+{ _ZN18daObjMc_Metalnet_c16OnPendingDestroyEv(); return 0; }
+static int __fastcall mn_d0(void *s, void *)
+{ return (int)(size_t)_ZN18daObjMc_Metalnet_cD0Ev((int *)s); }
+
+extern "C" void hal_fill_metal_net_vtable(void)
+{
+    void **vt = _ZTV8MetalNet;
+    hal_fill_platform_vtable();
+    ac_fill_shared(vt);
+    vt[0] = (void *)mn_init;
+    vt[3] = (void *)mn_clean;
+    vt[6] = (void *)mn_behavior;
+    vt[9] = (void *)mn_render;
+    vt[12] = (void *)mn_pdes;
+    vt[16] = (void *)PORT_D16(mn_d1);
+    /* Slot 17, the ROM's own deleting destructor (DTOR-PAIRS seat): the
+       matched flat-C body behind the ecx->arg adapter, the
+       lk2_platform_dtor_seat.cpp shape. Nothing on a mounted level
+       dispatches 17 (AfterCleanupResources dispatches 16 and frees
+       itself), so this is the ROM's word where the trap stood, and the
+       reference edge that links the TU. */
+    vt[17] = (void *)mn_d0;
+    /* 32 slots; slot 31 is Platform::Kill unchanged in the ROM table. */
+    vt[31] = (void *)ac_kill;
+}
+
+// ---- FLAG (actor 342, ov009) x4 --------------------------------------------
+//
+// The four castle-tower flags, at y 3095 and 3662. Behavior is one
+// Animation::Advance and a rotation matrix: the flag waves, and it is the
+// first actor on the grounds whose model is ANIMATED by the game's own
+// ModelAnim rather than posed once.
+extern "C" {
+int _ZN10daMcFlag_c13InitResourcesEv(void *self);
+int _ZN10daMcFlag_c8BehaviorEv(void *self);
+int _ZN10daMcFlag_c6RenderEv(void *self);
+int _ZN10daMcFlag_c16CleanupResourcesEv(void);
+int *_ZN10daMcFlag_cD0Ev(int *self);                  /* slot 17, DTOR-PAIRS seat (ov009 0x021120a8) */
+void *_ZTV4Flag[31];
+}
+/* PORT_HOST_ABI: two names of ONE ROM table, read off the ROM rather than
+   off a comment (lane ALIASCHK). ov009 0x02113ba0 carries its own RTTI
+   record: the word at 0x02113b9c relocates to the typeinfo at 0x02113b60,
+   whose word[1] points at the Itanium name string at 0x02113b6c =
+   "10daMcFlag_c", so 10daMcFlag_c is the ROM's own RTTI spelling of that
+   class. The ROM bodies whose literal pools load it are _Z20daMcFlag_c_classInitv,
+   _ZN10daMcFlag_cD0Ev, _ZN10daMcFlag_cD1Ev. Read out of
+   extracted/overlays/overlay_0009.bin; the LHS is not a config symbol
+   anywhere, so the alias cannot be defeated by a later slice. */
+#pragma comment(linker, "/alternatename:__ZTV10daMcFlag_c=__ZTV4Flag")
+
+static int __fastcall flag_init(void *s, void *)
+{ return _ZN10daMcFlag_c13InitResourcesEv(s); }
+static int __fastcall flag_clean(void *, void *)
+{ return _ZN10daMcFlag_c16CleanupResourcesEv(); }
+static int __fastcall flag_behavior(void *s, void *)
+{ return _ZN10daMcFlag_c8BehaviorEv(s); }
+static int __fastcall flag_render(void *s, void *)
+{ port_actor_render_probe("FLAG", (char *)s + 0xd4);
+  return _ZN10daMcFlag_c6RenderEv(s); }
+static int __fastcall flag_d0(void *s, void *)
+{ return (int)(size_t)_ZN10daMcFlag_cD0Ev((int *)s); }
+
+extern "C" void hal_fill_flag_vtable(void)
+{
+    void **vt = _ZTV4Flag;
+    ac_fill_shared(vt);
+    vt[0] = (void *)flag_init;
+    vt[3] = (void *)flag_clean;
+    vt[6] = (void *)flag_behavior;
+    vt[9] = (void *)flag_render;
+    vt[12] = (void *)ac_pdes_base;
+    vt[16] = (void *)PORT_D16(hal_cppd1_Flag);
+    /* Slot 17, the ROM's own deleting destructor (DTOR-PAIRS seat): the
+       matched flat-C body behind the ecx->arg adapter, the
+       lk2_platform_dtor_seat.cpp shape. Nothing on a mounted level
+       dispatches 17 (AfterCleanupResources dispatches 16 and frees
+       itself), so this is the ROM's word where the trap stood, and the
+       reference edge that links the TU. */
+    vt[17] = (void *)flag_d0;
+}
+
+// ============================================================================
+// GATE 18: ov085, THE FIRST ACTOR OVERLAY
+// ============================================================================
+//
+// Not the engine overlay and not the level's: ov085 exists for six classes
+// that several levels share, and the castle grounds names two of them.
+//
+// THE CONFIG'S NAMES ARE NOT SHIFTED HERE. That is checked, not assumed --
+// ov009 is the reason to check. Every one of ov085's six factories installs a
+// vtable whose slot 0 is its own class's InitResources and whose slot 16 is
+// its own D1, and the ROM's RTTI names agree from the other side (daMip_c is
+// the rabbit, daC_Jugem_c the Lakitu). Each class's own D0 spells the table
+// by the RTTI name and its D1 by the config name, which is why both spellings
+// have to resolve to ONE array -- the alternatename pairs below.
+
+// ---- RABBIT (actor 187, ov085) x12 -----------------------------------------
+//
+// _ZTV6Rabbit / _ZTV7daMip_c, ov085 0x021300f8. The twelve glowing rabbits.
+// This is the port's first AI actor: InitResources seeds it from the star
+// count and binds it to one of the level's own paths, and Behavior takes the
+// closest Player every frame and runs the flee/idle machine against it
+// through a MovingCylinderClsn and a WithMeshClsn.
+//
+// THE CATCH PATH IS GUARDED, and the guard is not here. Behavior's caught
+// branch calls Message::PrepareTalk and daPly_c::ShowMessage, which end in the
+// dialogue box's OAM/font machinery -- the same system the SIGN_POST's read
+// branch stops at (hal/actor_vtables.cpp). The rabbit still flees, still
+// gets touched and still plays its caught animation; it just does not open a
+// box that has nothing to draw with.
+extern "C" {
+int _ZN7daMip_c13InitResourcesEv(void *self);      /* face: method_faces */
+int _ZN7daMip_c8BehaviorEv(void *self);
+int _ZN7daMip_c6RenderEv(void *self);              /* face: method_faces */
+int _ZN7daMip_c16CleanupResourcesEv(void);
+void _ZN7daMip_c16OnPendingDestroyEv(void);
+int *_ZN7daMip_cD1Ev(int *self);
+int *_ZN7daMip_cD0Ev(int *self);
+int _ZN7daMip_c13OnYoshiTryEatEv(unsigned char *self);     /* slot 18, its own */
+void *_ZTV6Rabbit[31];
+}
+/* PORT_HOST_ABI: two names of ONE ROM table, read off the ROM rather than
+   off a comment (lane ALIASCHK). ov085 0x021300f8 carries its own RTTI
+   record: the word at 0x021300f4 relocates to the typeinfo at 0x021300c8,
+   whose word[1] points at the Itanium name string at 0x021300bc =
+   "7daMip_c", so 7daMip_c is the ROM's own RTTI spelling of that class. The
+   ROM bodies whose literal pools load it are _Z17daMip_c_classInitv, _ZN7daMip_cD0Ev,
+   _ZN7daMip_cD1Ev. Read out of extracted/overlays/overlay_0085.bin; the LHS
+   is not a config symbol anywhere, so the alias cannot be defeated by a
+   later slice. */
+#pragma comment(linker, "/alternatename:__ZTV7daMip_c=__ZTV6Rabbit")
+
+static int __fastcall rb_init(void *s, void *)
+{ return _ZN7daMip_c13InitResourcesEv(s); }
+static int __fastcall rb_clean(void *, void *)
+{ return _ZN7daMip_c16CleanupResourcesEv(); }
+static int __fastcall rb_behavior(void *s, void *)
+{ return _ZN7daMip_c8BehaviorEv(s); }
+static int __fastcall rb_render(void *s, void *)
+{ port_actor_render_probe("RABBIT", (char *)s + 0x300);
+  return _ZN7daMip_c6RenderEv(s); }
+static int __fastcall rb_pdes(void *, void *)
+{ _ZN7daMip_c16OnPendingDestroyEv(); return 0; }
+static int __fastcall rb_d1(void *s, void *)
+{ return (int)(size_t)_ZN7daMip_cD1Ev((int *)s); }
+static int __fastcall rb_d0(void *s, void *)
+{ return (int)(size_t)_ZN7daMip_cD0Ev((int *)s); }
+/* The rabbit is the first class on this level to OVERRIDE OnYoshiTryEat
+   rather than inherit Actor's -- Yoshi can eat one. */
+static int __fastcall rb_yoshi(void *s, void *)
+{ return _ZN7daMip_c13OnYoshiTryEatEv((unsigned char *)s); }
+
+extern "C" void hal_fill_rabbit_vtable(void)
+{
+    void **vt = _ZTV6Rabbit;
+    ac_fill_shared(vt);
+    vt[0] = (void *)rb_init;
+    vt[3] = (void *)rb_clean;
+    vt[6] = (void *)rb_behavior;
+    vt[9] = (void *)rb_render;
+    vt[12] = (void *)rb_pdes;
+    vt[16] = (void *)PORT_D16(rb_d1);
+    vt[17] = (void *)rb_d0;
+    vt[18] = (void *)rb_yoshi;
+}
+
+// ---- RABBIT_KEY (actor 229, ov085) -----------------------------------------
+//
+// _ZTV9RabbitKey / _ZTV15daObj_Mip_Key_c, ov085 0x021301d8 (RTTI daObj_Mip_Key_c).
+// The KEY the caught rabbit turns into. THIS is the actor that grants progress:
+// the caught-dialog state (_ZN7daMip_c15StateCaughtMainEv, already in gate 18) ends the talk
+// by calling Actor::Spawn(0xe5, ...) to make a RabbitKey at the rabbit's spot, and
+// the RabbitKey's own state machine writes the save "caught" bit (_Z18CollectMinigameKeyii ->
+// data_0209caa0[3]), plays the caught cutscene (daPly_c::SetNoControlState), and for
+// the eighth catch opens the minigame menu (_Z17StartMinigameMenuh). Without this class
+// registered the id-229 spawn was declined by the prespawn gate and the whole grant
+// was skipped silently -- no key, and because the save bit never set, a re-talk
+// re-entered the caught dialog and stuck. Same 20-slot Enemy shape as RABBIT, no
+// own OnYoshiTryEat override (ROM slots 18+ are the base's). The state machine is a
+// PMF table (data_ov085_0213071c/072c) dispatched out of this+0x188; the four
+// {function, delta} statics are seated host-side by port_rabbit_key_states_seat
+// (hal/actor_overlays.cpp) before the sinit copies them. TWO HOST COPIES ride
+// along: the seat-and-enter _ZN15daObj_Mip_Key_c11ChangeStateEP11MipKeyState (a real MSVC PMF over an
+// incomplete class, the gate-16 case -- port/unmatched/RabbitKey_StateSeat.cpp)
+// and Render (shadow-struct dExtSimpleModel_c slot-5 dispatch, cdecl into __fastcall --
+// port/unmatched/Ov085_Renders.cpp, the third ov085 render). Behavior's own
+// per-frame dispatch is hand-rolled in the matched source and safe as-is.
+extern "C" {
+int _ZN15daObj_Mip_Key_c13InitResourcesEv(void *self);   /* face: method_faces */
+int _ZN15daObj_Mip_Key_c8BehaviorEv(void *self);          /* face: method_faces */
+int _ZN15daObj_Mip_Key_c6RenderEv(void *self);            /* host copy: Ov085_Renders */
+int _ZN15daObj_Mip_Key_c16CleanupResourcesEv(void);
+void _ZN15daObj_Mip_Key_c16OnPendingDestroyEv(void);
+int *_ZN15daObj_Mip_Key_cD1Ev(int *self);
+int *_ZN15daObj_Mip_Key_cD0Ev(int *self);
+void *_ZTV15daObj_Mip_Key_c[31];
+}
+/* PORT_HOST_ABI: two names of ONE ROM table, read off the ROM rather than
+   off a comment (lane ALIASCHK). ov085 0x021301d8 carries its own RTTI
+   record: the word at 0x021301d4 relocates to the typeinfo at 0x02130194,
+   whose word[1] points at the Itanium name string at 0x021301a0 =
+   "15daObj_Mip_Key_c", so 15daObj_Mip_Key_c is the ROM's own RTTI spelling
+   of that class. The ROM bodies whose literal pools load it are
+   _Z25daObj_Mip_Key_c_classInitv, _ZN9RabbitKeyD0Ev, _ZN9RabbitKeyD1Ev. Read out of
+   extracted/overlays/overlay_0085.bin; the LHS is not a config symbol
+   anywhere, so the alias cannot be defeated by a later slice. */
+/* PORTSYNC2: both names of this ROM word are one name in main now; the alias would bind a symbol to itself. */ // #pragma comment(linker, "/alternatename:__ZTV15daObj_Mip_Key_c=__ZTV15daObj_Mip_Key_c")
+static int __fastcall rk_init(void *s, void *)
+{ return _ZN15daObj_Mip_Key_c13InitResourcesEv(s); }
+static int __fastcall rk_clean(void *, void *)
+{ return _ZN15daObj_Mip_Key_c16CleanupResourcesEv(); }
+static int __fastcall rk_behavior(void *s, void *)
+{ return _ZN15daObj_Mip_Key_c8BehaviorEv(s); }
+static int __fastcall rk_render(void *s, void *)
+{ port_actor_render_probe("RABBIT_KEY", (char *)s + 0x110);
+  return _ZN15daObj_Mip_Key_c6RenderEv(s); }
+static int __fastcall rk_pdes(void *, void *)
+{ _ZN15daObj_Mip_Key_c16OnPendingDestroyEv(); return 0; }
+static int __fastcall rk_d1(void *s, void *)
+{ return (int)(size_t)_ZN15daObj_Mip_Key_cD1Ev((int *)s); }
+static int __fastcall rk_d0(void *s, void *)
+{ return (int)(size_t)_ZN15daObj_Mip_Key_cD0Ev((int *)s); }
+
+extern "C" void hal_fill_rabbit_key_vtable(void)
+{
+    void **vt = _ZTV15daObj_Mip_Key_c;
+    ac_fill_shared(vt);
+    vt[0] = (void *)rk_init;
+    vt[3] = (void *)rk_clean;
+    vt[6] = (void *)rk_behavior;
+    vt[9] = (void *)rk_render;
+    vt[12] = (void *)rk_pdes;
+    vt[16] = (void *)PORT_D16(rk_d1);
+    vt[17] = (void *)rk_d0;
+}
+
+// ---- LAKITU_BRO (actor 235, ov085) x1 --------------------------------------
+//
+// _ZTV9LakituBro / _ZTV11daC_Jugem_c, ov085 0x02130344. The cameraman over
+// the moat. He is here rather than deferred with the rest of the cutscene
+// cast because what he reads is hosted: his own state machine places him
+// against the LIVE Camera, the one gate 13 brought up.
+//
+// His Behavior is a HOST COPY (port/unmatched/LakituBro_Behavior.cpp) for the
+// gate-16 reason -- it dispatches an mwcc pointer-to-member out of an eleven
+// entry state table, and MSVC forms a PMF over an incomplete class as the
+// four-word general representation.
+extern "C" {
+int _ZN11daC_Jugem_c13InitResourcesEv(void *self);   /* face: method_faces */
+int _ZN11daC_Jugem_c8BehaviorEv(void *self);         /* host copy */
+int _ZN11daC_Jugem_c6RenderEv(void *self);           /* face: method_faces */
+int _ZN11daC_Jugem_c16CleanupResourcesEv(void);
+void _ZN11daC_Jugem_c16OnPendingDestroyEv(void);
+int *_ZN11daC_Jugem_cD1Ev(int *self);
+int *_ZN11daC_Jugem_cD0Ev(int *self);
+void *_ZTV11daC_Jugem_c[31];
+}
+/* PORT_HOST_ABI: two names of ONE ROM table, read off the ROM rather than
+   off a comment (lane ALIASCHK). ov085 0x02130344 carries its own RTTI
+   record: the word at 0x02130340 relocates to the typeinfo at 0x02130304,
+   whose word[1] points at the Itanium name string at 0x02130310 =
+   "11daC_Jugem_c", so 11daC_Jugem_c is the ROM's own RTTI spelling of that
+   class. The ROM bodies whose literal pools load it are _Z21daC_Jugem_c_classInitv,
+   _ZN9LakituBroD0Ev, _ZN9LakituBroD1Ev. Read out of
+   extracted/overlays/overlay_0085.bin; the LHS is not a config symbol
+   anywhere, so the alias cannot be defeated by a later slice. */
+/* PORTSYNC2: both names of this ROM word are one name in main now; the alias would bind a symbol to itself. */ // #pragma comment(linker, "/alternatename:__ZTV11daC_Jugem_c=__ZTV11daC_Jugem_c")
+static int __fastcall lb_init(void *s, void *)
+{ return _ZN11daC_Jugem_c13InitResourcesEv(s); }
+static int __fastcall lb_clean(void *, void *)
+{ return _ZN11daC_Jugem_c16CleanupResourcesEv(); }
+static int __fastcall lb_behavior(void *s, void *)
+{ return _ZN11daC_Jugem_c8BehaviorEv(s); }
+static int __fastcall lb_render(void *s, void *)
+{ port_actor_render_probe("LAKITU_BRO", (char *)s + 0x110);
+  return _ZN11daC_Jugem_c6RenderEv(s); }
+static int __fastcall lb_pdes(void *, void *)
+{ _ZN11daC_Jugem_c16OnPendingDestroyEv(); return 0; }
+static int __fastcall lb_d1(void *s, void *)
+{ return (int)(size_t)_ZN11daC_Jugem_cD1Ev((int *)s); }
+static int __fastcall lb_d0(void *s, void *)
+{ return (int)(size_t)_ZN11daC_Jugem_cD0Ev((int *)s); }
+
+extern "C" void hal_fill_lakitu_bro_vtable(void)
+{
+    void **vt = _ZTV11daC_Jugem_c;
+    ac_fill_shared(vt);
+    vt[0] = (void *)lb_init;
+    vt[3] = (void *)lb_clean;
+    vt[6] = (void *)lb_behavior;
+    vt[9] = (void *)lb_render;
+    vt[12] = (void *)lb_pdes;
+    vt[16] = (void *)PORT_D16(lb_d1);
+    vt[17] = (void *)lb_d0;
+}
+
+// ============================================================================
+// GATE 19: ov098's CANNON
+// ============================================================================
+//
+// _ZTV7daCnn_c, ov098 0x0213c6a0 (daCnn_c -- "cannon"). One instance, behind
+// the grate in the west moat wall. The config's names are not shifted here
+// either: slot 0 is Cannon::InitResources and slot 16 is Cannon's own D1.
+//
+// IT IS DORMANT ON PURPOSE. The cannon's own Behavior reads the save before
+// it will open, so on a fresh save the lid stays shut -- which is what the
+// level looks like before Bob-omb Buddy opens it, and the reason nothing here
+// goes near the cannon-entry path.
+//
+// SLOTS 16/17 TRAP, the gate-17 reading twice over: nothing on this level
+// destroys a cannon, and src/_ZN6CannonD1Ev.cpp is a real C++ destructor over
+// its own shadow hierarchy rather than a C-named body, so hosting it would
+// mean MSVC synthesising member destructor calls against a layout that is not
+// the ROM's.
+extern "C" {
+int _ZN7daCnn_c13InitResourcesEv(void *self);      /* face: method_faces */
+int _ZN7daCnn_c8BehaviorEv(void *self);            /* face: method_faces */
+int _ZN7daCnn_c6RenderEv(void *self);              /* host copy */
+int _ZN7daCnn_c16CleanupResourcesEv(void);
+int *_ZN7daCnn_cD0Ev(int *self);                /* slot 17, DTOR-PAIRS seat (ov098 0x0213a938) */
+void *_ZTV7daCnn_c[31];
+}
+/* PORT_HOST_ABI: two names of ONE ROM table, read off the ROM rather than
+   off a comment (lane ALIASCHK). ov098 0x0213c6a0 carries its own RTTI
+   record: the word at 0x0213c69c relocates to the typeinfo at 0x0213c670,
+   whose word[1] points at the Itanium name string at 0x0213c664 =
+   "7daCnn_c", so 7daCnn_c is the ROM's own RTTI spelling of that class. The
+   ROM bodies whose literal pools load it are _Z17daCnn_c_classInitv, _ZN6CannonD0Ev,
+   _ZN6CannonD1Ev. Read out of extracted/overlays/overlay_0098.bin; the LHS
+   is not a config symbol anywhere, so the alias cannot be defeated by a
+   later slice. */
+/* PORTSYNC2: both names of this ROM word are one name in main now; the alias would bind a symbol to itself. */ // #pragma comment(linker, "/alternatename:__ZTV7daCnn_c=__ZTV7daCnn_c")
+static int __fastcall cn_init(void *s, void *)
+{ return _ZN7daCnn_c13InitResourcesEv(s); }
+static int __fastcall cn_clean(void *, void *)
+{ return _ZN7daCnn_c16CleanupResourcesEv(); }
+static int __fastcall cn_behavior(void *s, void *)
+{ return _ZN7daCnn_c8BehaviorEv(s); }
+static int __fastcall cn_render(void *s, void *)
+{ port_actor_render_probe("CANNON", (char *)s + 0xd4);
+  return _ZN7daCnn_c6RenderEv(s); }
+static int __fastcall cn_d0(void *s, void *)
+{ return (int)(size_t)_ZN7daCnn_cD0Ev((int *)s); }
+
+extern "C" void hal_fill_cannon_vtable(void)
+{
+    void **vt = _ZTV7daCnn_c;
+    ac_fill_shared(vt);
+    vt[0] = (void *)cn_init;
+    vt[3] = (void *)cn_clean;
+    vt[6] = (void *)cn_behavior;
+    vt[9] = (void *)cn_render;
+    vt[12] = (void *)ac_pdes_base;
+    vt[16] = (void *)PORT_D16(hal_cppd1_Cannon);
+    /* Slot 17, the ROM's own deleting destructor (DTOR-PAIRS seat): the
+       matched flat-C body behind the ecx->arg adapter, the
+       lk2_platform_dtor_seat.cpp shape. Nothing on a mounted level
+       dispatches 17 (AfterCleanupResources dispatches 16 and frees
+       itself), so this is the ROM's word where the trap stood, and the
+       reference edge that links the TU. */
+    vt[17] = (void *)cn_d0;
+}
+
+// ============================================================================
+// GATE 20: ov002's LAST TWO
+// ============================================================================
+//
+// EXIT (349) and WATERFALL_MIST (197), the two classes the castle grounds
+// names that live in the overlay already mounted. Neither has a model, so
+// neither takes a render probe, and both are shorter than any class above:
+// the Exit is a trigger box and the mist is three slots.
+//
+// THE CONFIG'S NAMES ARE SHIFTED HERE TOO, the other way round from ov009's.
+// In ov009 the factories were named right and the methods were the
+// neighbour's; in ov002 the *_SpawnInfo names are right and the METHODS carry
+// the neighbour's class name. Each factory's own literal pool names the
+// vtable it installs and the ROM's RTTI names that vtable back:
+//
+//   _Z21daChScene_c_classInitv          -> _ZTV11daChScene_c         RTTI 11daChScene_c
+//   _Z26daObjWaterfall_c_classInitv -> _ZTV16daObjWaterfall_c  RTTI 16daObjWaterfall_c
+//
+// daChScene_c is "change scene", which is what an exit does, and
+// daObjWaterfall_c is the waterfall. So the bodies below are spelled
+// VirtualDoor and PoppingLavaBubbles and are the exit's and the mist's. The
+// port uses the files the vtables point at and renames nothing.
+
+// ---- EXIT (actor 349, ov002) x4 --------------------------------------------
+//
+// _ZTV11daChScene_c, ov002 0x021086b4. The four level-transition volumes.
+// Three of its six own slots are do-nothing returns in the ROM and the other
+// three are the box: InitResources builds it and inverts the actor's matrix,
+// Behavior tests the Player in that local frame, and the whole of Behavior's
+// body sits behind `gNextSublevel < 0` -- the pending-entrance slot the level
+// boot leaves non-negative -- so on the grounds the four exits measure and
+// never fire. That is the ROM's gate, not a port guard.
+extern "C" {
+int _ZN11daChScene_c13InitResourcesEv(char *self);
+int _ZN11daChScene_c8BehaviorEv(char *self);
+int _ZN11daChScene_c6RenderEv(void);
+int _ZN11daChScene_c16CleanupResourcesEv(void);
+void _ZN11daChScene_c16OnPendingDestroyEv(void);
+int *_ZN11daChScene_cD0Ev(int *self);            /* slot 17, gate 207 */
+void *_ZTV11daChScene_c[31];
+}
+
+static int __fastcall ex_init(void *s, void *)
+{ return _ZN11daChScene_c13InitResourcesEv((char *)s); }
+static int __fastcall ex_clean(void *, void *)
+{ return _ZN11daChScene_c16CleanupResourcesEv(); }
+static int __fastcall ex_behavior(void *s, void *)
+{ return _ZN11daChScene_c8BehaviorEv((char *)s); }
+static int __fastcall ex_render(void *, void *)
+{ return _ZN11daChScene_c6RenderEv(); }
+static int __fastcall ex_pdes(void *, void *)
+{ _ZN11daChScene_c16OnPendingDestroyEv(); return 0; }
+static int __fastcall ex_d0(void *s, void *)
+{ return (int)(size_t)_ZN11daChScene_cD0Ev((int *)s); }
+
+extern "C" void hal_fill_exit_vtable(void)
+{
+    void **vt = _ZTV11daChScene_c;
+    ac_fill_shared(vt);
+    vt[0] = (void *)ex_init;
+    vt[3] = (void *)ex_clean;
+    vt[6] = (void *)ex_behavior;
+    vt[9] = (void *)ex_render;
+    vt[12] = (void *)ex_pdes;
+    /* SLOT 16 STILL STANDS IN, SLOT 17 IS NOW THE ROM'S OWN D0 (gate 207).
+       The gate-17 reading above holds for the D1 and only for the D1:
+       src/game/actors/d_a_ch_scene.cpp is a real C++ destructor over its own
+       shadow hierarchy, which MSVC would emit under ??1VirtualDoor@@UAE@XZ
+       against a layout that is not the ROM's. The D0 is a flat .c whose only
+       placeholders are VT and HEAP. Gate 204's three conditions all hold and
+       were re-measured on this build; see port/slice_gate207.txt. */
+    vt[16] = (void *)PORT_D16(hal_cppd1_VirtualDoor);   /* lane DTOR-FACES-CPP: the matched D1 */
+    vt[17] = (void *)ex_d0;
+}
+
+// ---- WATERFALL_MIST (actor 197, ov002) x7 ----------------------------------
+//
+// _ZTV16daObjWaterfall_c, ov002 0x021094a0. The moat's waterfall spray, and
+// the first class the port carries that the LEVEL'S OBJECT TABLES DO NOT
+// NAME: CASTLE_WATER's own InitResources ends by calling _ZN14daObjMcWater_c15SpawnWaterfallsEv,
+// which spawns seven of these along one of three seven-element Vector3 arrays
+// in ov009. The seven skips gate 19's census reported were that call.
+//
+// Three own slots; 3, 9 and 12 are ActorBase's, because the class has no
+// model and nothing to clean up. InitResources is a real MSVC method (face in
+// hal/method_faces.cpp) and picks a particle id from the level -- 0x24 here.
+//
+// ITS BEHAVIOR RUNS INTO A STUB and that is honest rather than hidden:
+// Particle::System::New is the no-op in hal/reverse_bridges.cpp until the
+// particle subsystem is seated, so the seven actors spawn at the ROM's own
+// positions, sit in both lists and tick. Every one of their eighteen slots is
+// matched src; nothing here changes when the particles arrive.
+#include "daObjWaterfall_c.h"
+extern "C" {
+int _ZN16daObjWaterfall_c13InitResourcesEv(void *self);   /* face */
+int _ZN16daObjWaterfall_c8BehaviorEv(char *self);
+int *_ZN16daObjWaterfall_cD0Ev(int *self);     /* slot 17, gate 207 */
+int _ZTV16daObjWaterfall_c[31];   /* SYNC4: int[], following
+                                     include/daObjWaterfall_c.h:9 */
+}
+
+static int __fastcall wm_init(void *s, void *)
+{ return _ZN16daObjWaterfall_c13InitResourcesEv(s); }
+static int __fastcall wm_clean(void *s, void *)
+{ return ((fBase_c *)s)->fBase_c::CleanupResources(); }
+static int __fastcall wm_behavior(void *s, void *)
+{ return _ZN16daObjWaterfall_c8BehaviorEv((char *)s); }
+static int __fastcall wm_render(void *s, void *)
+{ return ((fBase_c *)s)->fBase_c::Render(); }
+static int __fastcall wm_d0(void *s, void *)
+{ return (int)(size_t)_ZN16daObjWaterfall_cD0Ev((int *)s); }
+
+extern "C" void hal_fill_waterfall_mist_vtable(void)
+{
+    void **vt = (void **)_ZTV16daObjWaterfall_c;
+    ac_fill_shared(vt);
+    vt[0] = (void *)wm_init;
+    vt[3] = (void *)wm_clean;
+    vt[6] = (void *)wm_behavior;
+    vt[9] = (void *)wm_render;
+    vt[12] = (void *)ac_pdes_base;
+    /* The class here is PoppingLavaBubbles, not WaterfallMist: the vtable
+       _Z26daObjWaterfall_c_classInitv installs is _ZTV16daObjWaterfall_c, and that
+       class's D1 is an empty body over an Actor base -- which is what this
+       section already says about slots 3, 9 and 12. Slot 17 is that class's
+       own matched D0 as of gate 207, on gate 204's three conditions
+       re-measured against this build; see port/slice_gate207.txt. The name
+       shift holds there too: the ROM word at 0x021094a0+0x44 is
+       _ZN16daObjWaterfall_cD0Ev, not WaterfallMist's. */
+    vt[16] = (void *)PORT_D16(hal_cppd1_PoppingLavaBubbles);   /* lane DTOR-FACES-CPP */
+    vt[17] = (void *)wm_d0;
+}
+
+// ============================================================================
+// GATE 21: ov100's BUTTERFLY and FISH
+// ============================================================================
+//
+// The third ACTOR overlay. ov100 holds seven classes and the castle grounds
+// names three; these are the two whose own methods need nothing the port
+// cannot already spell.
+//
+// THE CONFIG'S NAMES CHECK OUT FOR BOTH, and that is checked rather than
+// assumed -- ov100 does carry one shifted pair. _Z19daBtfly_c_classInitv installs
+// _ZTV9Butterfly (RTTI 9daBtfly_c) and _Z18daFish_c_classInitv installs _ZTV4Fish (RTTI
+// 8daFish_c); the shift is Door/StarDoor, which is gate 22's.
+
+// ---- BUTTERFLY (actor 336, ov100) x2 ---------------------------------------
+//
+// _ZTV9Butterfly / _ZTV9daBtfly_c, ov100 0x02147e9c. The two flutterers over
+// the east lawn. Eight states, all matched, seated in hal/actor_overlays.cpp;
+// its Behavior is a plain C-named body that reads the state pair as two ints
+// itself, so no host copy is needed (the rabbit's case, not the fish's).
+//
+// Render dispatches slot 5 through a LOCAL SHADOW CLASS on both the ModelAnim
+// at +0xd4 and the Model at +0x138 -- ROM numbering, where two slots go to the
+// destructor -- which is exactly what the dual fill in hal/cxxname_bridge.cpp
+// already covers on both classes. Slot 3 never comes into it, so unlike the
+// cannon this one needs no host copy of Render either.
+extern "C" {
+int _ZN9daBtfly_c13InitResourcesEv(void *self);      /* face: method_faces */
+int _ZN9daBtfly_c8BehaviorEv(char *self);
+int _ZN9daBtfly_c6RenderEv(void *self);              /* face: method_faces */
+int _ZN9daBtfly_c16CleanupResourcesEv(void);
+void _ZN9daBtfly_c16OnPendingDestroyEv(void);
+int *_ZN9daBtfly_cD0Ev(int *self);             /* slot 17, DTOR-PAIRS seat (ov100 0x02140dd8) */
+void *_ZTV9daBtfly_c[31];
+}
+/* PORT_HOST_ABI: two names of ONE ROM table, read off the ROM rather than
+   off a comment (lane ALIASCHK). ov100 0x02147e9c carries its own RTTI
+   record: the word at 0x02147e98 relocates to the typeinfo at 0x02147e6c,
+   whose word[1] points at the Itanium name string at 0x02147e60 =
+   "9daBtfly_c", so 9daBtfly_c is the ROM's own RTTI spelling of that class.
+   The ROM bodies whose literal pools load it are _Z19daBtfly_c_classInitv,
+   _ZN9ButterflyD0Ev, _ZN9ButterflyD1Ev. Read out of
+   extracted/overlays/overlay_0100.bin; the LHS is not a config symbol
+   anywhere, so the alias cannot be defeated by a later slice. */
+/* PORTSYNC2: both names of this ROM word are one name in main now; the alias would bind a symbol to itself. */ // #pragma comment(linker, "/alternatename:__ZTV9daBtfly_c=__ZTV9daBtfly_c")
+static int __fastcall bf_init(void *s, void *)
+{ return _ZN9daBtfly_c13InitResourcesEv(s); }
+static int __fastcall bf_clean(void *, void *)
+{ return _ZN9daBtfly_c16CleanupResourcesEv(); }
+static int __fastcall bf_behavior(void *s, void *)
+{ return _ZN9daBtfly_c8BehaviorEv((char *)s); }
+static int __fastcall bf_render(void *s, void *)
+{ port_actor_render_probe("BUTTERFLY", (char *)s + 0xd4);
+  return _ZN9daBtfly_c6RenderEv(s); }
+static int __fastcall bf_pdes(void *, void *)
+{ _ZN9daBtfly_c16OnPendingDestroyEv(); return 0; }
+/* SLOT 16 IS LIVE, the bird's discovery applied here before it fires: three
+   of the eight states (0, 3 and 7) call MarkForDestruction, so a woken
+   swarm despawns through AfterCleanupResources -> D1. The body is
+   src/_ZN9ButterflyD0Ev.cpp minus its final Memory::Deallocate; the six
+   members in the ROM's own reverse order, not MSVC's. */
+/* slot 16: the matched src D1 through hal/dtor_faces_cpp.cpp (lane DTOR-FACES-CPP). */
+
+static int __fastcall bf_d0(void *s, void *)
+{ return (int)(size_t)_ZN9daBtfly_cD0Ev((int *)s); }
+
+extern "C" void hal_fill_butterfly_vtable(void)
+{
+    void **vt = _ZTV9daBtfly_c;
+    ac_fill_shared(vt);
+    vt[0] = (void *)bf_init;
+    vt[3] = (void *)bf_clean;
+    vt[6] = (void *)bf_behavior;
+    vt[9] = (void *)bf_render;
+    vt[12] = (void *)bf_pdes;
+    vt[16] = (void *)PORT_D16(hal_cppd1_Butterfly);
+    /* Slot 17, the ROM's own deleting destructor (DTOR-PAIRS seat): the
+       matched flat-C body behind the ecx->arg adapter, the
+       lk2_platform_dtor_seat.cpp shape. Nothing on a mounted level
+       dispatches 17 (AfterCleanupResources dispatches 16 and frees
+       itself), so this is the ROM's word where the trap stood, and the
+       reference edge that links the TU. */
+    vt[17] = (void *)bf_d0;
+}
+
+// ---- FISH (actor 344, ov100) x2 --------------------------------------------
+//
+// _ZTV4Fish / _ZTV8daFish_c, ov100 0x021484bc. The two shoals in the moat.
+//
+// THE FISH IS THE FIRST CLASS THE PORT CARRIES THAT CAN KILL ITSELF. Its
+// Behavior looks its owner up by actor id every frame and calls
+// ActorBase::MarkForDestruction when the owner is gone or refuses it -- which
+// is what binds a shoal to the water it was spawned against rather than to a
+// position. That makes slots 16/17 reachable in principle, so the trap there
+// is a real statement and not a formality: on the castle grounds the owner is
+// CASTLE_WATER, which lives as long as the level does, and the census is the
+// measurement (two fish in, two fish still on the lists at frame 3000).
+//
+// Its Behavior is a host copy for the pointer-to-member reason
+// (port/unmatched/Fish_Behavior.cpp), which also carries the seven-static
+// seat. Render is the same slot-5 shadow dispatch the butterfly has.
+extern "C" {
+int _ZN8daFish_c13InitResourcesEv(void *self);           /* face: method_faces */
+int _ZN8daFish_c8BehaviorEv(void *self);                 /* host copy */
+int _ZN8daFish_c6RenderEv(void *self);                   /* face: method_faces */
+int _ZN8daFish_c16CleanupResourcesEv(void *self);        /* face: method_faces */
+void _ZN8daFish_c16OnPendingDestroyEv(void);
+int *_ZN8daFish_cD0Ev(int *self);                  /* slot 17, DTOR-PAIRS seat (ov100 0x0214623c) */
+void *_ZTV8daFish_c[31];
+}
+/* PORT_HOST_ABI: two names of ONE ROM table, read off the ROM rather than
+   off a comment (lane ALIASCHK). ov100 0x021484bc carries its own RTTI
+   record: the word at 0x021484b8 relocates to the typeinfo at 0x0214848c,
+   whose word[1] points at the Itanium name string at 0x02148480 =
+   "8daFish_c", so 8daFish_c is the ROM's own RTTI spelling of that class.
+   The ROM bodies whose literal pools load it are _Z18daFish_c_classInitv, _ZN4FishD0Ev,
+   _ZN4FishD1Ev. Read out of extracted/overlays/overlay_0100.bin; the LHS is
+   not a config symbol anywhere, so the alias cannot be defeated by a later
+   slice. */
+/* PORTSYNC2: both names of this ROM word are one name in main now; the alias would bind a symbol to itself. */ // #pragma comment(linker, "/alternatename:__ZTV8daFish_c=__ZTV8daFish_c")
+static int __fastcall fs_init(void *s, void *)
+{ return _ZN8daFish_c13InitResourcesEv(s); }
+static int __fastcall fs_clean(void *s, void *)
+{ return _ZN8daFish_c16CleanupResourcesEv(s); }
+static int __fastcall fs_behavior(void *s, void *)
+{ return _ZN8daFish_c8BehaviorEv(s); }
+static int __fastcall fs_render(void *s, void *)
+{ port_actor_render_probe("FISH", (char *)s + 0xd4);
+  return _ZN8daFish_c6RenderEv(s); }
+static int __fastcall fs_pdes(void *, void *)
+{ _ZN8daFish_c16OnPendingDestroyEv(); return 0; }
+/* SLOT 16 IS LIVE, the class's own comment above already said so: the owner
+   test can MarkForDestruction any frame. src/_ZN4FishD0Ev.cpp minus the
+   Deallocate -- one ModelAnim, then Actor's D2. */
+/* slot 16: the matched src D1 through hal/dtor_faces_cpp.cpp (lane DTOR-FACES-CPP). */
+
+static int __fastcall fs_d0(void *s, void *)
+{ return (int)(size_t)_ZN8daFish_cD0Ev((int *)s); }
+
+extern "C" void hal_fill_fish_vtable(void)
+{
+    void **vt = _ZTV8daFish_c;
+    ac_fill_shared(vt);
+    vt[0] = (void *)fs_init;
+    vt[3] = (void *)fs_clean;
+    vt[6] = (void *)fs_behavior;
+    vt[9] = (void *)fs_render;
+    vt[12] = (void *)fs_pdes;
+    vt[16] = (void *)PORT_D16(hal_cppd1_Fish);
+    /* Slot 17, the ROM's own deleting destructor (DTOR-PAIRS seat): the
+       matched flat-C body behind the ecx->arg adapter, the
+       lk2_platform_dtor_seat.cpp shape. Nothing on a mounted level
+       dispatches 17 (AfterCleanupResources dispatches 16 and frees
+       itself), so this is the ROM's word where the trap stood, and the
+       reference edge that links the TU. */
+    vt[17] = (void *)fs_d0;
+}
+
+// ---- UNCHAINED_CHOMP (actor 337, ov100) ------------------------------------
+//
+// _ZTV14UnchainedChomp, ov100 (SpawnInfo at 0x02148020). The obstacle BoB star 3
+// (5 Silver Stars) needs; census-skipped today with no row here, not a crash.
+//
+// Behavior is a host copy for the same pointer-to-member reason Fish's is
+// (port/unmatched/UnchainedChomp_Behavior.cpp), the simplest ov100 PMF table: a
+// single Holder* at +0x668, not an N-state array. Render is the same ModelAnim
+// slot-5 shadow dispatch, off mModelAnim at +0x30c (ModelAnim_Renders.cpp).
+extern "C" {
+int _ZN11daWanwan2_c13InitResourcesEv(unsigned char *self);  /* host copy (PathPtr thiscall) */
+int _ZN11daWanwan2_c8BehaviorEv(void *self);                 /* host copy */
+int _ZN11daWanwan2_c6RenderEv(void *self);                   /* host copy */
+int _ZN11daWanwan2_c16CleanupResourcesEv(void);
+void _ZN11daWanwan2_c16OnPendingDestroyEv(void);
+void *_ZTV11daWanwan2_c[31];
+/* D1 teardown helpers (the other classes' D1 blocks use these too) */
+void __cxa_vec_cleanup(void *p, int n, int sz, void *dtor);
+void _ZN8Vector3sD1Ev(void);
+void _ZN7Vector3D1Ev(void);
+void _ZN12dEnemyBase_cD2Ev(void *);   /* the Enemy base D2 (ov002), already hosted */
+}
+
+static int __fastcall uc_init(void *s, void *)
+{ return _ZN11daWanwan2_c13InitResourcesEv((unsigned char *)s); }
+static int __fastcall uc_clean(void *, void *)
+{ return _ZN11daWanwan2_c16CleanupResourcesEv(); }
+static int __fastcall uc_behavior(void *s, void *)
+{ return _ZN11daWanwan2_c8BehaviorEv(s); }
+static int __fastcall uc_render(void *s, void *)
+{ port_actor_render_probe("UNCHAINED_CHOMP", (char *)s + 0x30c);
+  return _ZN11daWanwan2_c6RenderEv(s); }
+static int __fastcall uc_pdes(void *, void *)
+{ _ZN11daWanwan2_c16OnPendingDestroyEv(); return 0; }
+/* SLOT 16: the butterfly reading -- UnchainedChomp's matched Behavior never
+   calls MarkForDestruction itself, but D1 is still reachable through ordinary
+   AfterCleanupResources / level-unload teardown, so it is filled rather than
+   trapped. Body is src/_ZN14UnchainedChompD1Ev.cpp line for line (D1, not D0:
+   no final Deallocate). _ZN12dEnemyBase_cD2Ev is the shared Enemy base D2.
+
+   IT IS THE MATCHED TU ITSELF NOW (run link100 lane TAIL), not a
+   transcription of it. The one thing that kept src/_ZN14UnchainedChompD1Ev.cpp
+   out was a spelling, not a shape: that TU declares the table it stores as
+   `extern int _ZTV14UnchainedChomp;` at namespace scope OUTSIDE its extern "C"
+   block, so MSVC emits the reference decorated -- ?_ZTV14UnchainedChomp@@3HA
+   -- and the port's C-named host array cannot satisfy it. Measured, not
+   guessed: port/tools/closure.py on that single TU reports exactly one
+   unresolved symbol and that is the string. An /alternatename in the link100
+   block at the end of hal/cxx_aliases.cpp points the decorated name at the
+   array, which is the ordinary alias direction (an undefined name pointed at a
+   defined one, nothing redefined), and the body then links and reads the same
+   array this thunk did. */
+extern "C" void *_ZN11daWanwan2_cD1Ev(void *self);   /* ov100 0x021431c4 */
+static void *__fastcall uc_d1(void *s, void *)
+{ return _ZN11daWanwan2_cD1Ev(s); }
+
+/* SLOT 17: the ROM's own deleting destructor, matched src on slice_gate216.
+   It is a real C++ method (`void *_ZN14UnchainedChompD0Ev(UnchainedChomp *)`
+   inside an extern "C" block), so the C name IS what the object defines and
+   this adapter only supplies the ecx->arg convention. */
+extern "C" void *_ZN11daWanwan2_cD0Ev(void *self);   /* ov100 0x02143290 */
+static void *__fastcall uc_d0(void *s, void *)
+{ return _ZN11daWanwan2_cD0Ev(s); }
+
+extern "C" void hal_fill_unchained_chomp_vtable(void)
+{
+    void **vt = _ZTV11daWanwan2_c;
+    ac_fill_shared(vt);
+    vt[0] = (void *)uc_init;
+    vt[3] = (void *)uc_clean;
+    vt[6] = (void *)uc_behavior;
+    vt[9] = (void *)uc_render;
+    vt[12] = (void *)uc_pdes;
+    vt[16] = (void *)PORT_D16(uc_d1);
+    /* 17 USED TO KEEP THE TRAP, on the Butterfly/Fish reading: destroy is D1 +
+       an explicit Deallocate, and nothing on this level calls the deleting
+       form. That reading is unchanged and it is what makes the ROM's own word
+       free to seat here (run link100 lane TAIL): the slot is not dispatched, so
+       this changes no behaviour, and if a later level ever does dispatch it the
+       matched body is what the ROM would have run instead of an abort.
+
+       THE ROM'S OWN WORD, config/arm9/overlays/ov100/relocs.txt via
+       port/tools/tail_slots.py --module ov100 --vtable 0x02148188 --width 31:
+       slot 17 -> 0x02143290 = _ZN14UnchainedChompD0Ev, on slice_gate216.txt.
+       The body is uc_d1's chain plus the final Memory::Deallocate, spelled as
+       a real C++ method against UnchainedChomp.h, so this is the qualified
+       face and not the flat-C adapter the other seats take. */
+    vt[17] = (void *)uc_d0;
+    /* 31 slots, a plain Actor table. Slot 29 (OnAimedAtWithEgg) is the chomp's
+       own body, ov100 0x021442d4 -- the ROM word in _ZTV14UnchainedChomp slot
+       29. It is on slice_gate21.txt now and seated here rather than declining,
+       because slot 30 below is the Actor base body and that body's whole job is
+       to add slot 29's result to y: a seated 30 over a trapped 29 would only
+       move the freeze one slot along. */
+    vt[29] = (void *)uc_aimed;
+}
+
+// ============================================================================
+// GATE 22: ov100's DOOR
+// ============================================================================
+//
+// _ZTV4Door, ov100 0x02148188, RTTI 8daDoor_c -- the PLAIN door's table, and
+// config names it correctly.
+//
+// AN EARLIER READING OF THIS GATE WAS WRONG AND COST THE PORT A LEVEL (lane
+// CRASH12). It said config had swapped the two doors' names and that config's
+// `_ZTV4Door` was really the star door's table, so this array was hosted under
+// the name _ZTV8daDoor_c and the name _ZTV4Door was given to gate 40's array
+// instead. src/d_a_door.c stores _ZTV4Door into every plain door, so every
+// plain door in the castle grounds came up wearing the STAR door's methods and
+// died the first time one was drawn. The cartridge settles it, three ways:
+//
+//   1. TWO TABLES, TWO ADDRESSES. config lists _ZTV4Door at 0x02148188 and
+//      _ZTV12daStarGate_c at 0x021483cc. Its own convention for a genuine
+//      alias is one address listed twice (_ZTV9Butterfly/_ZTV9daBtfly_c both
+//      0x02147e9c; _ZTV4Fish/_ZTV8daFish_c both 0x021484bc). These two are not
+//      that.
+//   2. THE FACTORIES DISAGREE. _Z18daDoor_c_classInitv (0x0214589c) allocates 0x148
+//      bytes, stores the literal 0x02148188, and constructs a ModelAnim at
+//      +0xd4. _Z22daStarGate_c_classInitv (0x021461d4) allocates 0x118 bytes, stores
+//      the literal 0x021483cc, and constructs a CommonModel at +0xd4. Read out
+//      of extracted/overlays/overlay_0100.bin at base 0x02140d80.
+//   3. THE SLOTS DISAGREE in exactly the seven a subclass overrides -- 0, 3, 6,
+//      9, 12, 16, 17 -- and agree in the other twenty-four, which is why the
+//      mistake survived until a door was finally rendered. 0x02148188 carries
+//      the _ZN4Door* family, 0x021483cc the _ZN12daStarGate_c* family, and all
+//      fourteen addresses match config's own symbol rows.
+//
+// So the _ZN4Door* method family implements the PLAIN door, this array is it,
+// and gate 40 hosts the star door's table under its own name.
+//
+// The three castle doors come out of LoadDoorObjects rather than the standard
+// or simple loader, which is why they carry no record in the object tables
+// the other classes were read against -- the level names them as its kind
+// 0x09, count 3.
+//
+// Both its Behavior and its Render are host copies, for the two reasons this
+// gate has met all the way through: a pointer-to-member table (this time a
+// POINTER THE ACTOR CARRIES at +0x140, not a fixed array) and a shadow-class
+// dispatch that needs Model SLOT 4, the one the dual fill cannot serve. See
+// port/unmatched/Door_Behavior.cpp and Door_Render.cpp.
+extern "C" {
+int _ZN8daDoor_c13InitResourcesEv(void *self);      /* InitResources */
+int _ZN8daDoor_c16CleanupResourcesEv(void *self);      /* CleanupResources */
+int _ZN8daDoor_c8BehaviorEv(void *self);      /* Behavior -- host copy */
+int _ZN8daDoor_c6RenderEv(void *self);      /* Render   -- host copy */
+void _ZN8daDoor_c16OnPendingDestroyEv(void);           /* OnPendingDestroy */
+void *_ZTV8daDoor_c[31];   /* ov100 0x02148188, RTTI 8daDoor_c */
+}
+/* PORT_HOST_ABI: two names of ONE ROM table, and THIS one is a true alias,
+   read off the cartridge rather than off a comment. overlay_0100.bin at base
+   0x02140d80: the word at 0x02148184, the table's typeinfo slot, relocates to
+   0x02148158, whose word[1] points at the Itanium name string at 0x0214814c,
+   whose bytes spell "8daDoor_c". config calls that same address 0x02148188
+   _ZTV4Door. One address, two spellings, one host array. */
+/* PORTSYNC2: both names of this ROM word are one name in main now; the alias would bind a symbol to itself. */ // #pragma comment(linker, "/alternatename:__ZTV8daDoor_c=__ZTV8daDoor_c")
+static int __fastcall dr_init(void *s, void *)
+{ return _ZN8daDoor_c13InitResourcesEv(s); }
+static int __fastcall dr_clean(void *s, void *)
+{ return _ZN8daDoor_c16CleanupResourcesEv(s); }
+static int __fastcall dr_behavior(void *s, void *)
+{ return _ZN8daDoor_c8BehaviorEv(s); }
+static int __fastcall dr_render(void *s, void *)
+{ port_actor_render_probe("DOOR", (char *)s + 0xd4);
+  return _ZN8daDoor_c6RenderEv(s); }
+static int __fastcall dr_pdes(void *, void *)
+{ _ZN8daDoor_c16OnPendingDestroyEv(); return 0; }
+/* slot 16, the ROM's own D1: stores this table, destroys the ModelAnim at
+   +0xd4, then Actor's D2. Matched src on slice_gate216.txt. */
+extern "C" int *_ZN8daDoor_cD1Ev(int *t);   /* ov100 0x021443f4 */
+static int __fastcall dr_d1(void *s, void *)
+{ return (int)(size_t)_ZN8daDoor_cD1Ev((int *)s); }
+/* slot 17, the ROM's own D0, GATE 227. Table word 0x02148188 + 17*4 =
+   0x021481cc relocates to 0x02144424, and symbols.txt gives that address its
+   own kind:function(arm,size=0x44) record. It is the D1 written out inline
+   plus the Deallocate: store the vtable, dExtAnmModel_c::~dExtAnmModel_c at +0xd4,
+   Actor::~Actor, Memory::Deallocate(this, gameHeapPtr). Its src spells the two
+   loads with the shared header's VT0 and a bare G0, and port/CMakeLists.txt
+   binds them per-TU out of this body's own literal pool (0x02144460 ->
+   0x02148188, which is the table this gate hosts as _ZTV4Door, and
+   0x02144464 -> 0x020a0eac). No arguments beyond the receiver, so the
+   two-parameter shape, the same as dr_d1. */
+extern "C" int *_ZN8daDoor_cD0Ev(int *t);   /* ov100 0x02144424 */
+static int __fastcall dr_d0(void *s, void *)
+{ return (int)(size_t)_ZN8daDoor_cD0Ev((int *)s); }
+
+extern "C" void hal_fill_door_vtable(void)
+{
+    void **vt = _ZTV8daDoor_c;
+    ac_fill_shared(vt);
+    vt[0] = (void *)dr_init;
+    vt[3] = (void *)dr_clean;
+    vt[6] = (void *)dr_behavior;
+    vt[9] = (void *)dr_render;
+    vt[12] = (void *)dr_pdes;
+    /* SLOT 17 CARRIES THE ROM'S OWN WORD NOW (gate 227). The old note here
+       said it traps because nothing on the castle grounds destroys a door --
+       the three live from the level boot to the teardown -- and because its
+       matched body (_ZN4DoorD0Ev) carries the inferred-stub marker. The
+       first half is still true and is why this is a linkage seat rather than a
+       behaviour change; the second half is what changed, since lane STUBADJ
+       ruled the body REAL DECOMP against the ROM.
+       SLOT 16 CARRIES THE ROM'S OWN WORD NOW (run link100 lane TAIL).
+       port/tools/tail_slots.py --module ov100 --vtable 0x02148188 --width 31
+       reads slot 16 -> 0x021443f4, and that body spells the table by a name
+       this file's host array answers to, so it takes no rename. It is
+       the shared ac_d1_door chain with the class's own member type: the ROM
+       destroys a ModelAnim at +0xd4, not a CommonModel. Not dispatched either
+       way, by the same reading that keeps 17 trapping. */
+    vt[16] = (void *)PORT_D16(dr_d1);
+    vt[17] = (void *)dr_d0;
+}
+
+// ============================================================================
+// GATE 40: ov100's STAR_DOOR (actor 354) -- the _ZN12daStarGate_c* family
+// ============================================================================
+//
+// _ZTV12daStarGate_c, ov100 0x021483cc, RTTI 12daStarGate_c. A SEPARATE table
+// from the plain door's 0x02148188, not a second name for it: see the three
+// cartridge readings written out at gate 22. This array carried the name
+// _ZTV4Door until lane CRASH12, which is what put the star door's methods on
+// every plain door; the name belongs to gate 22 and has been given back.
+//
+// The class's own factory installs this table: _Z22daStarGate_c_classInitv
+// (ov100 0x021461d4) allocates 0x118 bytes, stores the literal 0x021483cc and
+// constructs a CommonModel at +0xd4. Its member is that CommonModel, so slot 16
+// is the class's own D1 (ov100 0x021458d4). D0 is plain C in src.
+// Nothing here is a host copy: both InitResources' and Behavior's
+// pointer-to-member sites are formed over COMPLETE local classes and both are
+// guarded off on a fresh boot (the callback table _ZN12daStarGate_c7ST_WAITE is
+// ov100 .bss, zeroed) -- see the head of slice_gate40.txt.
+extern "C" {
+int _ZN12daStarGate_c13InitResourcesEv(void *self);      /* face: method_faces */
+int _ZN12daStarGate_c8BehaviorEv(void *self);            /* face: method_faces */
+int _ZN12daStarGate_c6RenderEv(int self);                /* C in src */
+int _ZN12daStarGate_c16CleanupResourcesEv(void);         /* C in src */
+void _ZN12daStarGate_c16OnPendingDestroyEv(void);        /* C in src */
+int *_ZN12daStarGate_cD0Ev(int *self);                   /* C in src */
+void *_ZTV12daStarGate_c[31];   /* ov100 0x021483cc, RTTI 12daStarGate_c */
+}
+/* THE ALIAS THAT USED TO SIT HERE IS GONE (lane CRASH12). It was a linker
+   alternatename mapping this table's Itanium name onto gate 22's array, and it
+   was the defect. The directive is deliberately NOT quoted verbatim here: a
+   guard that scans for the text would read the quote as a live alias, which is
+   the scoping bug alternatename_guard already carries a fixture for.
+   The RTTI reading it rested on is correct and is kept
+   above: 0x021483c8 relocates to the typeinfo at 0x02148374, whose word[1]
+   points at the name string at 0x02148380 = "12daStarGate_c". What the reading
+   never checked is that _ZTV4Door is a DIFFERENT ADDRESS, 0x02148188, whose own
+   typeinfo at 0x02148158 names 8daDoor_c. Proving a name for one table is not
+   proving two tables are one; the alias has to be an address match, and this
+   one never was. The array is now declared under its own name, so
+   src/d_a_door.c's store of _ZTV4Door reaches gate 22's table instead of this
+   one. */
+
+static int __fastcall sd_init(void *s, void *)
+{ return _ZN12daStarGate_c13InitResourcesEv(s); }
+static int __fastcall sd_clean(void *, void *)
+{ return _ZN12daStarGate_c16CleanupResourcesEv(); }
+static int __fastcall sd_behavior(void *s, void *)
+{ return _ZN12daStarGate_c8BehaviorEv(s); }
+static int __fastcall sd_render(void *s, void *)
+{ port_actor_render_probe("STAR_DOOR", (char *)s + 0xd4);
+  return _ZN12daStarGate_c6RenderEv((int)(size_t)s); }
+static int __fastcall sd_pdes(void *, void *)
+{ _ZN12daStarGate_c16OnPendingDestroyEv(); return 0; }
+static int __fastcall sd_d0(void *s, void *)
+{ return (int)(size_t)_ZN12daStarGate_cD0Ev((int *)s); }
+
+extern "C" void hal_fill_star_door_vtable(void)
+{
+    void **vt = _ZTV12daStarGate_c;
+    ac_fill_shared(vt);
+    vt[0] = (void *)sd_init;
+    vt[3] = (void *)sd_clean;
+    vt[6] = (void *)sd_behavior;
+    vt[9] = (void *)sd_render;
+    vt[12] = (void *)sd_pdes;
+    /* slot 16 is the class's OWN D1, ov100 0x021458d4, the ROM word at
+       0x021483cc + 0x40. It held hal_cppd1_Door until lane CRASH12: that face
+       destroys a ModelAnim at +0xd4, which is the PLAIN door's member, and the
+       star door's is a CommonModel. slot 17 is the class's own C D0. */
+    vt[16] = (void *)PORT_D16(hal_cppd1_daStarGate_c);
+    vt[17] = (void *)sd_d0;
+}
+
+// ============================================================================
+// GATE 41: ov010's TRAP (actor 36) and LIGHT_BEAM (actor 37, shares this table)
+// ============================================================================
+//
+// _ZTV4Trap, ov010 0x02112ba8. The castle interior's traps and the light beam
+// through the entrance. LIGHT_BEAM is a variant of TRAP: its own Spawn
+// installs THIS SAME vtable (_ZTV4Trap) and it has no methods of its own, so
+// one fill serves both classes. The table wears three names -- config's
+// _ZTV4Trap, LIGHT_BEAM's RTTI _ZTV15daObjC1Hikari_c (hikari = light) at the
+// same address, and TRAP's own RTTI _ZTV14daObjC1_Trap_c that _Z24daObjC1_Trap_c_classInitv and
+// Trap's D0 spell -- so all three resolve to one host array.
+//
+// TRAP is Platform-derived (_Z24daObjC1_Trap_c_classInitv runs Platform's constructor and a Model
+// at 0x320), so the fill runs hal_fill_platform_vtable first, the SIGN_POST
+// shape. Nothing here dispatches a pointer-to-member: both Behavior and Render
+// are straight-line C++ methods.
+//
+// CLEANUP AND DESTRUCTOR (gate 31 reading applied). The old note here said
+// slots 16/17 trap because nothing destroys a trap or the light beam on the
+// castle-interior boot. That held only while there was no level teardown; a
+// level change destroys every actor the level spawned through the ROM's own
+// ActorBase::AfterCleanupResources, and both of these classes reach it. Two
+// bugs sat in the path:
+//
+//   1. tr_clean swallowed CleanupResources' return. src returns 1
+//      (SharedFilePtr released, done); AfterCleanupResources only unlinks and
+//      destroys the node when cleanup reports done (_ZN7fBase_c8drawPackEv maps 1 ->
+//      code 2), so returning 0 left TRAP and LIGHT_BEAM nodes dangling at
+//      teardown -- the stale-cleanup-node symptom of playlog 001951 (garden
+//      door) and the render-walk use-after-free of playlog 002712 (BoB). Fixed
+//      by forwarding the return.
+//
+//   2. Once cleanup reports done, AfterCleanupResources dispatches slot 16
+//      (D1). The ROM vtable at 0x02112ba8 puts _ZN9LightBeamD1Ev in slot 16 and
+//      _ZN9LightBeamD0Ev in slot 17, and BOTH classes share this one table -- but
+//      the two have different layouts and the shared dtor is written for only
+//      one of them. LIGHT_BEAM (_Z25daObjC1Hikari_c_classInitv, 364 bytes, Actor-derived) puts
+//      its Model at +0xd4 and a MovingCylinderClsnWithPos at +0x124, which is
+//      exactly the member chain _ZN9LightBeamD0Ev tears down. TRAP (_Z24daObjC1_Trap_c_classInitv, 944
+//      bytes, Platform-derived) puts its Model at +0x320 and has no
+//      MovingCylinderClsnWithPos at all, so running the 0xd4/0x124 chain on a
+//      TRAP would smash Platform's fields. So slot 16 (tr_d1) discriminates on
+//      the actor id at +0xc: LIGHT_BEAM (0x25) runs the real member chain,
+//      TRAP (0x24) does the Actor-level teardown only. Slot 17 keeps the trap,
+//      the sibling convention: AfterCleanupResources dispatches 16 and does the
+//      Deallocate itself, so a landing on the deleting form (17) means someone
+//      reached the actor through operator delete and deserves the abort.
+extern "C" {
+int _ZN15daObjC1Hikari_c13InitResourcesEv(void *self);        /* face: method_faces */
+int _ZN15daObjC1Hikari_c8BehaviorEv(void *self);              /* face: method_faces */
+int _ZN15daObjC1Hikari_c6RenderEv(void *self);                /* face: method_faces */
+int _ZN15daObjC1Hikari_c16CleanupResourcesEv(void);           /* C in src, returns 1 */
+int *_ZN15daObjC1Hikari_cD0Ev(int *self);                  /* slot 17, DTOR-PAIRS seat (ov010 0x02111a08) */
+void *_ZTV4Trap[31];
+void hal_fill_platform_vtable(void);
+}
+/* PORT_HOST_ABI: two names of ONE ROM table, read off the ROM rather than
+   off a comment (lane ALIASCHK). ov010 0x02112ba8 carries its own RTTI
+   record: the word at 0x02112ba4 relocates to the typeinfo at 0x02112b64,
+   whose word[1] points at the Itanium name string at 0x02112b70 =
+   "15daObjC1Hikari_c", so 15daObjC1Hikari_c is the ROM's own RTTI spelling
+   of that class. The ROM bodies whose literal pools load it are
+   _Z25daObjC1Hikari_c_classInitv, _ZN9LightBeamD0Ev, _ZN9LightBeamD1Ev. Read out of
+   extracted/overlays/overlay_0010.bin; the LHS is not a config symbol
+   anywhere, so the alias cannot be defeated by a later slice. */
+#pragma comment(linker, "/alternatename:__ZTV15daObjC1Hikari_c=__ZTV4Trap")
+/* PORT_HOST_ABI: REBOUND by lane ALIASCHK, and it was the one alias in the
+   tree whose two sides the ROM actually contradicts. It used to read
+   `__ZTV14daObjC1_Trap_c=__ZTV4Trap`, on the reading that one ov010 table
+   wears three names. It does not. 0x02112ba8 (config _ZTV4Trap, the line
+   above) is LIGHT_BEAM: its word at 0x02112ba4 relocates to the typeinfo
+   0x02112b64 whose word[1] names "15daObjC1Hikari_c". daObjC1_Trap_c is a
+   DIFFERENT class with its own table at 0x02112ae4 -- word at 0x02112ae0 ->
+   typeinfo 0x02112aa0 -> name string 0x02112aac = "14daObjC1_Trap_c" -- and
+   the only bodies whose literal pools load it are _Z24daObjC1_Trap_c_classInitv,
+   _ZN14daObjC1_Trap_cD1Ev and _ZN14daObjC1_Trap_cD0Ev, TRAP's own factory and
+   destructors. Gate 232 (hal/actor_classes_ov010.cpp) already acted on this
+   and hosts 0x02112ae4 as `int _ZTV14daObjC1_Trap_c[32]`, reaching the two src
+   TUs that spell the name through a per-source -D, so nothing spells the LHS
+   bare today and this directive is inert in either form. It is rebound rather
+   than deleted because a future slice that spells the name without that -D
+   would otherwise fire the old alias and silently re-create the gate-232
+   defect; bound here it lands on the table the ROM names. */
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync). DEFEATED: the left hand side is a real definition in this link now (actor_classes_ov010.cpp.obj), so the directive is inert and alternatename_guard fails on it. */
+// #pragma comment(linker, "/alternatename:__ZTV14daObjC1_Trap_c=_data_ov010_02112ae4")
+
+static int __fastcall tr_init(void *s, void *)
+{ return _ZN15daObjC1Hikari_c13InitResourcesEv(s); }
+static int __fastcall tr_clean(void *, void *)
+{ return _ZN15daObjC1Hikari_c16CleanupResourcesEv(); }
+static int __fastcall tr_behavior(void *s, void *)
+{ return _ZN15daObjC1Hikari_c8BehaviorEv(s); }
+static int __fastcall tr_render(void *s, void *)
+{ port_actor_render_probe("TRAP", (char *)s + 0x320);
+  return _ZN15daObjC1Hikari_c6RenderEv(s); }
+
+/* Slot 16, the D1 (complete-object) destructor both classes share through the
+   one _ZTV4Trap table. The hosted slot 16 is the ROM D0's body minus its final
+   Memory::Deallocate, which AfterCleanupResources performs itself after the
+   dispatch returns (the file's gate-31 recipe). The ROM's _ZN9LightBeamD0Ev is
+   written for LIGHT_BEAM's layout only -- Model at +0xd4, MovingCylinderClsnWithPos
+   at +0x124, then Actor's D2 -- so we can only run that chain when the object
+   really is a LIGHT_BEAM. Discriminate on the actor id at +0xc.
+   THE LIGHT_BEAM BRANCH IS THE ROM'S OWN D1 NOW (run linkfull wave 27, lane
+   V3B): src/_ZN9LightBeamD1Ev.cpp's _MSC_VER arm defines _ZN9LightBeamD1Ev as
+   the qualified call to the class's inline destructor, which tears down the
+   same three things this branch spelled by hand -- the dCcAcPos_c at +0x124,
+   the Model at +0xd4, then dActor_c -- through the same bodies (measured,
+   lane V3B's report (run linkfull)). The TRAP branch below is unchanged. */
+extern "C" void _ZN15daObjC1Hikari_cD1Ev(void *self);
+static int __fastcall tr_d1(void *s, void *)
+{
+    unsigned id = *(unsigned short *)((char *)s + 0xc);
+    if (id == 0x25) {                 /* LIGHT_BEAM: the layout the ROM dtor fits */
+        _ZN15daObjC1Hikari_cD1Ev(s);         /* members, then dActor_c: the whole D1 */
+        return (int)(size_t)s;
+    }
+    /* TRAP (0x24): Actor-level teardown only. The ROM's 0xd4/0x124 chain is
+       LIGHT_BEAM's and would smash Platform's fields on a 944-byte TRAP, whose
+       Model lives at +0x320. LOUD LEAK: TRAP's Model at +0x320 is NOT torn down
+       here -- _Z24daObjC1_Trap_c_classInitv constructs it (dExtSimpleModel_c::Model at +0x320) and nothing
+       else knows to free it, so a level change leaks one Model per castle-interior
+       trap. That is a bounded, non-corrupting leak; running the wrong-offset
+       chain to avoid it would corrupt. Left for whoever recovers TRAP's own D0
+       (the ROM shares _ZN9LightBeamD0Ev across both layouts, so there is no separate
+       matched TRAP dtor to call). */
+    return (int)(size_t)_ZN8dActor_cD2Ev(s);
+}
+
+static int __fastcall tr_d0(void *s, void *)
+{ return (int)(size_t)_ZN15daObjC1Hikari_cD0Ev((int *)s); }
+
+extern "C" void hal_fill_trap_vtable(void)
+{
+    void **vt = _ZTV4Trap;
+    hal_fill_platform_vtable();
+    ac_fill_shared(vt);
+    vt[0] = (void *)tr_init;
+    vt[3] = (void *)tr_clean;
+    vt[6] = (void *)tr_behavior;
+    vt[9] = (void *)tr_render;
+    vt[12] = (void *)ac_pdes_base;
+    vt[16] = (void *)PORT_D16(tr_d1);
+    /* Slot 17, the ROM's own deleting destructor (DTOR-PAIRS seat). The ROM
+       parks ONE body, _ZN9LightBeamD0Ev (ov010 0x02111a08), at word 17 of this
+       table for both ids that install it, and that body runs the LIGHT_BEAM
+       chain (MovingCylinderClsnWithPos +0x124, Model +0xd4) -- the same fact
+       tr_d1 above discriminates on for slot 16. Seating it is the ROM's word
+       where the trap stood; nothing dispatches 17 on a mounted level
+       (AfterCleanupResources dispatches 16 and frees itself), so the
+       TRAP-layout caveat in tr_d1 stays tr_d1's. */
+    vt[17] = (void *)tr_d0;
+}
+
+// ============================================================================
+// GATE 42: ov010's PEACH_PAINTING (actor 38)
+// ============================================================================
+//
+// _ZTV13PeachPainting / _ZTV14daObjC1Peach_c, ov010 0x02112c68. Peach's
+// portrait over the castle-interior stairs. A prior sweep marked it BLOCKED on
+// ov052 and a RollingRock spawn; the ROM disagrees, and it was the shared-base
+// illusion the gate-40/41 readings already turn on. ov010 and ov052 (and ov021)
+// are all linked at 0x021111a0 because the DS only ever has one overlay of a
+// base loaded, so an address in one names a symbol in every other. dsd
+// attributed two of PeachPainting's OWN internal references to the ov052/ov021
+// names at the shared address:
+//
+//   * InitResources' `data_ov052_02111e84(this)` is an arm_call
+//     to:0x02111e84 module:overlay(10) -- _ZN13PeachPainting20UpdateModelTransformEv, a three-line
+//     matrix/scale helper compiled in slice_gate42.txt. ov052's 0x02111e84 is a
+//     CLPS collision table (first word "CLPS"); calling it would crash.
+//   * The `_Z19daGrock_c_classInitv` handed to dExtSimpleModel_c::LoadFile is a load reloc
+//     to:0x02112d64 module:overlay(10) -- gC1PeachModelFile, an 8-byte BSS
+//     SharedFilePtr the ov010 sinits build, already mounted in ov010_syms.txt.
+//     CleanupResources names gC1PeachModelFile directly, the cross-check.
+//
+// So there is no cross-overlay spawn and no RollingRock; ov052 is NOT mounted.
+// The two mislabeled names are closed by /alternatename below (data_ov052 ->
+// func_ov010, _Z19daGrock_c_classInitv -> data_ov010's BSS SharedFilePtr).
+//
+// The vtable is the standard 31-slot Actor table (0x7c bytes): slot 12 is
+// ActorBase::OnPendingDestroy (ac_pdes_base, same word 0x02043ac0 as TRAP),
+// slots 0/3/6/9 the class's own four, slot 16 the D1 (Model at 0xd4 then
+// Actor::~Actor) and slot 17 the class's own C D0. Nothing dispatches a
+// pointer-to-member. _Z24daObjC1Peach_c_classInitv installs _ZTV13PeachPainting and D0
+// spells the dual name _ZTV14daObjC1Peach_c, so both resolve to one host array.
+extern "C" {
+int _ZN14daObjC1Peach_c13InitResourcesEv(void *self);   /* face: method_faces */
+int _ZN14daObjC1Peach_c8BehaviorEv(void *self);         /* face: method_faces */
+int _ZN14daObjC1Peach_c6RenderEv(void *self);           /* face: method_faces */
+int _ZN14daObjC1Peach_c16CleanupResourcesEv(void);      /* C in src */
+int *_ZN14daObjC1Peach_cD0Ev(int *self);                /* C in src */
+void *_ZTV14daObjC1Peach_c[31];
+/* the D1 member chain: Model at 0xd4, then Actor::~Actor. */
+void _ZN17dExtSimpleModel_cD1Ev(void *);
+void *_ZN8dActor_cD2Ev(void *);
+}
+/* PORT_HOST_ABI: two names of ONE ROM table, read off the ROM rather than
+   off a comment (lane ALIASCHK). ov010 0x02112c68 carries its own RTTI
+   record: the word at 0x02112c64 relocates to the typeinfo at 0x02112c24,
+   whose word[1] points at the Itanium name string at 0x02112c30 =
+   "14daObjC1Peach_c", so 14daObjC1Peach_c is the ROM's own RTTI spelling of
+   that class. The ROM bodies whose literal pools load it are
+   _Z24daObjC1Peach_c_classInitv, _ZN13PeachPaintingD0Ev, _ZN13PeachPaintingD1Ev. Read
+   out of extracted/overlays/overlay_0010.bin; the LHS is not a config
+   symbol anywhere, so the alias cannot be defeated by a later slice. */
+/* PORTSYNC2: both names of this ROM word are one name in main now; the alias would bind a symbol to itself. */ // #pragma comment(linker, "/alternatename:__ZTV14daObjC1Peach_c=__ZTV14daObjC1Peach_c")
+static int __fastcall pt_init(void *s, void *)
+{ return _ZN14daObjC1Peach_c13InitResourcesEv(s); }
+static int __fastcall pt_clean(void *, void *)
+{ return _ZN14daObjC1Peach_c16CleanupResourcesEv(); }
+static int __fastcall pt_behavior(void *s, void *)
+{ return _ZN14daObjC1Peach_c8BehaviorEv(s); }
+static int __fastcall pt_render(void *s, void *)
+{ port_actor_render_probe("PEACH_PAINTING", (char *)s + 0xd4);
+  return _ZN14daObjC1Peach_c6RenderEv(s); }
+/* slot 16: the class's D1 is a shadow-class C++ destructor in src, so it is not
+   compiled; the chain is spelled here (Model at 0xd4 then Actor::~Actor), the
+   gate-31 recipe for a shadow-class slot 16. */
+/* slot 16: the matched src D1 through hal/dtor_faces_cpp.cpp (lane DTOR-FACES-CPP). */
+static int __fastcall pt_d0(void *s, void *)
+{ return (int)(size_t)_ZN14daObjC1Peach_cD0Ev((int *)s); }
+
+extern "C" void hal_fill_peach_painting_vtable(void)
+{
+    void **vt = _ZTV14daObjC1Peach_c;
+    ac_fill_shared(vt);
+    vt[0] = (void *)pt_init;
+    vt[3] = (void *)pt_clean;
+    vt[6] = (void *)pt_behavior;
+    vt[9] = (void *)pt_render;
+    vt[12] = (void *)ac_pdes_base;
+    vt[16] = (void *)PORT_D16(hal_cppd1_PeachPainting);
+    vt[17] = (void *)pt_d0;
+}
+
+// ============================================================================
+// GATE 23: ov102's QUESTION_BLOCK
+// ============================================================================
+//
+// _ZTV13QuestionBlock / _ZTV18daObjHatenaBlock_c, ov102 0x0214e47c -- hatena
+// is the question mark, which is the ROM's own RTTI agreeing with config's
+// name for once. One instance, at (0,3498,-3500): the block on the castle
+// roof, over the tower the cannon shoots you to.
+//
+// NOTHING HERE NEEDS A HOST COPY, which makes it the first class since gate 17
+// that is only its own six slots. Its Behavior dispatches no pointer-to-member
+// at all -- a straight-line body over a MovingMeshCollider and an Animation --
+// and its Render is the slot-5 shadow dispatch on both ModelAnim and Model,
+// which the dual fill in hal/cxxname_bridge.cpp already serves on both. The
+// door's slot-4 problem does not arise.
+//
+// Slot 12 is ActorBase's own OnPendingDestroy, which is what the ROM's table
+// holds -- the class does not override it.
+extern "C" {
+int _ZN18daObjHatenaBlock_c13InitResourcesEv(char *self);
+int _ZN18daObjHatenaBlock_c8BehaviorEv(void *self);          /* face: method_faces */
+int _ZN18daObjHatenaBlock_c6RenderEv(void *self);            /* face: method_faces */
+int _ZN18daObjHatenaBlock_c16CleanupResourcesEv(void *self); /* face: method_faces */
+int *_ZN18daObjHatenaBlock_cD0Ev(int *self);        /* slot 17, DTOR-PAIRS seat (ov102 0x02149010) */
+void *_ZTV18daObjHatenaBlock_c[32];
+}
+/* PORT_HOST_ABI: two names of ONE ROM table, read off the ROM rather than
+   off a comment (lane ALIASCHK). ov102 0x0214e47c carries its own RTTI
+   record: the word at 0x0214e478 relocates to the typeinfo at 0x0214e3a8,
+   whose word[1] points at the Itanium name string at 0x0214e3b4 =
+   "18daObjHatenaBlock_c", so 18daObjHatenaBlock_c is the ROM's own RTTI
+   spelling of that class. The ROM bodies whose literal pools load it are
+   _Z40daObjHatenaBlock_c_classInit_CAP_BLOCK_Lv, _Z40daObjHatenaBlock_c_classInit_CAP_BLOCK_Mv, _Z40daObjHatenaBlock_c_classInit_CAP_BLOCK_Wv. Read out
+   of extracted/overlays/overlay_0102.bin; the LHS is not a config symbol
+   anywhere, so the alias cannot be defeated by a later slice. */
+/* PORTSYNC2: both names of this ROM word are one name in main now; the alias would bind a symbol to itself. */ // #pragma comment(linker, "/alternatename:__ZTV18daObjHatenaBlock_c=__ZTV18daObjHatenaBlock_c")
+static int __fastcall qb_init(void *s, void *)
+{ return _ZN18daObjHatenaBlock_c13InitResourcesEv((char *)s); }
+static int __fastcall qb_clean(void *s, void *)
+{ return _ZN18daObjHatenaBlock_c16CleanupResourcesEv(s); }
+static int __fastcall qb_behavior(void *s, void *)
+{ return _ZN18daObjHatenaBlock_c8BehaviorEv(s); }
+/* THE PROBE HAS TO PICK THE MEMBER THE ROM'S OWN Render PICKS, and it used to
+   name +0x320 for all six classes that share this vtable. That is the
+   ModelAnim, and src/_ZN13QuestionBlock6RenderEv.cpp:23-30 only draws it when
+   `mActorId == 0x14` -- the plain QUESTION_BLOCK. Every other id (21
+   EXCLAMATION_BLOCK, 22 EXCLAMATION_BLOCK_VS, 23/24/25 the three CAP_BLOCKs)
+   draws mModel at +0xd4, and InitResources never touches +0x320 for them
+   (src/_ZN13QuestionBlock13InitResourcesEv.cpp:26-46: only case 0 does).
+
+   So the probe was reading a member the class legitimately leaves zeroed and
+   reporting `file 00000000 transforms 00000000` on a block that was drawing
+   perfectly well. Run vsmap, chasing "the VS ! blocks do not render": the null
+   was the instrument's, not the game's. Reading +0xd4 for those ids is what the
+   probe was always supposed to say. */
+static int __fastcall qb_render(void *s, void *)
+{ port_actor_render_probe("QUESTION_BLOCK",
+                          (char *)s + (*(unsigned short *)((char *)s + 0xc) ==
+                                       0x14 ? 0x320 : 0xd4));
+  return _ZN18daObjHatenaBlock_c6RenderEv(s); }
+
+/* GATE 203: the block's own five HIT slots, ov102, all matched src and now
+   sliced (port/slice_gate203.txt). Every one of them is `(self, other)` on the
+   ROM -- the caller PUSHES the other actor -- so every veneer here takes the
+   THREE-parameter __fastcall shape (self in ecx, the dummy in edx, the
+   argument pushed) and MSVC emits `ret 4` for it. A two-parameter veneer would
+   emit a bare `ret`, pop nothing, and desync the caller's frame: that exact
+   mistake on this exact slot 28 is what hal/actor_classes_ov072.cpp records as
+   a live stack smash. The emitted `C2 04 00` is checked against the LINKED
+   binary, not inferred from these signatures. */
+extern "C" {
+void _ZN18daObjHatenaBlock_c19OnHitFromUnderneathER8dActor_c(void *self, void *other);  /* 28 OnHitFromUnderneath */
+void _ZN18daObjHatenaBlock_c15OnHitByMegaCharER7daPly_c(void *self, void *player); /* 27 OnHitByMegaChar     */
+void _ZN18daObjHatenaBlock_c8OnKickedER8dActor_c(void *self, void *other);  /* 24 OnKicked            */
+void _ZN18daObjHatenaBlock_c11OnAttacked1ER8dActor_c(void *self, void *other);  /* 22 OnAttacked1         */
+void _ZN18daObjHatenaBlock_c15OnGroundPoundedER8dActor_c(void *self, void *other);  /* 21 OnGroundPounded     */
+}
+static int __fastcall qb_under(void *s, void *, void *o)
+{ _ZN18daObjHatenaBlock_c19OnHitFromUnderneathER8dActor_c(s, o); return 0; }
+static int __fastcall qb_mega(void *s, void *, void *p)
+{ _ZN18daObjHatenaBlock_c15OnHitByMegaCharER7daPly_c(s, p); return 0; }
+static int __fastcall qb_kicked(void *s, void *, void *o)
+{ _ZN18daObjHatenaBlock_c8OnKickedER8dActor_c(s, o); return 0; }
+static int __fastcall qb_atk1(void *s, void *, void *o)
+{ _ZN18daObjHatenaBlock_c11OnAttacked1ER8dActor_c(s, o); return 0; }
+static int __fastcall qb_pounded(void *s, void *, void *o)
+{ _ZN18daObjHatenaBlock_c15OnGroundPoundedER8dActor_c(s, o); return 0; }
+
+static int __fastcall qb_d0(void *s, void *)
+{ return (int)(size_t)_ZN18daObjHatenaBlock_cD0Ev((int *)s); }
+
+extern "C" void hal_fill_question_block_vtable(void)
+{
+    void **vt = _ZTV18daObjHatenaBlock_c;
+    ac_fill_shared(vt);
+    vt[0] = (void *)qb_init;
+    vt[3] = (void *)qb_clean;
+    vt[6] = (void *)qb_behavior;
+    vt[9] = (void *)qb_render;
+    vt[12] = (void *)ac_pdes_base;
+    /* The gate-17 reading: the castle grounds' one block is never destroyed
+       -- its own Behavior parks it in state 2 when it is used rather than
+       marking it. Slot 16 is the matched D1; slot 17 is the ROM's own deleting
+       destructor (DTOR-PAIRS seat), the matched flat-C body behind the ecx->arg
+       adapter where the trap stood. */
+    vt[16] = (void *)PORT_D16(qb_d1);
+    vt[17] = (void *)qb_d0;
+    /* 32 slots. Five of the tail are the block's own ov102 bodies: 21
+       OnGroundPounded (0x02149820), 22 OnAttacked1 (0x021497c8), 24 OnKicked
+       (0x02149770), 27 OnHitByMegaChar (0x02149710) and 28
+       OnHitFromUnderneath (0x021496a4) -- the last is how a question block
+       answers being punched from below, so running Actor's do-nothing there
+       would be wrong rather than merely incomplete.
+
+       GATE 203 SEATS ALL FIVE. They were on ac_trapNN because they were in no
+       slice; slice_gate203.txt links them and their one shared helper
+       (func_ov102_02149078). The trap was not a harmless placeholder here: it
+       calls port_actor_slot_decline, the quarantine net catches the fault, and
+       the actor FREEZES for the rest of the level. Every one of these five
+       bodies ends in func_ov102_02149da8(c, 1) -- enter state 1, the bounce,
+       which gate 180 already hosts -- so trapping them is precisely what kept
+       the box from opening while the state table underneath was mounted and
+       correct the whole time. The reported symptom, "softlock when trying to
+       open exclamation box in jrb ship from below", is slot 28's.
+
+       Each is the THREE-parameter veneer: the ROM body is (self, other) and
+       both dispatch sites (src/func_ov002_020eeca8.cpp and the head-bonk host
+       copy unmatched/Player_HeadBonk.cpp) push the argument and expect the
+       CALLEE to pop it. Slot 31 is Platform::Kill, unchanged. */
+    vt[21] = (void *)qb_pounded;
+    vt[22] = (void *)qb_atk1;
+    vt[27] = (void *)qb_mega;
+    vt[28] = (void *)qb_under;
+    vt[31] = (void *)ac_kill;
+
+    /* SLOT 24 IS SEATED with qb_kicked, the block's own OnKicked (ov102
+       0x02149770). The convention conflict that used to block it is closed.
+       Slots 21/22/27/28 above are safe because every linked dispatch site for
+       them is thiscall: the receiver arrives in ECX and the callee pops the one
+       pushed argument, which is what the three-parameter veneer's `ret 4` does.
+       Slot 24's only dispatcher used to be the exception -- _Z19func_ov002_020eeeb8PvPc
+       was CDECL, both arguments pushed and the CALLER cleaning up via a batched
+       `add esp,10h`, which needed a callee that popped NOTHING. That dispatcher
+       is now the thiscall host copy unmatched/Actor_OnKickedDispatch.cpp, so
+       the site pushes one argument and expects the callee to pop it, exactly
+       like the seated slot-24 bodies (ac_kicked, and every override, already
+       emit `ret 4`). qb_kicked is the same three-parameter __fastcall veneer
+       that emits `ret 4`, so it balances the now-thiscall caller.
+
+       The body (_ZN13QuestionBlock8OnKickedER8dActor_c) was already sliced with its four siblings
+       in slice_gate203.txt, and its whole closure is in the link: it consults
+       func_ov102_02149078 (the refusal test, whose zero-argument ClosestPlayer
+       read is already host copied in Actor_ClosestPlayer_OverlayReaders.cpp)
+       and ends in func_ov102_02149da8(c, 1), the state-1 bounce already hosted.
+       It dispatches no vtable slot of its own, so there is no tail chain to
+       seat alongside it. This is the follow-up seat the dispatcher conversion
+       unblocked. */
+    vt[24] = (void *)qb_kicked;
+}

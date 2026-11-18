@@ -1,0 +1,48 @@
+diff --git a/src/engine/link/unit0203d7b8.cpp b/src/engine/link/unit0203d7b8.cpp
+--- a/src/engine/link/unit0203d7b8.cpp
++++ b/src/engine/link/unit0203d7b8.cpp
+@@ -1694,12 +1694,14 @@
+    data_020a0f80.
+    On success store the received set's receivedBitmap in *out and return 1;
+    else 0. */
++#ifndef PORT_WM_SEAM_HOSTED   /* host: the definition only; calls stay on this name. hal/comms_seam.cpp hosts it as a PORT_HOST_ABI seam face */
+ int func_020406b4(unsigned char *sendData, unsigned short *out) {
+     if (WM_StepDataSharing(data_020a0f74, sendData, data_020a0f80) != WM_ERRCODE_SUCCESS)
+         return 0;
+     *out = data_020a0f80->receivedBitmap;
+     return 1;
+ }
++#endif
+ 
+ /* daPly_c aid's packet in the last shared-data step: WM_GetSharedDataAddress
+    on the sharing info data_020a0f74 and received set data_020a0f80.
+@@ -2809,6 +2811,7 @@
+    4. Every frame the local input record data_020a1040 is copied into all
+    four records of data_020a1154, and the channel goes into bits 8-11 of
+    data_020a0f1c. */
++#ifndef PORT_WM_SEAM_HOSTED   /* host: the definition only; calls stay on this name. hal/comms_seam.cpp hosts it as a PORT_HOST_ABI seam face */
+ void func_0203e20c(void) {
+     if (data_020a0f40 != 0 && data_020a0f50 == 3) {
+         data_020a0f50 = 6;
+@@ -3038,6 +3041,7 @@
+         }
+     }
+ }
++#endif
+ 
+ /* The local-only link step (func_0203df40, mode 0): clear the record's 0x8000
+    flag and copy this frame's input record (data_020a1040) into all four
+@@ -3356,11 +3360,13 @@
+ /* Nonzero unless this console is the host: a download-play child
+    (MB_IsMultiBootChild) or any player but 0.
+    func_0203d9b4 is the same test the other way round. */
++#ifndef PORT_HOST_FUNC_0203D974   /* host: the definition only; calls stay on this name. hal/star_flow.cpp hosts it: it reads the console-type halfword at 0x027ffc40, which no host region maps */
+ int func_0203d974(void) {
+     if (MB_IsMultiBootChild())
+         return 1;
+     return data_020a0f10 != 0;
+ }
++#endif
+ 
+ /* Whether player i's record has flag 0x8000 (func_0203df40 sets it in each
+  * frame's local record, data_020a1040). */

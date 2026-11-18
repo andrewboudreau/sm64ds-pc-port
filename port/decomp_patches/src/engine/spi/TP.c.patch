@@ -1,0 +1,118 @@
+diff --git a/src/engine/spi/TP.c b/src/engine/spi/TP.c
+--- a/src/engine/spi/TP.c
++++ b/src/engine/spi/TP.c
+@@ -83,7 +83,19 @@
+     s32 yDotSizeInv;
+ } TPiCalibrateParam;
+ 
++#ifdef _MSC_VER
++/* host: the work struct is not this file's own static. On the DS it is one
++ * 0x38 bss object (tpState, with data_020a80e4 at +0x18), and the host's half
++ * of the other processor (port/hal/tsc_arm7.cpp) waits on, samples into and
++ * reports from that object, which port/hal/scene_boot.cpp hosts inside the
++ * save-state capture. A private copy here would leave the two sides talking
++ * past each other: the ROM's waits would never see a completion, and the
++ * auto-sample indication would never be armed. So the host names that one
++ * object, as every arm9 body did before this TU was promoted. */
++typedef struct TPiWork {
++#else
+ static struct {
++#endif
+     TPRecvCallback callback;
+     TPData buf;
+     u16 index;
+@@ -95,7 +107,23 @@
+     vu16 state;
+     vu16 err_flg;
+     vu16 command_flg;
++#ifdef _MSC_VER
++} TPiWork;
++#include <stddef.h>
++typedef char TPiWork_size_must_be_0x38[sizeof(TPiWork) == 0x38 ? 1 : -1];
++typedef char TPiWork_command_flg_at_0x36[offsetof(TPiWork, command_flg) == 0x36 ? 1 : -1];
++#ifdef __cplusplus
++extern "C" {
++#endif
++extern unsigned char tpState[];      /* the 0x38 run, port/hal/scene_boot.cpp */
++extern unsigned char data_020a80c8[]; /* initial$180, port/hal/tsc_arm7.cpp */
++#ifdef __cplusplus
++}
++#endif
++#define tpState (*(TPiWork *)tpState)
++#else
+ } tpState;
++#endif
+ 
+ static inline BOOL TPi_SamplingNow(void) {
+     if (0 > PXI_SendWordByFifo(PXI_FIFO_TAG_TOUCHPANEL,
+@@ -152,11 +180,18 @@
+     result->validity = (u8)spi_tp.e.validity;
+ }
+ 
++#ifdef _MSC_VER   /* the host compiles this as C++, which wants the enum cast */
++#define TP_HOST_CMD(c) ((TPRequestCommand)(c))
++#define TP_HOST_RES(r) ((TPRequestResult)(r))
++#else
++#define TP_HOST_CMD(c) (c)
++#define TP_HOST_RES(r) (r)
++#endif
+ static inline void TPi_ErrorAtPxi(TPRequestCommand command) {
+     tpState.err_flg |= (1 << command);
+ 
+     if (tpState.callback) {
+-        (tpState.callback)(command, TP_RESULT_PXI_BUSY, 0);
++        (tpState.callback)(TP_HOST_CMD(command), TP_RESULT_PXI_BUSY, 0);
+     }
+ }
+ 
+@@ -170,7 +205,11 @@
+     command = ((result & 0x7f00) >> 8);
+ 
+     if (err) {
++#ifdef _MSC_VER   /* the host compiles this as C++, which wants the enum cast */
++        TPi_ErrorAtPxi((TPRequestCommand)command);
++#else
+         TPi_ErrorAtPxi(command);
++#endif
+         return;
+     }
+ 
+@@ -184,7 +223,7 @@
+         TPi_CopyTpFromSystemWork(&tpState.samplingBufs[tpState.index]);
+ 
+         if (tpState.callback) {
+-            (tpState.callback)(command, TP_RESULT_SUCCESS, (u8)tpState.index);
++            (tpState.callback)(TP_HOST_CMD(command), TP_RESULT_SUCCESS, (u8)tpState.index);
+         }
+ 
+         return;
+@@ -212,7 +251,7 @@
+         tpState.command_flg &= ~(1 << command);
+ 
+         if (tpState.callback) {
+-            (tpState.callback)(command, TP_RESULT_SUCCESS, 0);
++            (tpState.callback)(TP_HOST_CMD(command), TP_RESULT_SUCCESS, 0);
+         }
+ 
+         break;
+@@ -229,7 +268,7 @@
+         tpState.command_flg &= ~(1 << command);
+ 
+         if (tpState.callback) {
+-            (tpState.callback)(command, (result & 0xff), 0);
++            (tpState.callback)(TP_HOST_CMD(command), TP_HOST_RES(result & 0xff), 0);
+         }
+         break;
+ 
+@@ -241,7 +280,11 @@
+ }
+ 
+ void TP_Init(void) {
++#ifdef _MSC_VER   /* host: the ROM's initial$180, hosted next to tpState */
++#define initial (*(vu16 *)data_020a80c8)
++#else
+     static u16 initial = FALSE;
++#endif
+ 
+     if (initial) {
+         return;

@@ -1,0 +1,3 @@
+# Written by port/tools/decomp_overlay.py. These files are byte-exact: never let
+# git convert their line endings (core.autocrlf would corrupt CRLF patches).
+* -text

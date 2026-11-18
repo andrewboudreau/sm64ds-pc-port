@@ -1,0 +1,24 @@
+# The ROM and anything made from it stay on your machine. Never commit them.
+*.nds
+*.sav
+extracted/
+
+# Build output, run output and the asset catalog (made from your ROM).
+/build/
+runs/
+tmpdir/
+/frames/
+playlog/
+*.bmp
+port/tools/_party_out/
+
+# Python and editor noise.
+__pycache__/
+*.pyc
+.venv/
+venv/
+.vs/
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

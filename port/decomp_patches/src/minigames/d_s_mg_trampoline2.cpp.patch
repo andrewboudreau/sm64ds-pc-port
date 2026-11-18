@@ -1,0 +1,111 @@
+diff --git a/src/minigames/d_s_mg_trampoline2.cpp b/src/minigames/d_s_mg_trampoline2.cpp
+--- a/src/minigames/d_s_mg_trampoline2.cpp
++++ b/src/minigames/d_s_mg_trampoline2.cpp
+@@ -114,7 +114,9 @@
+ dScMgTrampoline2_c *dScMgTrampoline2_c_classInit(void);
+ 
+ extern "C" {
++#ifndef _MSC_VER /* host: MSVC rejects a C-linkage redeclaration of a function an earlier line declares C++; the ROM names are C++ (_Z...), so the host drops the extern "C" */
+ extern void Trmp2Spinner_UpdateMatrix(char *c);
++#endif
+ extern Trampoline2ModelFilePtr sTrmp2StarModelFile;
+ extern int sTrmp2SpinnerCount;
+ extern unsigned char *sTrmp2Spinners;
+@@ -125,7 +127,9 @@
+ void func_0203cd80(int *m, short angle);
+ unsigned int d_s_mg_trampoline2NewCleanParticleHold(unsigned int a, unsigned int b, int c, int d,
+                                                     int e, const Vector3_16f *f);
++#ifndef _MSC_VER /* host: MSVC rejects a C-linkage redeclaration of a function an earlier line declares C++; the ROM names are C++ (_Z...), so the host drops the extern "C" */
+ void Jump2Popup_UpdateAll(void);
++#endif
+ extern const VecFx32 sTrmp2RandomSpawnPositions[];
+ extern void func_0203cc28(int *vector, int angle);
+ extern int sTrmpItemsHit;
+@@ -991,7 +995,9 @@
+     sTrmp2StarModelFile.Release();
+ }
+ 
++#ifndef _MSC_VER /* host: MSVC rejects a C-linkage redeclaration of a function an earlier line declares C++; the ROM names are C++ (_Z...), so the host drops the extern "C" */
+ extern "C" {
++#endif
+ void Trmp2Spinner_LoadAll(int x, int count) {
+     int i;
+     sTrmp2Spinners = (unsigned char *)x;
+@@ -1000,9 +1006,13 @@
+         Trmp2Spinner_SetModel((sTrmp2Spinners + i * 0x78));
+     }
+ }
++#ifndef _MSC_VER
+ }
++#endif
+ 
++#ifndef _MSC_VER /* host: MSVC rejects a C-linkage redeclaration of a function an earlier line declares C++; the ROM names are C++ (_Z...), so the host drops the extern "C" */
+ extern "C" {
++#endif
+ void Trmp2Spinner_InitAll(int hitCount) {
+     int i = 0;
+     int n = sTrmp2SpinnerCount;
+@@ -1022,9 +1032,13 @@
+         p += 0x78;
+     } while (i < sTrmp2SpinnerCount);
+ }
++#ifndef _MSC_VER
+ }
++#endif
+ 
++#ifndef _MSC_VER /* host: MSVC rejects a C-linkage redeclaration of a function an earlier line declares C++; the ROM names are C++ (_Z...), so the host drops the extern "C" */
+ extern "C" {
++#endif
+ void Trmp2Spinner_HideAll(void) {
+     int i = 0;
+     if (sTrmp2SpinnerCount > 0) {
+@@ -1036,9 +1050,13 @@
+         } while (i < sTrmp2SpinnerCount);
+     }
+ }
++#ifndef _MSC_VER
+ }
++#endif
+ 
++#ifndef _MSC_VER /* host: MSVC rejects a C-linkage redeclaration of a function an earlier line declares C++; the ROM names are C++ (_Z...), so the host drops the extern "C" */
+ extern "C" {
++#endif
+ void Trmp2Spinner_UpdateAll(void) {
+     int i;
+     for (i = 0; i < sTrmp2SpinnerCount; i++) {
+@@ -1048,9 +1066,13 @@
+         }
+     }
+ }
++#ifndef _MSC_VER
+ }
++#endif
+ 
++#ifndef _MSC_VER /* host: MSVC rejects a C-linkage redeclaration of a function an earlier line declares C++; the ROM names are C++ (_Z...), so the host drops the extern "C" */
+ extern "C" {
++#endif
+ void Trmp2Spinner_UpdateMatricesAll(void) {
+     int i;
+     for (i = 0; i < sTrmp2SpinnerCount; i++) {
+@@ -1060,7 +1082,9 @@
+         }
+     }
+ }
++#ifndef _MSC_VER
+ }
++#endif
+ 
+ void Trmp2Spinner_SetModel(void *raw) {
+     BMD_File *file = dExtSimpleModel_c::LoadFile(sTrmp2StarModelFile);
+@@ -1127,7 +1151,11 @@
+     VEC_Add(&SPINNER(raw)->mPos, &SPINNER(raw)->mVel, &SPINNER(raw)->mPos);
+ }
+ 
++#ifdef _MSC_VER /* host: MSVC rejects a C-linkage redeclaration of a function an earlier line declares C++; the ROM names are C++ (_Z...), so the host drops the extern "C" */
++void Trmp2Spinner_UpdateMatrix(char *raw) {
++#else
+ extern "C" void Trmp2Spinner_UpdateMatrix(char *raw) {
++#endif
+     Matrix4x3_FromTranslation(&data_020a0e68, SPINNER(raw)->mPos.x, SPINNER(raw)->mPos.y,
+                               SPINNER(raw)->mPos.z);
+     Matrix4x3_ApplyInPlaceToRotationZ(&data_020a0e68, SPINNER(raw)->mAngleZ);

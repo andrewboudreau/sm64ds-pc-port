@@ -1,0 +1,645 @@
+// ---- THE FRAME LOOP HANDS Stage::Behavior BACK ---------------------------
+//
+// (run link100, lane FRAME.) port/stage_lifecycle_map.txt sections 12b and 12c
+// named the one thing that had kept _ZTV5Stage slots 6 and 9 on host occupants
+// through five Stage lanes, and it was never a missing symbol:
+//
+//     THE PORT'S FRAME LOOP IS THE STAGE.
+//
+// tests/walk_window.cpp carried Stage::Behavior transcribed statement by
+// statement -- Stage::CheckInput in the input block, ShadowModel::CleanAll and
+// _ZN11KuppaScript7ProcessEv above the actor tick, the message pump and the VS
+// countdown below it -- with the freeze-mask latch in hal/actor_registry.cpp
+// and the countdown body in hal/star_flow.cpp. Seating slot 6 on the ROM's own
+// body without retiring those runs the cutscene script twice a frame.
+//
+// This file is the small half of that job: the FACES the ROM's body needs in
+// order to be called at all, and the entry point hal/stage_bridges.cpp's slot-6
+// thunk dispatches into. The frame-loop surgery itself is in
+// tests/walk_window.cpp; the accounting is section 13.
+//
+// SLOT 9 IS NOT HERE. Stage::Render stays on its host occupant this lane, for
+// the reason section 13's own slot-9 half measures.
+//
+// WHY A SEPARATE FILE AND NOT hal/stage_bridges.cpp. That file includes
+// "Stage.h", and include/Stage.h is generated from matched-function evidence:
+// it declares CleanupResources, LoadFog, LoadSkybox, LoadTextureTransformers,
+// OnPendingDestroy, RenderFog, RenderModel and RenderModelTransparent, and it
+// does NOT declare Behavior or Render. A translation unit cannot declare class
+// Stage twice, so the members this file needs cannot be added beside that
+// include -- and adding them to the generated header would put them in every
+// TU that includes it. One file, one declaration, no header change.
+//
+// EVERY SPELLING BELOW IS READ OUT OF THE ROM TU THAT PUBLISHES IT, not
+// guessed. MSVC encodes access, static-vs-instance, the calling convention and
+// the return type into a decorated name, so `static void PS_Cleanup()` and
+// `void PS_Cleanup()` are two different symbols and a face that picks the wrong
+// one links against nothing. The table is:
+//
+//   what Stage::Behavior SPELLS                   what the matched TU PUBLISHES
+//   ------------------------------------------   -----------------------------
+//   ?Behavior@Stage@@QAEHXZ                       itself   (_ZN5Stage8BehaviorEv.cpp)
+//   ?CheckCameraInput@Stage@@SAXXZ                itself   (_ZN5Stage16CheckCameraInputEv.cpp)
+//   ?LC_Update@Stage@@SAXXZ                       itself   (_ZN5Stage9LC_UpdateEv.cpp)
+//   ?PS_Update@Stage@@SAXXZ                       itself   (_ZN5Stage9PS_UpdateEv.cpp)
+//   ?PS_Init@Stage@@SAXXZ                         itself   (_ZN5Stage7PS_InitEv.cpp -- the .cpp, see below)
+//   ?StartSceneFade@dScene_c@@SAXIIG@Z               itself   (already in the image)
+//   ?StopTimer@Timer@@QAEXXZ                      itself   (already in the image)
+//   ?CleanAll@ShadowModel@@SAXXZ                  itself   (already in the image)
+//   ---- these THREE the tree already had plumbing for; see below ----
+//   ?CheckInput@Stage@@QAEXXZ                     _ZN5Stage10CheckInputEv
+//   ?CanPause@Stage@@SAHXZ                        _ZN5Stage8CanPauseEv
+//   ?IsPauseDisabled@Stage@@SAHXZ                 _ZN5Stage15IsPauseDisabledEv
+//   ---- and these FOUR are what this file is for ----
+//   ?PS_Cleanup@Stage@@SAXXZ                      _ZN5Stage10PS_CleanupEv       (flat C name)
+//   ?VE_Init@Stage@@SAXXZ                         _ZN5Stage7VE_InitEv           (flat C name)
+//   ?VE_Update@Stage@@SAXXZ                       _ZN5Stage9VE_UpdateEv         (flat C name)
+//   ?SetSceneToSpawn@dScene_c@@SAXII@Z               _ZN8dScene_c15SetSceneToSpawnEjj (flat C name)
+//
+// THE FOUR ARE A PURE SPELLING DIFFERENCE and the faces below are one-line
+// forwarders. All are __cdecl on both sides -- a `static` member is __cdecl in
+// MSVC, and so is a flat C function -- so each forward is a call and nothing
+// else.
+//
+// THE THREE ABOVE THEM ARE NOT THIS FILE'S, AND THAT IS A CORRECTION.
+// This file carried faces for them and the build refused it:
+// port/tools/alternatename_guard.py reported three NEW defeated aliases,
+// because hal/w8a_stage_faces.cpp:133-136 has carried
+//
+//     /alternatename:?CanPause@Stage@@SAHXZ=__ZN5Stage8CanPauseEv
+//     /alternatename:?IsPauseDisabled@Stage@@SAHXZ=__ZN5Stage15IsPauseDisabledEv
+//     /alternatename:?CheckInput@Stage@@QAEXXZ=__ZN5Stage10CheckInputEv
+//
+// since lane w8a, and a face DEFINES the left-hand side, which makes an alias
+// inert. That file says exactly what it was waiting for: "ALL FIVE ARE INERT
+// TODAY. Their LHS is referenced only by Stage::Behavior, Stage::Render and
+// Stage::RenderNumber, none of which is in this lane's slice ... They land now
+// with their provenance so the piece that adds those bodies adds translation
+// units and not plumbing." This is that piece. The faces are deleted and the
+// aliases fire. ?CheckInput@Stage@@QAEXXZ is __thiscall against a __cdecl
+// target, which the alias survives for the reason a face would have: neither
+// spelling takes a stack argument and both clean zero bytes, so the only
+// difference is an ecx the flat-C body never reads.
+//
+// AND ONE MORE NAME IS NOT A SPELLING DIFFERENCE AT ALL, AND MUST NOT BE READ
+// AS ONE.
+// ?UpdateMessage@Stage@@SAXXZ is what Stage::Behavior spells;
+// src/_ZN5Stage13UpdateMessageEv.cpp declares the method NON-static and so
+// publishes ?UpdateMessage@Stage@@QAEXXZ. Renaming that gap away would be a
+// mistake, because the matched TU is a STUB in a second and worse way:
+// it defines its OWN empty Message::UpdateWindow, Message::Update,
+// Message::DisplaySaving and SaveData::SaveCurrentFile locally and calls those,
+// so linking it would tick nothing at all -- the message box would be driven by
+// four empty bodies. hal/message_pump.cpp is the port's answer to that and has
+// been since it was written: port_message_pump IS Stage::UpdateMessage's body,
+// statement for statement, calling the REAL matched Message methods. So the
+// face points there. The stub stays out of the link, and hal/message_pump.cpp's
+// header keeps the whole derivation.
+//
+// PS_Init HAS TWO FILES WITH THE SAME STEM. src/_ZN5Stage7PS_InitEv.cpp is flat C
+// and publishes _ZN5Stage7PS_InitEv; src/_ZN5Stage7PS_InitEv.cpp declares
+// `struct Stage { static void PS_Init(); }` and publishes ?PS_Init@Stage@@SAXXZ,
+// which is what Stage::Behavior calls. config/match_attempts.jsonl records the
+// .cpp as the matching attempt (0 divergences). port/slice_gate220.txt enrols
+// the .cpp ONLY -- both would give CMake two objects with one name in one
+// directory -- and there is deliberately no face here, because a face would
+// make the choice look optional.
+
+#include <cstdio>
+#include <cstdlib>
+
+
+extern "C" {
+/* the flat-C matched bodies the faces below forward to */
+void _ZN10dScStage_c10PS_CleanupEv(void);
+void _ZN10dScStage_c7VE_InitEv(void);
+void _ZN10dScStage_c9VE_UpdateEv(void);
+void _ZN8dScene_c15SetSceneToSpawnEjj(unsigned int a, unsigned int b);
+/* Stage::UpdateMessage's body, on the port: hal/message_pump.cpp */
+void port_message_pump(void);
+/* run link100, lane RENDER9: the flat-C matched bodies slot 9's faces forward
+   to. Each is a real ROM body already compiled into this link; what is missing
+   is only the MSVC spelling src/_ZN5Stage6RenderEv.cpp calls them by. */
+void _ZN10dScStage_c21RenderVsModeCountdownEv(void);
+void _ZN5dPa_c6UpdateEv(void *self);
+void _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(int draw, void *obj, int px,
+                                              int py, int pal, int prio,
+                                              void *mtx);
+}
+
+/* The class, declared exactly the way the ROM TU declares it -- public
+   members, non-static Behavior, static everything else. This is a DECLARATION
+   of the ROM's own methods, not a second definition of the class the port uses;
+   nothing here has storage. */
+class dScStage_c {
+public:
+    /* the ROM bodies this file's two lanes seat. Defined in src/, not here. */
+    virtual int  Behavior();   /* main declares both virtual (UAEHXZ); */
+    virtual int  Render();     /* the qualified calls stay direct */
+    /* the faces */
+    static void PS_Cleanup();
+    static void UpdateMessage();
+    static void VE_Init();
+    static void VE_Update();
+    /* run link100, lane RENDER9 -- slot 9's own four. One is a spelling face
+       and three are seams; the blocks below say which and why. */
+    static void RenderVsModeCountdown();
+    static void RenderVsModeNewStar();
+    static void PS_Render();
+    static void LC_Render();
+};
+
+/* Scene::SetSceneToSpawn is the same shape one class over. Stage::Behavior's
+   level-change arm spells the static member ?SetSceneToSpawn@dScene_c@@SAXII@Z,
+   and src/_ZN8dScene_c15SetSceneToSpawnEjj.cpp -- already in the image on
+   port/slice_gate10.txt -- is flat C. Declared here rather than taken from a
+   header for the same reason class Stage is: this file must not pull in a
+   second declaration of either class. */
+class Scene {
+public:
+    static void SetSceneToSpawn(unsigned int a, unsigned int b);
+};
+
+/* ---- the faces ---------------------------------------------------------- */
+
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync): main's tree defines these
+   three as real Stage statics now, so src/ emits ?PS_Cleanup@Stage@@SAXXZ,
+   ?VE_Init@Stage@@SAXXZ and ?VE_Update@Stage@@SAXXZ itself and these faces
+   were the second definition (LNK2005). UpdateMessage stays: it is a host
+   substitution, not a forward to a ROM body.
+void Stage::PS_Cleanup()            { _ZN5Stage10PS_CleanupEv(); }
+void Stage::VE_Init()               { _ZN5Stage7VE_InitEv(); }
+void Stage::VE_Update()             { _ZN5Stage9VE_UpdateEv(); }             */
+void dScStage_c::UpdateMessage()         { port_message_pump(); }
+void Scene::SetSceneToSpawn(unsigned int a, unsigned int b)
+{ _ZN8dScene_c15SetSceneToSpawnEjj(a, b); }
+
+/* ---- SLOT 9's SPELLING FACES (run link100, lane RENDER9) ------------------
+ *
+ * Same reading as the block above: src/_ZN5Stage6RenderEv.cpp declares its own
+ * local classes and so SPELLS the MSVC decorated names, while the matched
+ * bodies these forward to are flat C. All three are __cdecl on both sides -- a
+ * `static` member is __cdecl in MSVC, a member of a nested class taking no
+ * argument but the receiver is __thiscall on both -- so each is a call and
+ * nothing else.
+ *
+ *   ?RenderVsModeCountdown@Stage@@SAXXZ     _ZN5Stage21RenderVsModeCountdownEv
+ *       Already in the image on port/slice_gate27.txt and /OPT:REF-dropped
+ *       until today, because Stage::Render was its only caller.
+ *   ?Update@SysTracker@Particle@@QAEXXZ     _ZN5dPa_c6UpdateEv
+ *       Reached through hostgen (port/slice_gate29.txt). __thiscall on the
+ *       face and __cdecl on the target, which is the CheckInput shape one
+ *       block up in reverse: the receiver is a real argument here, so the face
+ *       PASSES it rather than dropping it, and neither side has a stack
+ *       argument to disagree about. hal/particle_bridges.cpp calls the same
+ *       body with the same `(char *)stage + 0x50` receiver; its
+ *       port_particle_frame call site is retired in this commit.
+ *   ?Render@OAM@@SAH_NPAUOamAttr@@HHHHPAUMatrix2x2@@@Z
+ *       The seven-argument OAM::Render, port/slice_gate27.txt. The recovered
+ *       source declares it returning int and the matched body is void; the ROM
+ *       leaves r0 holding whatever the body left there and Stage::Render
+ *       discards the value at both of its two call sites, so the face returns
+ *       0 rather than inventing a meaning for a register nobody reads. */
+
+/* ---- TWO MORE THINGS SLOT 9's CLOSURE NEEDS, AND NEITHER IS A FACE --------
+ *
+ * ONE: MI_Copy32B. G3X::SetFogTable's whole body is `MI_Copy32B(table,
+ * (void *)0x4000360)` and src/Copy32Bytes.c is ARM ASSEMBLY -- a six-line
+ * ldmia/stmia block MSVC cannot assemble. port/slice_w8a.txt named this as one
+ * of the walls in front of Stage::RenderFog and it is the only one left.
+ *
+ * hal/model_host.cpp already hosts its SIBLING for the same reason and with the
+ * same marker -- MIi_CpuCopyFast, "PORT_HOST_ABI: ARM asm primitive (32-byte
+ * block copy), MSVC cannot assemble" -- so this is the established shape rather
+ * than a new liberty, and it belongs beside that one the day anybody owns that
+ * file. THE ARITY IS NOT GUESSED: the ARM body takes r0 and r1 and every caller
+ * in the corpus is src/_ZN3G3X11SetFogTableEPv.cpp, which declares it
+ * `void MI_Copy32B(void *, void *)` and passes (src, dst) in that order. There
+ * is no second caller to disagree with, checked across all of src/.
+ * PORT_HOST_ABI: ARM asm primitive (32-byte block copy), MSVC cannot assemble.
+ *
+ * TWO: data_020755b8's SPELLING. src/_ZN5Stage12RenderNumberEhiibi.cpp declares
+ * `extern unsigned char data_020755b8[];` OUTSIDE its one-line extern "C", so
+ * the reference is C++-mangled, exactly as the same file's func_020aba70 is --
+ * hal/w8a_stage_faces.cpp landed an alias for that one and wrote down why. The
+ * ROM bytes are emitted flat by port/tools/romdata.py (a named row this lane
+ * added: four bytes, relocation-free, delta-to-next-symbol exact), so the two
+ * names are the same address and the alias is exact. It is an ALIAS rather than
+ * a face because a face would have to DEFINE the array, which means either a
+ * second copy of the ROM's bytes or hand-typed constants -- and romdata.py's
+ * own header says a hand-typed constant is "a value nobody can re-derive from
+ * the image". */
+
+/* PORT_HOST_ABI: ARM asm primitive (32-byte block copy), MSVC cannot assemble.
+ * TAG MOVED HERE, run link100 wave 14, lane SHADOWS3. The identical ruling is
+ * already written twenty lines up, inside the block comment, and
+ * hal/model_host.cpp carries it verbatim for this function's sibling
+ * MIi_CpuCopyFast -- but linkage.py binds a reason to the first CODE line
+ * under the tag and a blank line ends the run, so the tag up there documented
+ * nothing and this row read as owed work. src/Copy32Bytes.c is seven ARM
+ * instructions (three ldmia/stmia pairs and a bx lr) in an `asm` block; there
+ * is no C form of it to seat, now or later. The arity argument above still
+ * stands unchanged: r0 and r1, one caller, src/_ZN3G3X11SetFogTableEPv.cpp,
+ * passing (src, dst) in that order. */
+extern "C" void MI_Copy32B(void *src, void *dst)
+{
+    const unsigned char *s = (const unsigned char *)src;
+    unsigned char *d = (unsigned char *)dst;
+    for (int i = 0; i < 32; ++i)
+        d[i] = s[i];
+}
+
+#pragma comment(linker, "/alternatename:?data_020755b8@@3PAEA=_data_020755b8")
+
+struct OamAttr;
+struct Matrix2x2;
+
+struct OAM {
+    static int Render(bool, OamAttr *, int, int, int, int, Matrix2x2 *);
+};
+
+struct Particle {
+    struct SysTracker {
+        void Update();
+    };
+};
+
+/* RETIRED at ALIAS2 (wave 8, the main -> port sync): both bodies below are
+   defined by the tree itself now. Stage::RenderVsModeCountdown comes out of
+   src/ as ?RenderVsModeCountdown@Stage@@SAXXZ; Particle::SysTracker::Update
+   comes out of the hostgen copy of src/_ZN8Particle10SysTracker6UpdateEv.cpp
+   as ?Update@SysTracker@Particle@@QAEXXZ. Both faces were the second
+   definition (LNK2005).
+void Stage::RenderVsModeCountdown() { _ZN5Stage21RenderVsModeCountdownEv(); }
+
+void Particle::SysTracker::Update()
+{ _ZN5dPa_c6UpdateEv(this); }                                 */
+
+int OAM::Render(bool draw, OamAttr *obj, int px, int py, int pal, int prio,
+                Matrix2x2 *mtx)
+{
+    _ZN3OAM6RenderEbP7OamAttriiiiP9Matrix2x2(draw ? 1 : 0, (void *)obj, px, py,
+                                             pal, prio, (void *)mtx);
+    return 0;
+}
+
+/* ---- SLOT 9's SEAMS (run link100, lane RENDER9; two of the three retired by
+ * run linkfull, lane S42D) ---------------------------------------------------
+ *
+ * Stage::PS_Render, Stage::LC_Render and Stage::RenderVsModeNewStar were three
+ * of section 6's twelve pieces, and the three RENDER9 did not enrol. Every one
+ * was a MATCHED body sitting in src/ ready to link; what none of them had was
+ * its SPRITE TEMPLATE DATA -- ov002 OamAttr records at 0x0210c548..0x0210d188
+ * and the ov001 span 0x020abd98..0x020ad450 past the 0x020ab800..0x020abb00
+ * run port/ov001_syms.txt mounted. port/stage_lifecycle_map.txt section 6
+ * called this exactly ("a row in port/ov002_syms.txt -- the mount lane's
+ * file, not this one's") and section 13c kept it on the blocked list for the
+ * same reason. port/slice_slot9.txt lists every symbol each one wants.
+ *
+ * TWO OF THE THREE ARE THE ROM'S OWN BODIES NOW. port/ov002_syms.txt carries
+ * the eight OamAttr rows PS_Render reads (OAM::PAUSE, VS_PAUSE, MM_SMALL_STAR,
+ * TINY_STAR, the two arrows and the two small arrows) and the ten LC_Render
+ * reads (0x0210caf4..0x0210cfa0, the level-clear banner's text sprites, five
+ * languages by two texts); port/ov001_syms.txt carries the whole controller-
+ * mode text span (21 symbols: five per-language pointer tables, incl.
+ * OAM::CONTROLLER_MODE_TEXTS, and the sixteen lists they point at, the
+ * sixteen interior pointers rebased by ovdata's own pass). With the data
+ * hosted, src/_ZN5Stage9PS_RenderEv.cpp and src/_ZN5Stage9LC_RenderEv.cpp
+ * compile in place of the two seams that stood here (port/slice_w31_s42d.txt,
+ * the two window targets, the same two this file is on). What they draw:
+ *   PS_Render  while paused (Stage::PS_Update's states): on the TOP screen the
+ *              course's star row (MM_SMALL_STAR / SMALL_STAR_EMPTY), the coin
+ *              record (COIN, TIMES, RenderNumber), and on the controller-mode
+ *              page the mode's title sprite (CONTROLLER_MODE_TEXTS[mode], one
+ *              table per language); on the TOUCH screen the PAUSE sprite, the
+ *              course arrows, and the TINY_STAR cursor beside the chosen row.
+ *   LC_Render  while the level-clear (star-get) save menu is up: the banner's
+ *              text sprites on the TOP screen -- the second text on a NEW
+ *              COIN RECORD (LC_Update sets sLevelClearNewRecord), the first on the
+ *              courses 15..20 -- and, every frame the menu is up, the ROM's
+ *              own palette cycle (LoadFile 0x25a -> GX::LoadOBJPltt slot
+ *              0x1c0) that animates them. On an ordinary star with no new
+ *              record it draws nothing, exactly as the cartridge does.
+ *
+ * RenderVsModeNewStar STAYS A SEAM: its five ov002 rows (0x0210cfd0..0x0210d188,
+ * OAM::VS_NEW_STAR_APPEARED and four more) are not mounted, and the body is VS
+ * (parked by ruling). It keeps RENDER9's shape and reason: LOUD ONCE, named,
+ * never aborting -- Stage::Render's next statement is correct either way. It
+ * was behaviour-neutral against what it replaced (Stage::Render never ran
+ * before RENDER9, so nothing drew the VS popup), and still is. */
+
+static void slot9_seam(const char *what, const char *why)
+{
+    std::fprintf(stderr,
+                 "[stageframe] SEAM: %s (_ZTV10dScStage_c slot 9, dScStage_c::Render) is "
+                 "not hosted -- %s. See port/slice_slot9.txt and "
+                 "port/stage_lifecycle_map.txt section 18.\n", what, why);
+}
+
+/* THE ONE SPELLING PS_Render NEEDS. Its matched source calls the timer-digit
+ * renderer by the flat name _ZN5Stage12RenderNumberEhiibi (extern "C"), and
+ * this link holds only the decorated static member
+ * ?RenderNumber@Stage@@SAXEHH_NH@Z, from src/_ZN5Stage12RenderNumberEhiibi.cpp
+ * on port/slice_slot9.txt (Stage::Render's own OAM block reaches it that
+ * way). Same body, same shape: a static member takes no receiver, so both
+ * spellings are __cdecl with the five arguments on the stack, and the bool
+ * fourth argument is pushed as a full word from either side. The
+ * RenderBouncingArrows row in hal/cxx_aliases.cpp is the precedent; this one
+ * lives beside the retired seam rather than in that file because it exists
+ * for slot 9 alone. */
+#pragma comment(linker, "/alternatename:__ZN10dScStage_c12RenderNumberEhiibi=?RenderNumber@dScStage_c@@SAXEHH_NH@Z")
+
+/* RenderVsModeNewStar is the ROM's own body now: src/_ZN10dScStage_c19RenderVsModeNewStarEv.cpp
+ * is on port/slice_w31_s42d.txt and its five ov002 rows are mounted by port/ov002_syms.txt
+ * (run hunt8, lane WIGGLER1). */
+
+/* ---- TWO MORE FACES, AND THEY ARE NOT SPELLING FIXES --------------------
+ *
+ * The eleven above forward one __cdecl name to another and an /alternatename
+ * would have done the same job. These two would NOT: both targets are
+ * __thiscall INSTANCE methods and both callers are __cdecl with the receiver
+ * (or the argument) on the stack, so an alias would leave the callee reading
+ * ecx for a receiver nobody put there and cleaning a number of bytes the
+ * caller also cleans. That is the wrong-arity raw cast that smashes the stack
+ * on first exercise, and it is why every row in the block generated for this
+ * gate was checked for its convention rather than only for its name.
+ *
+ * daPly_c::CanPause. src/func_02029408.c calls `func_020bd828(gPlayers
+ * [gLocalPlayerId])` -- one __cdecl argument, the local player. 0x020bd828 is
+ * _ZN7daPly_c8CanPauseEv in config/arm9/overlays/ov002/symbols.txt line 435,
+ * and src/game/player/Player.cpp compiles it as a real C++ method against
+ * Player.h, so it publishes ?CanPause@daPly_c@@QAEHXZ and takes its receiver in
+ * ecx. The face moves the argument into the receiver, which is what the ARM
+ * call did with r0.
+ *
+ * Message::Display. Same shape and worth reading twice, because the recovered
+ * source looks like it has an argument it does not use. src/_ZN7Message7Display
+ * Ej.cpp declares `void Message::Display(unsigned int msg)` and its body never
+ * mentions `msg` -- it passes `this` to _ZN7Message11DisplayTextEi, whose own
+ * TU defines it as `void (unsigned short t)`. So the ROM's function takes ONE
+ * value in r0 and the recovery modelled that value as the receiver; `msg` is
+ * the register nothing wrote. The caller (src/_ZN5Stage9PS_UpdateEv.cpp:204,
+ * `_ZN7Message7DisplayEj(data_020756d0[sPauseDisplayedCourse])`) passes exactly that
+ * one value. The face therefore hands the argument in as the RECEIVER and
+ * anything at all as msg, which reproduces the register state the ARM caller
+ * left. */
+
+class Message {
+public:
+    /* main's Message.h now declares it static void Display(u32 msg): the one
+       value the ARM caller left in r0 is the argument, not a receiver. */
+    static void Display(unsigned int msg);
+};
+
+class daPly_c {
+public:
+    int CanPause();
+};
+
+extern "C" void _ZN7Message7DisplayEj(int m)
+{ Message::Display((unsigned)m); }
+
+extern "C" int func_020bd828(void *p)
+{ return ((daPly_c *)p)->daPly_c::CanPause(); }
+
+/* ---- func_020199a4: RETIRED (catchup1 Stage C round 2) -------------------
+ * Stage::Behavior's VS arm calls it past data_0209fcc8 >= 7. It used to be a
+ * loud host seam because its closure (the DS heap allocator and the IRQ
+ * primitives) was not linked. SLICE4 (dadb2f5e253) links
+ * src/unnamed/arm9/0201/func_020199a4.c whole with that closure, so the ROM
+ * body answers the call and the seam here was a second definition. */
+
+/* ---- the entry point hal/stage_bridges.cpp dispatches into ---------------
+ *
+ * The slot thunks there are __fastcall with a dummy second parameter, which is
+ * how every seat in that family carries a __thiscall receiver. The ROM's
+ * Stage::Behavior is __thiscall int(void), so the thunk hands the receiver
+ * straight through and returns what the ROM returns -- 1 on every path, which
+ * is the "this pass succeeded" code the behaviour Process reads.
+ *
+ * THE COUNTER IS NOT DECORATION. port/tools/stage_pause_proof.py needs to know
+ * that the ROM's body ran EXACTLY ONCE per frame, which is the whole hazard
+ * port/stage_lifecycle_map.txt section 12b named: a seat that leaves a
+ * transcribed statement behind in the frame loop runs the kuppa script twice
+ * and every cutscene in the game plays at double speed. An exit code cannot see
+ * that and a screenshot cannot either. It is incremented by the thunk itself,
+ * so it cannot disagree with what ran. SM64DS_STAGE_FRAME_COUNT=1 prints the
+ * total at process exit; unset, one increment is all this costs.
+ *
+ * AND THE FRAME LOOP READS IT LIVE. tests/walk_window.cpp compares it across a
+ * frame to tell "the Stage ticked" from "it did not", which is the question its
+ * three Stage-less frames (the debug menu, and the two no-spawn dev-rig arms)
+ * raise and a DS frame never does. */
+
+static unsigned g_beh_calls;
+
+static unsigned g_ren_calls;
+
+static void stage_frame_report(void)
+{
+    std::fprintf(stderr, "[stageframe] dScStage_c::Behavior ran %u time(s), "
+                 "dScStage_c::Render ran %u time(s)\n", g_beh_calls, g_ren_calls);
+}
+
+static void stage_frame_arm(void)
+{
+    static int armed;
+    if (armed)
+        return;
+    armed = 1;
+    if (std::getenv("SM64DS_STAGE_FRAME_COUNT"))
+        std::atexit(stage_frame_report);
+}
+
+extern "C" unsigned port_stage_behavior_calls(void) { return g_beh_calls; }
+
+/* THE Ctrl BRIDGE RUNS HERE, and the placement is the point.
+
+   The port hosts five interior fields of the ROM's Ctrl block as SEPARATE
+   arrays (data_0209f4a0/a2/a4/a6/ac), so it needs a copy the cartridge does
+   not: on hardware every actor reads data_0209f498 + N*0x18 directly, and
+   Stage::Behavior's own CheckInput is what fills it. The copy therefore
+   belongs at exactly the instant the ROM's write finishes -- after
+   Stage::Behavior returns, before any other actor's Behavior runs -- and
+   that instant is this line.
+
+   tests/walk_window.cpp defines port_frame_ctrl_publish and its banner
+   carries the measurement: the same copy placed BELOW port_actor_tick hands
+   src/_ZN6Player8BehaviorEv.cpp:170 last frame's stick, which is a
+   one-frame input lag on every walk in the game.
+
+   NOT A CALL THE ROM MAKES, and this file is not going to blur that. It is a
+   host bridge at a ROM boundary; it moves nothing of the ROM's and adds
+   nothing to what Stage::Behavior does. */
+extern "C" void port_frame_ctrl_publish(void);
+
+extern "C" unsigned char data_0209f49c[], data_0209f49e[], data_0209f4a0[],
+                         data_0209f4a2[], data_0209f4a4[], data_0209f4a6[],
+                         data_0209f4a8[], data_0209f4a9[], data_0209f4ac[];
+extern "C" int data_0209f498[];
+
+/* A SECOND COPY, AND IT RUNS BEFORE Stage::Behavior, NOT AFTER.
+
+   On the cartridge Ctrl is one block, four 0x18-byte records at
+   data_0209f498, and two ROM functions clear its button words every frame
+   through that one spelling: Stage::CheckCameraInput zeroes held and
+   pressed over gNumPlayers records, and Stage::CheckInput, when it does
+   not reach main_part, walks a LITERAL FOUR records and zeroes touching,
+   delay, cnt, mag, nx, ny, ang, held and pressed in each. Stage::Behavior
+   calls both, then _ZN11KuppaScript7ProcessEv, then the actor walk -- so on
+   hardware a cutscene script writes the characters' records strictly
+   between the ROM's clear and the ROM's read, every frame.
+
+   The port does not host Ctrl as one block. Seven of its interior fields
+   are separate objects (data_0209f49c/9e/a0/a2/a4/a6/ac, declared above),
+   and port_frame_ctrl_publish -- this file's own bridge, called AFTER
+   Stage::Behavior below -- is what carries data_0209f498 out to them,
+   bounded by the live player count (gNumPlayers, which InitResources
+   sets from the ROM's own single-player byte and which SetNumPlayers only
+   raises for VS). So the ROM's clear of records 1, 2 and 3 never reached
+   the split objects: CheckInput zeroes them inside data_0209f498, but the
+   only copy out of that struct runs after Stage::Behavior, which is after
+   _ZN11KuppaScript7ProcessEv has already written the cutscene's press into the
+   split objects for this frame. Records 1..3 of the split objects were
+   therefore written by the opening's own script command
+   (src/func_ov002_020bd3a0.c, the ONLY writer of data_0209f49e in all of
+   src/) and by nothing else, ever -- one scripted press stayed set for
+   every later frame, so the driven characters kept re-entering
+   St_Jump_Init / St_PunchKick_Init instead of walking to the castle.
+
+   The existing copy below cannot simply be widened to four records where
+   it stands: it runs after _ZN11KuppaScript7ProcessEv, so a four-slot loop there
+   would immediately overwrite the script's own press with data_0209f498's
+   (still-scripted, not-yet-recleared) contents -- INPUT1 measured exactly
+   that failure shape, the puppets' split records pinned at the script's
+   values with no cartridge clear ever landing.
+
+   So this copy runs at the HEAD of the frame instead, before the ROM's own
+   Stage::Behavior (and therefore before CheckInput's clear and before
+   _ZN11KuppaScript7ProcessEv). That is equivalent to the cartridge, not a
+   deviation from it: CheckInput's clear branch writes the SAME zeros every
+   frame it fires, so priming the split objects with the previous frame's
+   already-cleared struct value carries forward a value the ROM was about
+   to write again anyway. The width is a literal four -- the ROM's own
+   Ctrl block width and the bound of CheckInput's own clear loop -- not
+   gNumPlayers, because CheckInput's clear reaches all four records
+   regardless of live player count; only the post-Behavior publish below is
+   bounded by player count, because that is the copy that feeds actors that
+   read player state. */
+/* PLAY093 (the ending: "Mario does not walk into the castle with the others"). What this prime wrote, so that port_ctrl_script_wrote can say
+   which split fields a Kuppa script changed after it. The script's player commands (func_ov002_020bd4e0 and the other walk / press commands)
+   write the split fields at data_0209f4xx + mPlayerNo * 0x18 inside _ZN11KuppaScript7ProcessEv, which runs AFTER CheckInput's clear on the cartridge
+   and so wins over it; port_frame_ctrl_publish copied the cleared block over the split for every live player (gNumPlayers, 1 outside VS),
+   which erased the script's walk for the local Mario (slot 0) while the other characters (extra Player actors, slots 1..3, not counted live)
+   kept theirs and walked in alone. */
+static short g_pr_s[4][6];
+static unsigned char g_pr_b[4][3];
+
+extern "C" int port_ctrl_script_wrote(int pi, int fld)
+{
+    extern unsigned char *gRunningKuppaScript;      /* the running Kuppa script, 0 when none */
+    if (pi < 0 || pi >= 4 || fld < 0 || fld >= 9) return 0;
+    if (gRunningKuppaScript == 0) return 0;
+    const int o = pi * 0x18;
+    static unsigned char *const sp[6] = { data_0209f49c, data_0209f49e, data_0209f4a0, data_0209f4a2, data_0209f4a4, data_0209f4a6 };
+    static unsigned char *const bp[3] = { data_0209f4a8, data_0209f4a9, data_0209f4ac };
+    static int on = -1;
+    if (on < 0) { const char *e = std::getenv("SM64DS_CTRL_SCRIPT_KEEP"); on = (e && e[0] == '0') ? 0 : 1; }   /* 0 = the old copy-over, for the before row */
+    if (!on) return 0;
+    if (fld < 6) return *(short *)(sp[fld] + o) != g_pr_s[pi][fld];
+    return bp[fld - 6][o] != g_pr_b[pi][fld - 6];
+}
+
+static void port_frame_ctrl_prime(void)
+{
+    for (int pi = 0; pi < 4; ++pi) {
+        const char *r = (const char *)data_0209f498 + pi * 0x18;
+        const int o = pi * 0x18;
+        *(short *)(data_0209f49c + o) = *(const short *)(r + 0x04);
+        *(short *)(data_0209f49e + o) = *(const short *)(r + 0x06);
+        *(short *)(data_0209f4a0 + o) = *(const short *)(r + 0x08);
+        *(short *)(data_0209f4a2 + o) = *(const short *)(r + 0x0a);
+        *(short *)(data_0209f4a4 + o) = *(const short *)(r + 0x0c);
+        *(short *)(data_0209f4a6 + o) = *(const short *)(r + 0x0e);
+        g_pr_s[pi][0] = *(const short *)(r + 0x04); g_pr_s[pi][1] = *(const short *)(r + 0x06);
+        g_pr_s[pi][2] = *(const short *)(r + 0x08); g_pr_s[pi][3] = *(const short *)(r + 0x0a);
+        g_pr_s[pi][4] = *(const short *)(r + 0x0c); g_pr_s[pi][5] = *(const short *)(r + 0x0e);
+        g_pr_b[pi][0] = *(const unsigned char *)(r + 0x10); g_pr_b[pi][1] = *(const unsigned char *)(r + 0x11);
+        g_pr_b[pi][2] = *(const unsigned char *)(r + 0x14);
+        /* THE STYLUS POINT, Ctrl +0x10 and +0x11, and leaving it out was a
+           visible bug for every player. Minimap::Behavior places the touch
+           marker with `SetSubBg2Offset(0x100 - x, 0x80 - y)` reading exactly
+           these two bytes, so with them stuck at zero the marker was drawn at
+           the map's top-left corner wherever the player actually touched --
+           measured on 0.4.0: a click at the middle of the map moves 1260
+           pixels and every one of them is inside a quarter disc of radius 40
+           at DS (0,0), and the scroll registers read 0x100 / 0x80 for three
+           different touch points. The flag at +0x14 below was fanned out and
+           the two coordinates beside it were not, which is why the marker
+           appeared at all and never moved. */
+        *(unsigned char *)(data_0209f4a8 + o) = *(const unsigned char *)(r + 0x10);
+        *(unsigned char *)(data_0209f4a9 + o) = *(const unsigned char *)(r + 0x11);
+        *(unsigned char *)(data_0209f4ac + o) = *(const unsigned char *)(r + 0x14);
+    }
+}
+
+/* THE STAR-SELECT INTERLUDE HAS NO STAGE, and these two slots are the
+   ROM's own Stage bodies, so they must not run while it is live.
+   hal/level_change.cpp's port_level_scene_interlude carries the whole
+   derivation and the two measured faults. */
+extern "C" int port_level_interlude_live(void);   /* hal/level_change.cpp */
+
+extern "C" unsigned char data_0209fc50;   /* the seated player count (SetNumPlayers) */
+extern "C" unsigned char gGameMode;   /* game mode: 1 is VS */
+extern "C" void *gPlayers[];         /* per-seat daPly_c* */
+
+
+
+extern "C" int port_stage_rom_behavior(void *self)
+{
+    if (port_level_interlude_live())
+        return 1;
+    stage_frame_arm();
+    ++g_beh_calls;
+    port_frame_ctrl_prime();
+    const int r = ((dScStage_c *)self)->dScStage_c::Behavior();
+    port_frame_ctrl_publish();
+    return r;
+}
+
+/* ---- SLOT 9's ENTRY POINT (run link100, lane RENDER9) ---------------------
+ *
+ * Same shape as slot 6's above, and the counter is there for the same reason:
+ * port/stage_lifecycle_map.txt section 12a's double-dispatch hazard is the
+ * whole risk of this seat, and with pixels rather than script steps an exit
+ * code cannot see it. tests/walk_window.cpp reads this live to tell "the Stage
+ * rendered" from "it did not", which is the question its Stage-less frames
+ * raise. SM64DS_STAGE_FRAME_COUNT=1 prints both totals at process exit.
+ *
+ * ONE HOST BRIDGE RUNS AHEAD OF THE BODY, and it is the same kind of thing
+ * port_frame_ctrl_publish is for slot 6: a copy the cartridge does not need.
+ * The level's TextureTransformers are LOADED by Stage::InitResources on the
+ * ROM (its LoadTextureTransformers call), and _ZTV5Stage slot 0 is still the
+ * boot body rather than the ROM's InitResources -- so on this port nothing
+ * loads them except hal/stage_bridges.cpp's lazy block, which used to sit in
+ * front of the advance loop inside port_stage_advance_anims. Stage::Render's
+ * own first block is that advance loop and it loads nothing, so the load half
+ * is called here, at the same instant it used to run, and the advance half is
+ * the ROM's. port_stage_anims_load is that half alone; its banner in
+ * hal/stage_bridges.cpp carries the whole derivation, including what the
+ * slot-0 lane has to retire it with.
+ *
+ * NOT A CALL THE ROM MAKES, and this file will not blur that either. */
+extern "C" void port_stage_anims_load(void *self);   /* hal/stage_bridges.cpp */
+
+extern "C" unsigned port_stage_render_calls(void) { return g_ren_calls; }
+
+extern "C" int port_stage_rom_render(void *self)
+{
+    if (port_level_interlude_live())
+        return 1;
+    stage_frame_arm();
+    ++g_ren_calls;
+    port_stage_anims_load(self);
+    return ((dScStage_c *)self)->dScStage_c::Render();
+}

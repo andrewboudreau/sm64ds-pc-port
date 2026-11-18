@@ -1,0 +1,41 @@
+diff --git a/src/SPLAnim_Scale.c b/src/SPLAnim_Scale.c
+--- a/src/SPLAnim_Scale.c
++++ b/src/SPLAnim_Scale.c
+@@ -1,4 +1,20 @@
+ #include "private/spl_particle_views.h"
++#ifdef _MSC_VER
++/* host: mwccarm compiles `/` and `%` on ints to the ROM helper _s32_div_f
++   (0x01ffabe4), which answers x / 0 = x and x % 0 = 0 where x86 idiv faults
++   (c0000094). hal/cstd_div.c's ds_idiv / ds_imod are that helper's answers. */
++#ifdef __cplusplus
++extern "C" {
++#endif
++int ds_idiv(int, int);
++int ds_imod(int, int);
++#ifdef __cplusplus
++}
++#endif
++#define SPL_DIV(a, b) ds_idiv((a), (b))
++#else
++#define SPL_DIV(a, b) ((a) / (b))
++#endif
+ 
+ /* The particle definition's scale animation (SPL's SPLScaleAnim): the scale
+  * ramps start -> mid over life rates [0, in), holds mid until out, then ramps
+@@ -19,7 +35,7 @@
+     unsigned char out = anim->out;
+     if (lifeRate < in) {
+         short start = anim->start;
+-        ptcl->animScale = start + lifeRate * (anim->mid - start) / in;
++        ptcl->animScale = start + SPL_DIV(lifeRate * (anim->mid - start), in);
+         return;
+     }
+     if (lifeRate < out) {
+@@ -28,6 +44,6 @@
+     }
+     {
+         short end = anim->end;
+-        ptcl->animScale = end + (lifeRate - 0xff) * (end - anim->mid) / (0xff - out);
++        ptcl->animScale = end + SPL_DIV((lifeRate - 0xff) * (end - anim->mid), 0xff - out);
+     }
+ }

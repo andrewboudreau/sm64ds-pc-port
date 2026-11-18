@@ -1,0 +1,15 @@
+diff --git a/src/engine/wm/WM_System.c b/src/engine/wm/WM_System.c
+--- a/src/engine/wm/WM_System.c
++++ b/src/engine/wm/WM_System.c
+@@ -62,7 +62,11 @@
+ static WMArm9Buf *wm9buf;
+ static OSMessageQueue bufMsgQ;
+ static OSMessage bufMsg[WM_BUF_MSG_NUM];
++#ifdef _MSC_VER   /* MSVC spells the 32-byte alignment __declspec(align) */
++static __declspec(align(32)) u32 fifoBuf[WM_BUF_MSG_NUM][WM_FIFO_BUF_SIZE / sizeof(u32)];
++#else
+ static u32 fifoBuf[WM_BUF_MSG_NUM][WM_FIFO_BUF_SIZE / sizeof(u32)] __attribute__((aligned(32)));
++#endif
+ 
+ static void WmReceiveFifo(PXIFifoTag tag, u32 fifo_buf_adr, BOOL err);
+ static void WmClearFifoRecvFlag(void);

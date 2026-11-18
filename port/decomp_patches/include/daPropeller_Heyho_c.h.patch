@@ -1,0 +1,28 @@
+diff --git a/include/daPropeller_Heyho_c.h b/include/daPropeller_Heyho_c.h
+--- a/include/daPropeller_Heyho_c.h
++++ b/include/daPropeller_Heyho_c.h
+@@ -112,8 +112,24 @@
+         in src/game/actors/d_a_propeller_heyho.cpp] */
+     s16                          mTargetAngY;           /* 0x3e6 */
+ 
++#ifdef _MSC_VER
++    /* Host only. The anonymous union holding a Vector3 (which has a user
++       constructor) deletes MSVC's implicit default constructor, so the
++       factory's `new daPropeller_Heyho_c()` cannot compile. fBase_c::operator new
++       clears the block before construction, so an empty constructor builds
++       exactly what the implicit one does. */
++    daPropeller_Heyho_c() {}
++#endif
++
+     /* --- vtable --- */
++    #ifdef _MSC_VER
++    /* host two-arm destructor spelling; ruling in include/ModelBase.h */
++    virtual void Destructor1();   /* D1 */
++    virtual void Destructor0();   /* D0 */
++    ~daPropeller_Heyho_c() {}   /* no slot */
++    #else
+     virtual ~daPropeller_Heyho_c() {}
++    #endif
+ 
+     virtual s32   OnYoshiTryEat();         /* slot 18 */
+     virtual void OnTurnIntoEgg(daPly_c &player); /* slot 19 */
