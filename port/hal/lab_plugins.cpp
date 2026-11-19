@@ -27,7 +27,14 @@
    EVERY CALL INTO A PLUGIN IS GUARDED (structured exception handling): a
    plugin that faults is switched off for the rest of the run with one log
    line, and the game carries on. A plugin that blocks or corrupts memory
-   cannot be guarded against. */
+   cannot be guarded against.
+
+   THIS FILE IS ITSELF TRACED. The tracing build turns /Gh on for the whole
+   directory (add_compile_options) and MSVC has no per-file way back, so the
+   loader's own few calls a frame (frame_hook, the guarded callers, the api_*
+   functions a plugin calls) land in the trace like any game function. They
+   never carry an actor as `this` or first argument, so the lab's per-actor
+   views do not show them; its whole-game hot counts do. */
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <malloc.h>
@@ -150,14 +157,20 @@ bool json_value(const char *text, const char *key, std::string *out)
         out->clear();
         if (*q == '"') {
             for (++q; *q && *q != '"'; ++q) {
-                if (*q == '\\' && q[1]) ++q;
-                out->push_back(*q);
+                char c = *q;
+                if (c == '\\' && q[1]) {
+                    c = *++q;
+                    if (c == 'n') c = '\n';
+                    else if (c == 't') c = '\t';
+                    else if (c == 'r') c = '\r';
+                }
+                out->push_back(c);
             }
             return true;
         }
         while (*q && *q != ',' && *q != '}' && *q != ' ' && *q != '\r' && *q != '\n' && *q != '\t')
             out->push_back(*q++);
-        return !out->empty();
+        return !out->empty() && *out != "null";   /* null: as good as absent */
     }
     return false;
 }
@@ -184,20 +197,13 @@ std::unordered_map<std::string, unsigned> g_syms;
 unsigned g_sym_base = 0x400000;
 bool g_syms_tried;
 
-void load_syms(void)
+/* one table into g_syms: walk_window.symtab (tab-separated, with a build stamp
+   that has to match the running exe) or the linker's map; false, with g_syms
+   left empty, when the file is missing or was made for another build */
+bool read_syms(const std::string &path, bool from_tab)
 {
-    if (g_syms_tried) return;
-    g_syms_tried = true;
-    /* walk_window.symtab (port/tools/mk_symtab.py, written beside the exe by the
-       tracing build) carries the exe's stamp, so a table from another build is
-       refused; the map is the fallback */
-    bool from_tab = true;
-    FILE *f = fopen((g_exe_dir + "walk_window.symtab").c_str(), "rb");
-    if (!f) { f = fopen((g_exe_dir + "walk_window.map").c_str(), "rb"); from_tab = false; }
-    if (!f) {
-        fprintf(stderr, "[plugins] no walk_window.symtab or .map beside the exe: symbol() answers NULL\n");
-        return;
-    }
+    FILE *f = fopen(path.c_str(), "rb");
+    if (!f) return false;
     const unsigned char *im = (const unsigned char *)GetModuleHandleA(0);
     const IMAGE_NT_HEADERS32 *nt = (const IMAGE_NT_HEADERS32 *)(im + ((const IMAGE_DOS_HEADER *)im)->e_lfanew);
     const unsigned run_stamp = nt->FileHeader.TimeDateStamp, run_size = nt->OptionalHeader.SizeOfImage;
@@ -237,13 +243,31 @@ void load_syms(void)
     }
     fclose(f);
     if (from_tab && (!have_stamp || !stamp_ok)) {
-        fprintf(stderr, "[plugins] walk_window.symtab %s: symbol() answers NULL\n",
+        fprintf(stderr, "[plugins] walk_window.symtab %s; trying walk_window.map\n",
                 have_stamp ? "was made for another build (timestamp or image size differ)" : "has no build stamp");
         g_syms.clear();
-        return;
+        return false;
     }
-    fprintf(stderr, "[plugins] symbol table: %u names from %s\n", (unsigned)g_syms.size(),
-            from_tab ? "walk_window.symtab" : "walk_window.map");
+    return true;
+}
+
+void load_syms(void)
+{
+    if (g_syms_tried) return;
+    g_syms_tried = true;
+    /* walk_window.symtab (port/tools/mk_symtab.py, written beside the exe by the
+       tracing build) first; the map the same link wrote is the fallback, when the
+       table is missing or stale (mk_symtab failed after a relink) */
+    const char *from = "walk_window.symtab";
+    if (!read_syms(g_exe_dir + from, true)) {
+        g_sym_base = 0x400000;
+        from = "walk_window.map";
+        if (!read_syms(g_exe_dir + from, false)) {
+            fprintf(stderr, "[plugins] no usable walk_window.symtab or .map beside the exe: symbol() answers NULL\n");
+            return;
+        }
+    }
+    fprintf(stderr, "[plugins] symbol table: %u names from %s\n", (unsigned)g_syms.size(), from);
 }
 
 /* ---- the API the plugin sees ---- */
@@ -371,7 +395,11 @@ std::string find_dll(const std::string &folder, std::string *why)
 HMODULE load_plugin_dll(const std::string &dll)
 {
     HMODULE h = LoadLibraryExA(dll.c_str(), 0, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
-    if (!h) h = LoadLibraryExA(dll.c_str(), 0, LOAD_WITH_ALTERED_SEARCH_PATH);
+    /* only where the LOAD_LIBRARY_SEARCH_* flags are not understood (a Windows
+       without KB2533623); any other failure stays a failure, so a missing import
+       is never looked for in the working folder or on PATH */
+    if (!h && GetLastError() == ERROR_INVALID_PARAMETER)
+        h = LoadLibraryExA(dll.c_str(), 0, LOAD_WITH_ALTERED_SEARCH_PATH);
     return h;
 }
 

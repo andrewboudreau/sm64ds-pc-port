@@ -15,8 +15,12 @@ rem A = 0x1000). Set SM64DS_HOST_PAD yourself to override it.
 if not defined SM64DS_HOST_PAD set "SM64DS_HOST_PAD=1000@300,1000@360,1000@420"
 rem The game runs from the repo folder, the way port\docs\BUILDING.md runs it.
 cd /d "%~dp0.."
+if not exist "build\port-trace\walk_window.exe" (
+  echo The tracing build is missing: run port\build-port-trace.cmd, then port\mods_api\naming_lab\build.cmd.
+  exit /b 1
+)
 if not exist "build\port-trace\mods\naming-lab\plugin\naming_lab.dll" (
-  echo The lab is not built: run port\build-port-trace.cmd, then port\mods_api\naming_lab\build.cmd.
+  echo The lab plugin is not installed: run port\mods_api\naming_lab\build.cmd.
   exit /b 1
 )
 start "" "build\port-trace\walk_window.exe"

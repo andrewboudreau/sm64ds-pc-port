@@ -562,10 +562,34 @@ class GitInclude:
     def list(self):
         return sorted(self.names)
 
+    def _prefetch(self):
+        # The port's decomp\ submodule is usually a partial clone (blob:none), and
+        # cat-file fetches each missing blob on its own round trip: hundreds of
+        # them for one header lookup, which timed lab_focus out. Ask for every
+        # missing header blob in one fetch first. Best effort: a full clone has
+        # nothing missing, and offline the lookups below simply come back empty.
+        r = self.sp.run(['git', '-C', REPO, 'ls-tree', '-r', self.rev, 'include/'],
+                        capture_output=True, text=True)
+        oids = [ln.split()[2] for ln in r.stdout.splitlines() if len(ln.split()) >= 3 and ln.split()[1] == 'blob']
+        if not oids:
+            return
+        env = dict(os.environ, GIT_NO_LAZY_FETCH='1')
+        r = self.sp.run(['git', '-C', REPO, 'cat-file', '--batch-check'], capture_output=True, text=True,
+                        input=''.join(o + '\n' for o in oids), env=env)
+        missing = [ln.split()[0] for ln in r.stdout.splitlines() if ln.endswith(' missing')]
+        if not missing:
+            return
+        print(f'lab: fetching {len(missing)} header blobs of {self.rev} (partial clone)', flush=True)
+        for k in range(0, len(missing), 2000):
+            self.sp.run(['git', '-C', REPO, '-c', 'fetch.negotiationAlgorithm=noop', 'fetch', '-q', '--no-tags',
+                         '--no-write-fetch-head', '--recurse-submodules=no', '--filter=blob:none', 'origin',
+                         *missing[k:k + 2000]], capture_output=True)
+
     def _load_all(self):
         # one `git cat-file --batch` for every header: a `git show` per file took
         # over 30 s the first time a class had to be looked up in the index
         names = sorted(self.names)
+        self._prefetch()
         r = self.sp.run(['git', '-C', REPO, 'cat-file', '--batch'], capture_output=True,
                         input=''.join(f'{self.rev}:include/{n}\n' for n in names).encode())
         out, pos = r.stdout, 0
@@ -662,7 +686,10 @@ class Headers:
         body = text[start:i - 1]
         # the blocks enclosing a line: an anonymous `union {` / `struct {` is part of
         # the class's own layout (dActor_c's mPos overlays mPosX/Y/Z that way), so
-        # its fields count; a method body or a named nested type does not
+        # its fields count; a method body or a named nested type does not. Each
+        # anonymous block keeps the field list as it was at its `{`: one that
+        # closes with a declarator (`} alpha;`) is a named member after all, so
+        # its fields are dropped again rather than flattened into the class
         blocks = []
         doc = []
         for line in body.split('\n'):
@@ -680,11 +707,13 @@ class Headers:
                 elif s:
                     doc = []
             anon = bool(ANON_BLOCK_RX.match(line))
-            for ch in line:
+            for k, ch in enumerate(line):
                 if ch == '{':
-                    blocks.append(anon)
+                    blocks.append((list(fields),) if anon else None)
                 elif ch == '}' and blocks:
-                    blocks.pop()
+                    b = blocks.pop()
+                    if b and re.match(r'\s*[A-Za-z_]', line[k + 1:]):
+                        fields = b[0]
         fields.sort(key=lambda f: f['offset'])
         if not any(f['offset'] == 0 for f in fields):
             fields.insert(0, {'offset': 0, 'type': 'void **', 'name': '__vtable', 'array': '',

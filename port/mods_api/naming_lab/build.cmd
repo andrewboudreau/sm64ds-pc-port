@@ -9,13 +9,13 @@ rem MSVC x86, cmake and NINJA_EXE, the same as the port's own build scripts.
 call "%~dp0..\..\tools\vs_env.cmd"
 if errorlevel 1 exit /b 1
 set "ROOT=%~dp0..\..\.."
-cmake -S "%~dp0." -B "%ROOT%\build\naming_lab" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM="%NINJA_EXE%" >nul || exit /b 1
+cmake -S "%~dp0." -B "%ROOT%\build\naming_lab" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM="%NINJA_EXE%" || exit /b 1
 "%NINJA_EXE%" -C "%ROOT%\build\naming_lab" || exit /b 1
 if not exist "%ROOT%\build\port-trace\walk_window.exe" (
   echo build\port-trace\walk_window.exe is missing: run port\build-port-trace.cmd first.
   exit /b 1
 )
 if not exist "%ROOT%\build\port-trace\mods\naming-lab\plugin" mkdir "%ROOT%\build\port-trace\mods\naming-lab\plugin"
-copy /y "%~dp0mod.json" "%ROOT%\build\port-trace\mods\naming-lab\" >nul || exit /b 1
-copy /y "%ROOT%\build\naming_lab\naming_lab.dll" "%ROOT%\build\port-trace\mods\naming-lab\plugin\" >nul || exit /b 1
+copy /y "%~dp0mod.json" "%ROOT%\build\port-trace\mods\naming-lab\" || exit /b 1
+copy /y "%ROOT%\build\naming_lab\naming_lab.dll" "%ROOT%\build\port-trace\mods\naming-lab\plugin\" || exit /b 1
 echo installed build\port-trace\mods\naming-lab

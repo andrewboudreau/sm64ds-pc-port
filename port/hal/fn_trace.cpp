@@ -99,8 +99,11 @@ __declspec(naked) void __cdecl _penter(void)
         push    eax
         push    ecx
         push    edx
-        cmp     dword ptr [ntr_fn_trace_on], 2
-        je      SHORT fnt_lab
+        mov     eax, dword ptr [ntr_fn_trace_on]   // read the mode ONCE: the lab
+        cmp     eax, 2                             // plugin switches it between
+        je      fnt_lab                            // 0 and 2 from the game thread
+        test    eax, eax
+        je      SHORT fnt_full
         mov     ecx, 3
         lock xadd dword ptr [ntr_fn_trace_head], ecx   // claim 3 words; ecx = old head
         lea     eax, [ecx+3]
@@ -130,26 +133,34 @@ fnt_lab:
         // argument (`self` for the extern "C" functions that take the object
         // first). The plugin owns the buffer and drains it every frame; this
         // file never writes it to disk. ntr_fn_trace_frame leaves mode 2 alone
-        // unless SM64DS_FN_TRACE is also set, which the lab never does. The
-        // claim is the same locked xadd as above, four words at a time.
-        mov     edx, 4
-        lock xadd dword ptr [ntr_fn_trace_head], edx   // claim 4 words; edx = old head
-        lea     eax, [edx+4]
-        cmp     eax, dword ptr [ntr_fn_trace_cap]
-        ja      SHORT fnt_lab_over
-        mov     eax, dword ptr [ntr_fn_trace_buf]
-        lea     eax, [eax+edx*4]
-        mov     dword ptr [eax+8], ecx      // ecx is still the caller's
+        // unless SM64DS_FN_TRACE is also set, which the lab never does.
+        //
+        // THE CLAIM IS A COMPARE-AND-SWAP, NOT AN XADD. The plugin zeroes head
+        // from the game thread after each drain; an xadd that overshot cap and
+        // handed its claim back with a `lock sub` could land that sub after the
+        // zero, leaving head at 0xFFFFFFFC and the next record 16 bytes before
+        // the buffer. Here a claim is only ever made when it fits, so head never
+        // passes cap and there is nothing to hand back; a full buffer drops the
+        // record. If head moved under us (another thread, or the drain's zero),
+        // cmpxchg reloads eax and we try again.
+        mov     eax, dword ptr [ntr_fn_trace_head]
+fnt_lab_retry:
+        lea     edx, [eax+4]
+        cmp     edx, dword ptr [ntr_fn_trace_cap]
+        ja      fnt_full                           // full: record nothing
+        lock cmpxchg dword ptr [ntr_fn_trace_head], edx   // head == eax ? head = edx : eax = head
+        jne     fnt_lab_retry
+        mov     edx, dword ptr [ntr_fn_trace_buf]
+        lea     edx, [edx+eax*4]
         mov     ecx, dword ptr [esp+12]     // return into the CALLEE: fn + 5
-        mov     dword ptr [eax], ecx
+        mov     dword ptr [edx], ecx
         mov     ecx, dword ptr [esp+16]     // return into the CALLER: the call site
-        mov     dword ptr [eax+4], ecx
+        mov     dword ptr [edx+4], ecx
+        mov     ecx, dword ptr [esp+4]      // the caller's ecx, as pushed above
+        mov     dword ptr [edx+8], ecx
         mov     ecx, dword ptr [esp+20]     // the first stack argument
-        mov     dword ptr [eax+12], ecx
-        jmp     SHORT fnt_full
-fnt_lab_over:
-        lock sub dword ptr [ntr_fn_trace_head], 4      // give the claim back
-        jmp     SHORT fnt_full
+        mov     dword ptr [edx+12], ecx
+        jmp     fnt_full
     }
 }
 
