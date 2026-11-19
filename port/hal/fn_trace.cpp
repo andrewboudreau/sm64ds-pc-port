@@ -99,6 +99,8 @@ __declspec(naked) void __cdecl _penter(void)
         push    eax
         push    ecx
         push    edx
+        cmp     dword ptr [ntr_fn_trace_on], 2
+        je      SHORT fnt_lab
         mov     ecx, 3
         lock xadd dword ptr [ntr_fn_trace_head], ecx   // claim 3 words; ecx = old head
         lea     eax, [ecx+3]
@@ -120,6 +122,34 @@ fnt_full:
         pop     eax
 fnt_off:
         ret
+fnt_lab:
+        // LAB MODE (ntr_fn_trace_on == 2, set only by the naming-lab plugin,
+        // port/mods_api/naming_lab): four words a record -- callee+5, the call
+        // site, ecx (`this` for a thiscall method: the callee's prologue has
+        // not run, so ecx is still what the caller loaded) and the first stack
+        // argument (`self` for the extern "C" functions that take the object
+        // first). The plugin owns the buffer and drains it every frame; this
+        // file never writes it to disk. ntr_fn_trace_frame leaves mode 2 alone
+        // unless SM64DS_FN_TRACE is also set, which the lab never does. The
+        // claim is the same locked xadd as above, four words at a time.
+        mov     edx, 4
+        lock xadd dword ptr [ntr_fn_trace_head], edx   // claim 4 words; edx = old head
+        lea     eax, [edx+4]
+        cmp     eax, dword ptr [ntr_fn_trace_cap]
+        ja      SHORT fnt_lab_over
+        mov     eax, dword ptr [ntr_fn_trace_buf]
+        lea     eax, [eax+edx*4]
+        mov     dword ptr [eax+8], ecx      // ecx is still the caller's
+        mov     ecx, dword ptr [esp+12]     // return into the CALLEE: fn + 5
+        mov     dword ptr [eax], ecx
+        mov     ecx, dword ptr [esp+16]     // return into the CALLER: the call site
+        mov     dword ptr [eax+4], ecx
+        mov     ecx, dword ptr [esp+20]     // the first stack argument
+        mov     dword ptr [eax+12], ecx
+        jmp     SHORT fnt_full
+fnt_lab_over:
+        lock sub dword ptr [ntr_fn_trace_head], 4      // give the claim back
+        jmp     SHORT fnt_full
     }
 }
 
